@@ -1,0 +1,7 @@
+{
+	"files.exclude": {
+		"**/.build": true,
+		"DerivedData": true,
+		".swiftpm": true,
+	}
+}

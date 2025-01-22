@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.aldunelabs.cakeagent";
+option java_outer_classname = "cakeagent";
+option objc_class_prefix = "cakeagent";
+option go_package = "linux/pkg/cakeagent";
+
+package cakeagent;
+
+import "google/protobuf/empty.proto";
+
+service Agent {
+	rpc Info (google.protobuf.Empty) returns (InfoReply);
+	rpc Execute (ExecuteRequest) returns (ExecuteReply);
+	rpc Shell(stream ShellMessage) returns (stream ShellReponse);
+}
+
+message InfoReply {
+	message MemoryInfo {
+		uint64 total = 1;
+		uint64 free = 2;
+		uint64 used = 3;
+	}
+
+	string version = 1;
+	int64 uptime = 2;
+	MemoryInfo memory = 3;
+	int32 cpuCount = 4;
+	repeated string ipaddresses = 5;
+	string osname = 6;
+	string hostname = 7;
+	string release = 8;
+}
+
+message ExecuteRequest {
+	optional bytes input = 1;
+	string command = 2;
+	repeated string args = 3;
+}
+
+message ExecuteReply {
+	optional bytes input = 1;
+	optional bytes output = 2;
+	optional bytes error = 3;
+	int32 exitCode = 4;
+}
+
+message ShellMessage {
+	bytes datas = 1;
+}
+
+enum Format {
+	stdout = 0;
+	stderr = 1;
+	end = 2;
+}
+
+message ShellReponse {
+	Format format = 1;
+	optional bytes datas = 2;
+}

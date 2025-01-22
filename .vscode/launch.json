@@ -1,0 +1,131 @@
+{
+	"configurations": [
+		{
+			"name": "go cakeagent",
+			"type": "go",
+			"request": "launch",
+			"mode": "auto",
+			"program": "${workspaceFolder}/linux",
+			"args": [
+				"--listen=tcp://127.0.0.1:5000"
+			]
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [
+				"run",
+				"--listen=tcp://127.0.0.1:5000"
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "cakeagent run",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
+			"preLaunchTask": "swift: Build Debug cakeagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [
+				"--help"
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "testagent help",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [
+				"--insecure",
+				"--connect=tcp://127.0.0.1:500",
+				"infos"
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "testagent infos",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [
+				"--insecure",
+				"--connect=tcp://127.0.0.1:500",
+				"exec",
+				"ls"
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "testagent exec",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [
+				"--insecure",
+				"--connect=tcp://127.0.0.1:500",
+				"shell"
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "testagent shell",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "Release testagent",
+			"program": "${workspaceFolder:cakeagent}/.build/release/testagent",
+			"preLaunchTask": "swift: Build Release testagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "Debug cakeagent",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
+			"preLaunchTask": "swift: Build Debug cakeagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "Debug cakeagent",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
+			"preLaunchTask": "swift: Build Debug cakeagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "Release cakeagent",
+			"program": "${workspaceFolder:cakeagent}/.build/release/cakeagent",
+			"preLaunchTask": "swift: Build Release cakeagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "Debug testagent",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "Release testagent",
+			"program": "${workspaceFolder:cakeagent}/.build/release/testagent",
+			"preLaunchTask": "swift: Build Release testagent"
+		}
+	]
+}

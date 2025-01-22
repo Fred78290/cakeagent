@@ -1,0 +1,78 @@
+name: Release
+on:
+  push:
+    branches:
+    - 'master'
+    tags:
+    - 'v*'
+  pull_request:
+    branches:
+    - 'master'
+
+env:
+  BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+  P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+  KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+  APPLE_ID: ${{ secrets.APPLE_ID }}
+  TEAM_ID: ${{ secrets.TEAM_ID }}
+  APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build:
+    runs-on: macos-13
+    timeout-minutes: 10
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          submodules: recursive
+ 
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2.1.0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23
+
+      - name: Version
+        run: |
+          VERSION_TAG="${GITHUB_REF##*/}"
+          TMPFILE=$(mktemp)
+          envsubst < darwin/Sources/CakeAgent/CI/CI.swift > $TMPFILE
+          cp $TMPFILE darwin/Sources/CakeAgent/CI/CI.swift
+          cp $TMPFILE darwin/Sources/CakeAgent/CI/CI.swift
+
+      - name: Build Go binary
+        run: |
+          mkdir -p _artifacts
+          pushd linux
+          GOARCH=amd64 GOOS=linux go build -o ../_artifacts/cakeagent-linux-amd64
+          GOARCH=arm64 GOOS=linux go build -o ../_artifacts/cakeagent-linux-arm64
+          popd
+
+      - name: Build Swift package
+        run: |
+          swift build -c release --arch x86_64 --product CakeAgent
+          swift build -c release --arch arm64 --product CakeAgent
+
+      - name: Run tests
+        run: swift test
+
+      - name: Create MacOS package
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          export VERSION_TAG="${GITHUB_REF##*/}"
+          ./ci/setup-keychain.sh $RUNNER_TEMP/app-signing.keychain-db
+          ./ci/create-pkg.sh $RUNNER_TEMP/app-signing.keychain-db
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+
+      - name: "Create release"
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION_TAG="${GITHUB_REF##*/}"
+          gh release create -F /tmp/release-note.txt --draft --title "${VERSION_TAG}" "${VERSION_TAG}" \
+            ./.ci/Caker-${VERSION_TAG}.pkg \
+            ./_artifacts/cakeagent-linux-amd64 \
+            ./_artifacts/cakeagent-linux-arm64
