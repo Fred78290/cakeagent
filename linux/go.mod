@@ -46,3 +46,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
 )
+
+replace github.com/mdlayher/vsock v1.2.1 => github.com/Fred78290/vsock v0.0.1
