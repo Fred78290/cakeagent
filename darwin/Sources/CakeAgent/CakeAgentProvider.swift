@@ -288,7 +288,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		}
 	}
 
-	func shell(requestStream: GRPC.GRPCAsyncRequestStream<CakeAgentLib.Cakeagent_ShellMessage>, responseStream: GRPC.GRPCAsyncResponseStreamWriter<CakeAgentLib.Cakeagent_ShellReponse>, context: GRPC.GRPCAsyncServerCallContext) async throws {
+	func shell(requestStream: GRPC.GRPCAsyncRequestStream<CakeAgentLib.Cakeagent_ShellMessage>, responseStream: GRPC.GRPCAsyncResponseStreamWriter<CakeAgentLib.Cakeagent_ShellResponse>, context: GRPC.GRPCAsyncServerCallContext) async throws {
 		let process = Process()
 		let inputPipe = TTY()
 		let outputPipe = Pipe()
@@ -305,7 +305,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 
 			if data.isEmpty == false {
 				Task {
-					_ = try? await responseStream.send(Cakeagent_ShellReponse.with { message in
+					_ = try? await responseStream.send(Cakeagent_ShellResponse.with { message in
 						message.format = .stderr
 						message.datas = data
 					})
@@ -354,7 +354,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 					group.addTask {
 						do {
 							for try await reply in inbound {
-								try await responseStream.send(Cakeagent_ShellReponse.with { $0.datas = Data(buffer: reply) })
+								try await responseStream.send(Cakeagent_ShellResponse.with { $0.datas = Data(buffer: reply) })
 							}
 						} catch {
 							if error is CancellationError == false {
@@ -369,7 +369,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 				}
 			}
 
-			try await responseStream.send(Cakeagent_ShellReponse.with { $0.format = .end })
+			try await responseStream.send(Cakeagent_ShellResponse.with { $0.format = .end })
 
 			self.logger.debug("Exit shell")
 		} catch {

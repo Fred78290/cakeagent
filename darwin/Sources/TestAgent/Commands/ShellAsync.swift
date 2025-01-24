@@ -34,7 +34,7 @@ final class ShellAsync: GrpcParsableCommand {
 	}
 
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {		
-		var shellStream: BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellReponse>?
+		var shellStream: BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>?
 		var pipeChannel: NIOAsyncChannel<ByteBuffer, ByteBuffer>?
 
 		shellStream = client.shell(callOptions: .init(), handler: { response in

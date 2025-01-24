@@ -166,7 +166,7 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 						}
 						doCancel()
 					} else if available > 0 {
-						if err = stream.Send(&cakeagent.ShellReponse{Format: format, Datas: buffer[:available]}); err != nil {
+						if err = stream.Send(&cakeagent.ShellResponse{Format: format, Datas: buffer[:available]}); err != nil {
 							glog.Errorf("Failed to send output: %v", err)
 							doCancel()
 						}
@@ -234,7 +234,7 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 
 			doCancel()
 
-			stream.Send(&cakeagent.ShellReponse{Format: cakeagent.Format_end})
+			stream.Send(&cakeagent.ShellResponse{Format: cakeagent.Format_end})
 		} else {
 			glog.Errorf("Failed to start command: %v", err)
 		}

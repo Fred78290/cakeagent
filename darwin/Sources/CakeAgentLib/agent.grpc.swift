@@ -28,8 +28,8 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
 
   func shell(
     callOptions: CallOptions?,
-    handler: @escaping (Cakeagent_ShellReponse) -> Void
-  ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellReponse>
+    handler: @escaping (Cakeagent_ShellResponse) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>
 }
 
 extension Cakeagent_AgentClientProtocol {
@@ -84,8 +84,8 @@ extension Cakeagent_AgentClientProtocol {
   /// - Returns: A `ClientStreamingCall` with futures for the metadata and status.
   public func shell(
     callOptions: CallOptions? = nil,
-    handler: @escaping (Cakeagent_ShellReponse) -> Void
-  ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellReponse> {
+    handler: @escaping (Cakeagent_ShellResponse) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse> {
     return self.makeBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       callOptions: callOptions ?? self.defaultCallOptions,
@@ -169,7 +169,7 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
 
   func makeShellCall(
     callOptions: CallOptions?
-  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellReponse>
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -208,7 +208,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
 
   public func makeShellCall(
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellReponse> {
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse> {
     return self.makeAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       callOptions: callOptions ?? self.defaultCallOptions,
@@ -246,7 +246,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func shell<RequestStream>(
     _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Cakeagent_ShellReponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_ShellMessage {
+  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_ShellMessage {
     return self.performAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       requests: requests,
@@ -258,7 +258,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func shell<RequestStream>(
     _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Cakeagent_ShellReponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_ShellMessage {
+  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_ShellMessage {
     return self.performAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       requests: requests,
@@ -294,7 +294,7 @@ public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
   func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply>]
 
   /// - Returns: Interceptors to use when invoking 'shell'.
-  func makeShellInterceptors() -> [ClientInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellReponse>]
+  func makeShellInterceptors() -> [ClientInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellResponse>]
 }
 
 public enum Cakeagent_AgentClientMetadata {
@@ -337,7 +337,7 @@ public protocol Cakeagent_AgentProvider: CallHandlerProvider {
 
   func execute(request: Cakeagent_ExecuteRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ExecuteReply>
 
-  func shell(context: StreamingResponseCallContext<Cakeagent_ShellReponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ShellMessage>) -> Void>
+  func shell(context: StreamingResponseCallContext<Cakeagent_ShellResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ShellMessage>) -> Void>
 }
 
 extension Cakeagent_AgentProvider {
@@ -374,7 +374,7 @@ extension Cakeagent_AgentProvider {
       return BidirectionalStreamingServerHandler(
         context: context,
         requestDeserializer: ProtobufDeserializer<Cakeagent_ShellMessage>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ShellReponse>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ShellResponse>(),
         interceptors: self.interceptors?.makeShellInterceptors() ?? [],
         observerFactory: self.shell(context:)
       )
@@ -403,7 +403,7 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
 
   func shell(
     requestStream: GRPCAsyncRequestStream<Cakeagent_ShellMessage>,
-    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellReponse>,
+    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>,
     context: GRPCAsyncServerCallContext
   ) async throws
 }
@@ -449,7 +449,7 @@ extension Cakeagent_AgentAsyncProvider {
       return GRPCAsyncServerHandler(
         context: context,
         requestDeserializer: ProtobufDeserializer<Cakeagent_ShellMessage>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ShellReponse>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ShellResponse>(),
         interceptors: self.interceptors?.makeShellInterceptors() ?? [],
         wrapping: { try await self.shell(requestStream: $0, responseStream: $1, context: $2) }
       )
@@ -472,7 +472,7 @@ public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when handling 'shell'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeShellInterceptors() -> [ServerInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellReponse>]
+  func makeShellInterceptors() -> [ServerInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellResponse>]
 }
 
 public enum Cakeagent_AgentServerMetadata {

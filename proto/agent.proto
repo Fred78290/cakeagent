@@ -13,7 +13,7 @@ import "google/protobuf/empty.proto";
 service Agent {
 	rpc Info (google.protobuf.Empty) returns (InfoReply);
 	rpc Execute (ExecuteRequest) returns (ExecuteReply);
-	rpc Shell(stream ShellMessage) returns (stream ShellReponse);
+	rpc Shell(stream ShellMessage) returns (stream ShellResponse);
 }
 
 message InfoReply {
@@ -56,7 +56,7 @@ enum Format {
 	end = 2;
 }
 
-message ShellReponse {
+message ShellResponse {
 	Format format = 1;
 	optional bytes datas = 2;
 }

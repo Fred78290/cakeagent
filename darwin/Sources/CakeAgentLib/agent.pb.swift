@@ -190,7 +190,7 @@ public struct Cakeagent_ShellMessage: @unchecked Sendable {
   public init() {}
 }
 
-public struct Cakeagent_ShellReponse: @unchecked Sendable {
+public struct Cakeagent_ShellResponse: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -481,8 +481,8 @@ extension Cakeagent_ShellMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension Cakeagent_ShellReponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ShellReponse"
+extension Cakeagent_ShellResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ShellResponse"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "format"),
     2: .same(proto: "datas"),
@@ -515,7 +515,7 @@ extension Cakeagent_ShellReponse: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_ShellReponse, rhs: Cakeagent_ShellReponse) -> Bool {
+  public static func ==(lhs: Cakeagent_ShellResponse, rhs: Cakeagent_ShellResponse) -> Bool {
     if lhs.format != rhs.format {return false}
     if lhs._datas != rhs._datas {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
