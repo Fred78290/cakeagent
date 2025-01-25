@@ -8,16 +8,13 @@ import SwiftProtobuf
 final class Infos: GrpcParsableCommand {
 	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "infos", abstract: "Test infos")
 
-	@OptionGroup var options: Root.Options
+	@OptionGroup var options: CakeAgentClientOptions
 
 	func validate() throws {
-		try self.options.validate()
+		try self.options.validate(try Root.getDefaultServerAddress())
 	}
 
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
-		let response = client.info(.init(), callOptions: callOptions)
-
-		let json = try await response.response.get().jsonString()
-		print(json)
+		print(try await CakeAgentHelper(on: on, client: client).info(callOptions: callOptions))
 	}
 }
