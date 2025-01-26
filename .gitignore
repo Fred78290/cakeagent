@@ -10,3 +10,7 @@ DerivedData/
 .env
 
 *.p12
+
+_artifacts/
+
+*.pkg

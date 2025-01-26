@@ -1,10 +1,11 @@
-name: Release
+name: Build CakeAgent
 on:
   push:
     branches:
     - 'master'
     tags:
-    - 'v*'
+      - 'v*'
+      - 'ci-build'
   pull_request:
     branches:
     - 'master'
@@ -21,7 +22,7 @@ env:
 jobs:
   build:
     runs-on: macos-13
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: checkout
         uses: actions/checkout@v4.2.2
@@ -38,7 +39,7 @@ jobs:
 
       - name: Version
         run: |
-          VERSION_TAG="${GITHUB_REF##*/}"
+          VERSION="${GITHUB_REF##*/}"
           TMPFILE=$(mktemp)
           envsubst < darwin/Sources/CakeAgent/CI/CI.swift > $TMPFILE
           cp $TMPFILE darwin/Sources/CakeAgent/CI/CI.swift
@@ -54,8 +55,8 @@ jobs:
 
       - name: Build Swift package
         run: |
-          swift build -c release --arch x86_64 --product CakeAgent
-          swift build -c release --arch arm64 --product CakeAgent
+          swift build -c release --arch x86_64 --product cakeagent
+          swift build -c release --arch arm64 --product cakeagent
 
       - name: Run tests
         run: swift test
@@ -63,16 +64,34 @@ jobs:
       - name: Create MacOS package
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          export VERSION_TAG="${GITHUB_REF##*/}"
-          ./ci/setup-keychain.sh $RUNNER_TEMP/app-signing.keychain-db
-          ./ci/create-pkg.sh $RUNNER_TEMP/app-signing.keychain-db
-          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+          export VERSION="${GITHUB_REF##*/}"
+          ./ci/setup-keychain.sh
+          ./ci/create-pkg.sh
+          security delete-keychain build.keychain
 
       - name: "Create release"
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          VERSION_TAG="${GITHUB_REF##*/}"
-          gh release create -F /tmp/release-note.txt --draft --title "${VERSION_TAG}" "${VERSION_TAG}" \
-            ./.ci/Caker-${VERSION_TAG}.pkg \
+          VERSION="${GITHUB_REF_NAME}"
+          gh release create --title "${VERSION}" "${VERSION}" \
+            ./.ci/Caker-${VERSION}.pkg \
+            ./_artifacts/cakeagent-linux-amd64 \
+            ./_artifacts/cakeagent-linux-arm64
+
+
+      - name: Create Pre MacOS package
+        if: github.event_name == 'push' && github.ref == 'refs/tags/ci-build'
+        run: |
+          export VERSION="SNAPSHOT-$(git rev-parse HEAD)"
+          ./ci/setup-keychain.sh
+          ./ci/create-pkg.sh
+          security delete-keychain build.keychain
+    
+      - name: "Create prerelease"
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-build')
+        run: |
+          VERSION="SNAPSHOT-$(git rev-parse HEAD)"
+          gh release create --draft --title "${VERSION}" "${VERSION}" \
+            ./.ci/Caker-${VERSION}.pkg \
             ./_artifacts/cakeagent-linux-amd64 \
             ./_artifacts/cakeagent-linux-arm64
