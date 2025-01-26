@@ -94,6 +94,7 @@ func (s *server) Execute(ctx context.Context, req *cakeagent.ExecuteRequest) (re
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
+	home, _ := os.UserHomeDir()
 	reply = &cakeagent.ExecuteReply{}
 
 	arguments := append([]string{req.Command}, req.Args...)
@@ -102,6 +103,7 @@ func (s *server) Execute(ctx context.Context, req *cakeagent.ExecuteRequest) (re
 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	cmd.Dir = home
 	cmd.Env = os.Environ()
 
 	if len(req.Input) > 0 {
@@ -139,6 +141,7 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 		stdoutInput, stdoutOutput := io.Pipe()
 		stderrInput, stderrOutput := io.Pipe()
 		ctx, cancel := context.WithCancel(context.Background())
+		home, _ := os.UserHomeDir()
 		var wg sync.WaitGroup
 
 		wg.Add(3)
@@ -215,6 +218,7 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 		cmd.Stdout = stdoutOutput
 		cmd.Stderr = stderrOutput
 		cmd.Env = os.Environ()
+		cmd.Dir = home
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setsid:  true,
 			Setctty: true,

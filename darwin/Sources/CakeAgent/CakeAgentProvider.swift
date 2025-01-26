@@ -11,9 +11,11 @@ let cakerSignature = "com.aldunelabs.cakeagent"
 
 class ServiceError : Error, CustomStringConvertible, @unchecked Sendable {
 	let description: String
+	let exitCode: Int32
 
-	init(_ what: String) {
+	init(_ what: String, _ code: Int32 = -1) {
 		self.description = what
+		self.exitCode = code
 	}
 }
 
@@ -238,6 +240,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		process.arguments = ["-c", arguments.joined(separator: " ")]
 		process.standardOutput = outputPipe
 		process.standardError = errorPipe
+		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
 		if request.hasInput {
 			let inputPipe = Pipe()
@@ -299,6 +302,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		process.standardInput = inputPipe.fileHandleForReading
 		process.standardOutput = outputPipe.fileHandleForWriting
 		process.standardError = errorPipe.fileHandleForWriting
+		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
 		errorPipe.fileHandleForReading.readabilityHandler = { handler in
 			let data = handler.availableData
