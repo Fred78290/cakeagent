@@ -91,7 +91,7 @@ jobs:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-build')
         run: |
           VERSION="SNAPSHOT-$(git rev-parse HEAD)"
-          gh release create --draft --title "${VERSION}" "${VERSION}" \
+          gh release create --prerelease --title --generate-notes "${VERSION}" "${VERSION}" \
             ./.ci/Caker-${VERSION}.pkg \
             ./_artifacts/cakeagent-linux-amd64 \
             ./_artifacts/cakeagent-linux-arm64
