@@ -47,7 +47,7 @@ public struct CakeAgentClientOptions: ParsableArguments {
 			throw ValidationError("connection address is unparsable")
 		}
 
-		if listeningAddress.scheme != "unix" && listeningAddress.scheme != "tcp" {
+		if listeningAddress.scheme != "unix" && listeningAddress.scheme != "tcp" && !listeningAddress.isFileURL {
 			throw ValidationError("unsupported address scheme: \(String(describing: listeningAddress.scheme))")
 		}
 

@@ -3,19 +3,19 @@ package main
 import (
 	"os"
 
-	"github.com/Fred78290/cakeagent/cmd/types" // Remplacez par le chemin de votre module
-	"github.com/Fred78290/cakeagent/pkg"       // Remplacez par le chemin de votre module
+	"github.com/Fred78290/cakeagent/cmd/types"
+	"github.com/Fred78290/cakeagent/pkg"
+	"github.com/Fred78290/cakeagent/version"
+
+	// Remplacez par le chemin de votre module
 	"github.com/Fred78290/cakeagent/service"
 	glog "github.com/sirupsen/logrus"
 )
 
-var phVersion = "v0.0.0-unset"
-var phBuildDate = ""
-
 func main() {
 	cfg := types.NewConfig()
 
-	if err := cfg.ParseFlags(os.Args[1:], phVersion); err != nil {
+	if err := cfg.ParseFlags(os.Args[1:], version.VERSION); err != nil {
 		glog.Fatalf("flag parsing error: %v", err)
 	}
 
@@ -33,9 +33,9 @@ func main() {
 	glog.Infof("config: %s", cfg)
 
 	if cfg.DisplayVersion {
-		glog.Infof("The current version is: %s, build at: %s", phVersion, phBuildDate)
+		glog.Infof("The current version is: %s, build at: %s", version.VERSION, version.BUILD_DATE)
 	} else if cfg.InstallService {
-		err = service.InstallService(cfg.Address)
+		err = service.InstallService(cfg)
 	} else {
 		_, err = pkg.StartServer(cfg)
 	}

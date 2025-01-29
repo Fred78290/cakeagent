@@ -40,7 +40,7 @@ public struct CakeAgentHelper: Sendable {
 	                                tlsKey: String?) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
-		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL{
+		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
 			target = ConnectionTarget.unixDomainSocket(listeningAddress.path())
 		} else if listeningAddress.scheme == "tcp" {
 			target = ConnectionTarget.hostAndPort(listeningAddress.host ?? "127.0.0.1", listeningAddress.port ?? 5000)

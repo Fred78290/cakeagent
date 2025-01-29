@@ -4,9 +4,29 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
+
+	"github.com/Fred78290/cakeagent/cmd/types"
 )
 
-func InstallService(listen string) (err error) {
+func InstallService(cfg *types.Config) (err error) {
+	args := []string{
+		os.Args[0],
+		fmt.Sprintf("--listen=%s", cfg.Address),
+	}
+
+	if cfg.CaCert != "" {
+		args = append(args, fmt.Sprintf("--ca-cert='%s'", cfg.CaCert))
+	}
+
+	if cfg.TlsCert != "" {
+		args = append(args, fmt.Sprintf("--tls-cert='%s'", cfg.TlsCert))
+	}
+
+	if cfg.TlsKey != "" {
+		args = append(args, fmt.Sprintf("--tls-key='%s'", cfg.TlsKey))
+	}
+
 	service := `
 [Unit]
 Description=CakeAgent Service
@@ -15,7 +35,7 @@ After=network.target
 [Service]
 Type=simple
 Restart=on-failure
-ExecStart=` + fmt.Sprintf("%s --listen=%s", os.Args[0], listen) + `
+ExecStart=` + strings.Join(args, " ") + `
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin/:/sbin
 
 [Install]
