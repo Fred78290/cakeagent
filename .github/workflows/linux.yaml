@@ -1,4 +1,4 @@
-name: Build CakeAgent
+name: Build Prerealase CakeAgent
 on:
   push:
     branches:
@@ -37,14 +37,17 @@ jobs:
         run: |
           mkdir -p _artifacts
           pushd linux
-          GOARCH=amd64 GOOS=linux go build -o ../_artifacts/cakeagent-linux-amd64
-          GOARCH=arm64 GOOS=linux go build -o ../_artifacts/cakeagent-linux-arm64
+          VERSION="SNAPSHOT-$(git rev-parse HEAD)"
+          BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ`
+          LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE=${BUILD_DATE}"
+          GOARCH=amd64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
+          GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
           popd
     
       - name: "Create linux prerelease"
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-linux')
         run: |
           VERSION="SNAPSHOT-$(git rev-parse HEAD)"
-          gh release create --prerelease --title "${VERSION}" --generate-notes \
+          gh release create --prerelease --generate-notes --title "${VERSION}" ${VERSION} \
             ./_artifacts/cakeagent-linux-amd64 \
             ./_artifacts/cakeagent-linux-arm64
