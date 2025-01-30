@@ -85,7 +85,7 @@ jobs:
       - name: Create Pre MacOS package
         if: github.event_name == 'push' && github.ref == 'refs/tags/ci-build'
         run: |
-          export VERSION="SNAPSHOT-$(git rev-parse HEAD)"
+          export VERSION="SNAPSHOT-$(git rev-parse --short=8 HEAD)"
           ./ci/setup-keychain.sh
           ./ci/create-pkg.sh
           security delete-keychain build.keychain
@@ -93,7 +93,7 @@ jobs:
       - name: "Create prerelease"
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-build')
         run: |
-          VERSION="SNAPSHOT-$(git rev-parse HEAD)"
+          VERSION="SNAPSHOT-$(git rev-parse --short=8 HEAD)"
           gh release create --prerelease --generate-notes --title "${VERSION}" ${VERSION} \
             ./.ci/Caker-${VERSION}.pkg \
             ./_artifacts/cakeagent-linux-amd64 \
