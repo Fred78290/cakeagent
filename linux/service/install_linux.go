@@ -11,6 +11,10 @@ import (
 
 func InstallService(cfg *types.Config) (err error) {
 	args := []string{
+		"/bin/sh",
+		"-c",
+		"'",
+		"exec",
 		os.Args[0],
 		fmt.Sprintf("--listen=%s", cfg.Address),
 	}
@@ -27,6 +31,10 @@ func InstallService(cfg *types.Config) (err error) {
 		args = append(args, fmt.Sprintf("--tls-key='%s'", cfg.TlsKey))
 	}
 
+	args = append(args, "'")
+
+	defaultEnv := ""
+
 	service := `
 [Unit]
 Description=CakeAgent Service
@@ -35,8 +43,10 @@ After=network.target
 [Service]
 Type=simple
 Restart=on-failure
-ExecStart=` + strings.Join(args, " ") + `
+EnvironmentFile=-/etc/default/cakeagent
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin/:/sbin
+User=root
+ExecStart=` + strings.Join(args, " ") + `
 
 [Install]
 WantedBy=multi-user.target
@@ -44,7 +54,9 @@ WantedBy=multi-user.target
 
 	servicePath := "/etc/systemd/system/cakeagent.service"
 
-	if err := os.WriteFile(servicePath, []byte(service), 0644); err != nil {
+	if err := os.WriteFile("/etc/default/cakeagent", []byte(defaultEnv), 0644); err != nil {
+		err = fmt.Errorf("Failed to write env file: %v", err)
+	} else if err = os.WriteFile(servicePath, []byte(service), 0644); err != nil {
 		err = fmt.Errorf("Failed to write service file: %v", err)
 	} else {
 		cmds := [][]string{

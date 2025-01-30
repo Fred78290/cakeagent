@@ -213,7 +213,13 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 			glog.Infof("Shell session ended")
 		}
 
-		cmd := exec.CommandContext(ctx, "/bin/sh", "-il")
+		shell := "bash"
+
+		if shell, err = exec.LookPath(shell); err != nil {
+			shell = "/bin/sh"
+		}
+
+		cmd := exec.CommandContext(ctx, shell, "-i", "-l")
 		cmd.Stdin = stdinIntput
 		cmd.Stdout = stdoutOutput
 		cmd.Stderr = stderrOutput
