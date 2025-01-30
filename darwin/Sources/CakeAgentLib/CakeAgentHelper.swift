@@ -37,7 +37,7 @@ public struct CakeAgentHelper: Sendable {
 	                                connectionTimeout: Int64,
 	                                caCert: String?,
 	                                tlsCert: String?,
-	                                tlsKey: String?) throws -> CakeAgentClient {
+									tlsKey: String?) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -111,13 +111,29 @@ public struct CakeAgentHelper: Sendable {
 		var pipeChannel: NIOAsyncChannel<ByteBuffer, ByteBuffer>?
 
 		shellStream = client.shell(callOptions: callOptions, handler: { response in
-			if response.format == .stdout {
-				outputHandle.write(response.datas)
-			} else if response.format == .stderr {
-				errorHandle.write(response.datas)
-			} else {
-				if let channel = pipeChannel {					
+			if let channel = pipeChannel {					
+				if response.format == .end {
 					_ = channel.channel.close()
+				} else {
+					channel.channel.eventLoop.execute {
+						do {
+							if response.format == .stdout {
+								try outputHandle.write(contentsOf: response.datas)
+							} else if response.format == .stderr {
+								try errorHandle.write(contentsOf: response.datas)
+							}
+						} catch {
+							if error is CancellationError == false {
+								guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
+									let errMessage = "error: \(error)\n".data(using: .utf8)!
+
+									FileHandle.standardError.write(errMessage)
+									errorHandle.write(errMessage)
+									return
+								}
+							}
+						}
+					}
 				}
 			}
 		})
@@ -152,7 +168,10 @@ public struct CakeAgentHelper: Sendable {
 				} catch {
 					if error is CancellationError == false {
 						guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-							errorHandle.write("error: \(error)\n".data(using: .utf8)!)
+							let errMessage = "error: \(error)\n".data(using: .utf8)!
+
+							FileHandle.standardError.write(errMessage)
+							errorHandle.write(errMessage)
 							return
 						}
 					}
