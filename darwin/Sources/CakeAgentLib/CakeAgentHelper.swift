@@ -5,11 +5,42 @@ import NIO
 import NIOPosix
 import NIOSSL
 
-public typealias CakeAgentClient = Cakeagent_AgentNIOClient
-
 extension CakeAgentClient {
 	public func close() async throws {
 		try await self.channel.close().get()
+	}
+}
+
+extension FileHandle {
+	func makeRaw() -> termios {
+		var term: termios = termios()
+		let inputTTY: Bool = isatty(self.fileDescriptor) != 0
+
+		if inputTTY {
+			if tcgetattr(self.fileDescriptor, &term) != 0 {
+				perror("tcgetattr error")
+			}
+
+			var newState: termios = term
+
+			newState.c_iflag &= UInt(IGNBRK) | ~UInt(BRKINT | INPCK | ISTRIP | IXON)
+			newState.c_cflag |= UInt(CS8)
+			newState.c_lflag &= ~UInt(ECHO | ICANON | IEXTEN | ISIG)
+			newState.c_cc.16 = 1
+			newState.c_cc.17 = 17
+
+			if tcsetattr(self.fileDescriptor, TCSANOW, &newState) != 0 {
+				perror("tcsetattr error")
+			}
+		}
+
+		return term
+	}
+
+	func restoreState(_ term: UnsafePointer<termios>) {
+		if tcsetattr(self.fileDescriptor, TCSANOW, term) != 0 {
+			perror("tcsetattr error")
+		}
 	}
 }
 
@@ -24,12 +55,12 @@ public struct CakeAgentHelper: Sendable {
 
 	public init(on: EventLoopGroup, listeningAddress: URL, connectionTimeout: Int64, caCert: String?, tlsCert: String?, tlsKey: String?) throws {
 		self.eventLoopGroup = on
-		self.client = try! CakeAgentHelper.createClient(on: on,
-		                                                listeningAddress: listeningAddress,
-		                                                connectionTimeout: connectionTimeout,
-		                                                caCert: caCert,
-		                                                tlsCert: tlsCert,
-		                                                tlsKey: tlsKey)
+		self.client = try! Self.createClient(on: on,
+		                                     listeningAddress: listeningAddress,
+		                                     connectionTimeout: connectionTimeout,
+		                                     caCert: caCert,
+		                                     tlsCert: tlsCert,
+		                                     tlsKey: tlsKey)
 	}
 
 	public static func createClient(on: EventLoopGroup,
@@ -37,7 +68,7 @@ public struct CakeAgentHelper: Sendable {
 	                                connectionTimeout: Int64,
 	                                caCert: String?,
 	                                tlsCert: String?,
-									tlsKey: String?) throws -> CakeAgentClient {
+	                                tlsKey: String?) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -84,8 +115,14 @@ public struct CakeAgentHelper: Sendable {
 	                 outputHandle: FileHandle = FileHandle.standardOutput,
 	                 errorHandle: FileHandle = FileHandle.standardError,
 	                 callOptions: CallOptions? = nil) async throws -> Int32 {
+		var state = inputHandle.makeRaw()
+
+		defer {
+			inputHandle.restoreState(&state)
+		}
+
 		let response = try await client.execute(Cakeagent_ExecuteRequest.with { req in
-			if isatty(inputHandle.fileDescriptor) == 0{
+			if isatty(inputHandle.fileDescriptor) == 0 {
 				req.input = inputHandle.readDataToEndOfFile()
 			}
 
@@ -109,6 +146,11 @@ public struct CakeAgentHelper: Sendable {
 	                  callOptions: CallOptions? = nil) async throws {
 		var shellStream: BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>?
 		var pipeChannel: NIOAsyncChannel<ByteBuffer, ByteBuffer>?
+		var term = inputHandle.makeRaw()
+
+		defer {
+			inputHandle.restoreState(&term)
+		}
 
 		shellStream = client.shell(callOptions: callOptions, handler: { response in
 			if let channel = pipeChannel {					

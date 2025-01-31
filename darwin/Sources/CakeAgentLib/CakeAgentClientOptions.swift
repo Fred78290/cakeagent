@@ -5,6 +5,8 @@ import NIO
 import NIOPosix
 import NIOSSL
 
+public typealias CakeAgentClient = Cakeagent_AgentNIOClient
+
 public struct CakeAgentClientOptions: ParsableArguments {
 
 	@Option(help: "Connection timeout in seconds")
