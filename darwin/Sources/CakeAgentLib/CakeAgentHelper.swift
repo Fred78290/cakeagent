@@ -29,7 +29,7 @@ public struct InfoReply: Sendable, Codable {
 
 	public func toJSON() -> String {
 		let encoder = JSONEncoder()
-		encoder.outputFormatting = .prettyPrinted
+		encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
 
 		return String(data: try! encoder.encode(self), encoding: .utf8)!
 	}
@@ -128,9 +128,9 @@ public struct CakeAgentHelper: Sendable {
 		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration))
 	}
 
-	public func info(callOptions: CallOptions? = nil) async throws -> InfoReply {
+	public func info(callOptions: CallOptions? = nil) throws -> InfoReply {
 		let response = client.info(.init(), callOptions: callOptions)
-		let infos = try await response.response.get()
+		let infos = try response.response.wait()
 
 		return InfoReply(version: infos.version,
 		                 uptime: infos.uptime,
@@ -149,21 +149,21 @@ public struct CakeAgentHelper: Sendable {
 	                 inputHandle: FileHandle = FileHandle.standardInput,
 	                 outputHandle: FileHandle = FileHandle.standardOutput,
 	                 errorHandle: FileHandle = FileHandle.standardError,
-	                 callOptions: CallOptions? = nil) async throws -> Int32 {
+	                 callOptions: CallOptions? = nil) throws -> Int32 {
 		var state = inputHandle.makeRaw()
 
 		defer {
 			inputHandle.restoreState(&state)
 		}
 
-		let response = try await client.execute(Cakeagent_ExecuteRequest.with { req in
+		let response = try client.execute(Cakeagent_ExecuteRequest.with { req in
 			if isatty(inputHandle.fileDescriptor) == 0 {
 				req.input = inputHandle.readDataToEndOfFile()
 			}
 
 			req.command = command
 			req.args = arguments
-		}).response.get()
+		}).response.wait()
 
 		if response.hasError {
 			errorHandle.write(response.error)

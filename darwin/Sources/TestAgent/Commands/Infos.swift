@@ -15,6 +15,6 @@ final class Infos: GrpcParsableCommand {
 	}
 
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
-		print(try await CakeAgentHelper(on: on, client: client).info(callOptions: callOptions).toJSON())
+		print(try CakeAgentHelper(on: on, client: client).info(callOptions: callOptions).toJSON())
 	}
 }
