@@ -23,6 +23,6 @@ final class Exec: GrpcParsableCommand {
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
 		let command = self.arguments.remove(at: 0)
 
-		Foundation.exit(try await CakeAgentHelper(on: on, client: client).exec(command: command, arguments: self.arguments, callOptions: callOptions))
+		Foundation.exit(try CakeAgentHelper(on: on, client: client).exec(command: command, arguments: self.arguments, callOptions: callOptions))
 	}
 }
