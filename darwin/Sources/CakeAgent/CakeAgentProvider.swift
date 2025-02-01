@@ -228,7 +228,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		let errorPipe = Pipe()
 		var outputData = Data()
 		var errorData = Data()
-		var arguments: [String] = ["-c"]
+		var arguments: [String] = [request.command]
 
 		arguments.append(contentsOf: request.args)
 

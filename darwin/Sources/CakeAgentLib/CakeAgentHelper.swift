@@ -144,7 +144,8 @@ public struct CakeAgentHelper: Sendable {
 		                 release: infos.release)
 	}
 
-	public func exec(arguments: [String],
+	public func exec(command: String,
+					 arguments: [String],
 	                 inputHandle: FileHandle = FileHandle.standardInput,
 	                 outputHandle: FileHandle = FileHandle.standardOutput,
 	                 errorHandle: FileHandle = FileHandle.standardError,
@@ -160,7 +161,8 @@ public struct CakeAgentHelper: Sendable {
 				req.input = inputHandle.readDataToEndOfFile()
 			}
 
-			req.command = arguments.joined(separator: " ")
+			req.command = command
+			req.args = arguments
 		}).response.get()
 
 		if response.hasError {

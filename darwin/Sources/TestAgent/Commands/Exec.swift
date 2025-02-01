@@ -14,9 +14,15 @@ final class Exec: GrpcParsableCommand {
 
 	func validate() throws {
 		try self.options.validate(try Root.getDefaultServerAddress())
+		
+		if arguments.count < 1 {
+			throw ValidationError("At least one argument is required")
+		}
 	}
 
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
-		Foundation.exit(try await CakeAgentHelper(on: on, client: client).exec(arguments: self.arguments, callOptions: callOptions))
+		let command = self.arguments.remove(at: 0)
+
+		Foundation.exit(try await CakeAgentHelper(on: on, client: client).exec(command: command, arguments: self.arguments, callOptions: callOptions))
 	}
 }
