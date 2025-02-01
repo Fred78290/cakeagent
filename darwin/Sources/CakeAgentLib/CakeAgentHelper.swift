@@ -11,6 +11,30 @@ extension CakeAgentClient {
 	}
 }
 
+public struct InfoReply: Sendable, Codable {
+	public let version: String
+	public let uptime: Int64
+	public let memory: MemoryInfo?
+	public let cpuCount: Int32
+	public let ipaddresses: [String]
+	public let osname: String
+	public let hostname: String
+	public let release: String 
+
+	public struct MemoryInfo: Sendable, Codable {
+		public let total: UInt64
+		public let free: UInt64
+		public let used: UInt64
+	}
+
+	public func toJSON() -> String {
+		let encoder = JSONEncoder()
+		encoder.outputFormatting = .prettyPrinted
+
+		return String(data: try! encoder.encode(self), encoding: .utf8)!
+	}
+}
+
 extension FileHandle {
 	func makeRaw() -> termios {
 		var term: termios = termios()
@@ -104,10 +128,20 @@ public struct CakeAgentHelper: Sendable {
 		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration))
 	}
 
-	public func info(callOptions: CallOptions? = nil) async throws -> String {
+	public func info(callOptions: CallOptions? = nil) async throws -> InfoReply {
 		let response = client.info(.init(), callOptions: callOptions)
+		let infos = try await response.response.get()
 
-		return try await response.response.get().jsonString()
+		return InfoReply(version: infos.version,
+		                 uptime: infos.uptime,
+		                 memory: infos.hasMemory ? InfoReply.MemoryInfo(total: infos.memory.total,
+		                                                                free: infos.memory.free,
+		                                                                used: infos.memory.used) : nil,
+		                 cpuCount: infos.cpuCount,
+		                 ipaddresses: infos.ipaddresses,
+		                 osname: infos.osname,
+		                 hostname: infos.hostname,
+		                 release: infos.release)
 	}
 
 	public func exec(arguments: [String],
