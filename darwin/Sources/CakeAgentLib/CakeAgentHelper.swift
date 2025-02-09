@@ -92,7 +92,8 @@ public struct CakeAgentHelper: Sendable {
 	                                connectionTimeout: Int64,
 	                                caCert: String?,
 	                                tlsCert: String?,
-	                                tlsKey: String?) throws -> CakeAgentClient {
+	                                tlsKey: String?,
+									retries: ConnectionBackoff.Retries = .unlimited) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -123,7 +124,11 @@ public struct CakeAgentHelper: Sendable {
 				certificateVerification: .noHostnameVerification)
 		}
 
-		clientConfiguration.connectionBackoff = ConnectionBackoff(maximumBackoff: TimeInterval(connectionTimeout), minimumConnectionTimeout: 5.0)
+		if retries != .unlimited {
+			clientConfiguration.connectionBackoff = ConnectionBackoff(maximumBackoff: TimeInterval(connectionTimeout), minimumConnectionTimeout: TimeInterval(connectionTimeout), retries: retries)
+		} else {
+			clientConfiguration.connectionBackoff = ConnectionBackoff(maximumBackoff: TimeInterval(connectionTimeout))
+		}
 
 		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration))
 	}
