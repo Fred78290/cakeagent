@@ -42,6 +42,8 @@ jobs:
           LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE=${BUILD_DATE}"
           GOARCH=amd64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
           GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
+          GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
+          GOARCH=arm64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-arm64
           popd
     
       - name: "Create linux prerelease"
@@ -50,4 +52,6 @@ jobs:
           VERSION="SNAPSHOT-$(git rev-parse --short=8 HEAD)"
           gh release create --prerelease --generate-notes --title "${VERSION}" ${VERSION} \
             ./_artifacts/cakeagent-linux-amd64 \
-            ./_artifacts/cakeagent-linux-arm64
+            ./_artifacts/cakeagent-linux-arm64 \
+            ./_artifacts/cakeagent-darwin-amd64 \
+            ./_artifacts/cakeagent-darwin-arm64

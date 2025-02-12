@@ -54,6 +54,8 @@ jobs:
           LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE={BUILD_DATE}"
           GOARCH=amd64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
           GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
+          GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
+          GOARCH=arm64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-arm64
           popd
 
       - name: Build Swift package
@@ -97,4 +99,6 @@ jobs:
           gh release create --prerelease --generate-notes --title "${VERSION}" ${VERSION} \
             ./.ci/Caker-${VERSION}.pkg \
             ./_artifacts/cakeagent-linux-amd64 \
-            ./_artifacts/cakeagent-linux-arm64
+            ./_artifacts/cakeagent-linux-arm64 \
+            ./_artifacts/cakeagent-darwin-amd64 \
+            ./_artifacts/cakeagent-darwin-arm64
