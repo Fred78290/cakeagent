@@ -14,6 +14,7 @@ extension CakeAgentClient {
 public enum Status: String, Sendable, Codable {
 	case running
 	case stopped
+	case unknown
 }
 
 public struct InfoReply: Sendable, Codable {
