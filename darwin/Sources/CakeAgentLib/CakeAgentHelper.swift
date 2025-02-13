@@ -44,6 +44,26 @@ public struct InfoReply: Sendable, Codable {
 		self.status = .stopped
 	}
 
+	public init(info: Cakeagent_InfoReply) {
+		self.name = info.hostname
+		self.version = info.version
+		self.uptime = info.uptime
+		self.cpuCount = info.cpuCount
+		self.ipaddresses = info.ipaddresses
+		self.osname = info.osname
+		self.hostname = info.hostname
+		self.release = info.release
+		self.status = .running
+
+		if info.hasMemory {
+			self.memory = MemoryInfo.with {
+				$0.total = info.memory.total
+				$0.free = info.memory.free
+				$0.used = info.memory.used
+			}
+		}
+	}
+
 	public struct MemoryInfo: Sendable, Codable {
 		public var total: UInt64?
 		public var free: UInt64?
