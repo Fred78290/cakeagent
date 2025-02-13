@@ -11,20 +11,52 @@ extension CakeAgentClient {
 	}
 }
 
+public enum Status: String, Sendable, Codable {
+	case running
+	case stopped
+}
+
 public struct InfoReply: Sendable, Codable {
-	public let version: String
-	public let uptime: Int64
-	public let memory: MemoryInfo?
-	public let cpuCount: Int32
-	public let ipaddresses: [String]
-	public let osname: String
-	public let hostname: String
-	public let release: String 
+	public var version: String?
+	public var uptime: Int64?
+	public var memory: MemoryInfo?
+	public var cpuCount: Int32
+	public var ipaddresses: [String]
+	public var osname: String
+	public var hostname: String?
+	public var release: String?
+	public var status: Status
+
+	init() {
+		self.version = nil
+		self.uptime = 0
+		self.memory = nil
+		self.cpuCount = 0
+		self.ipaddresses = []
+		self.osname = ""
+		self.hostname = nil
+		self.release = NSFilePathErrorKey
+		self.status = .stopped
+	}
 
 	public struct MemoryInfo: Sendable, Codable {
-		public let total: UInt64
-		public let free: UInt64
-		public let used: UInt64
+		public var total: UInt64?
+		public var free: UInt64?
+		public var used: UInt64?
+
+		init() {
+			self.total = nil
+			self.free = nil
+			self.used = nil
+		}
+
+		public static func with(
+			_ populator: (inout Self) throws -> Void
+		) rethrows -> Self {
+			var message = Self()
+			try populator(&message)
+			return message
+		}
 	}
 
 	public func toJSON() -> String {
@@ -32,6 +64,14 @@ public struct InfoReply: Sendable, Codable {
 		encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
 
 		return String(data: try! encoder.encode(self), encoding: .utf8)!
+	}
+
+	public static func with(
+		_ populator: (inout Self) throws -> Void
+	) rethrows -> Self {
+		var message = Self()
+		try populator(&message)
+		return message
 	}
 }
 
@@ -93,7 +133,7 @@ public struct CakeAgentHelper: Sendable {
 	                                caCert: String?,
 	                                tlsCert: String?,
 	                                tlsKey: String?,
-									retries: ConnectionBackoff.Retries = .unlimited) throws -> CakeAgentClient {
+	                                retries: ConnectionBackoff.Retries = .unlimited) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -137,20 +177,25 @@ public struct CakeAgentHelper: Sendable {
 		let response = client.info(.init(), callOptions: callOptions)
 		let infos = try response.response.wait()
 
-		return InfoReply(version: infos.version,
-		                 uptime: infos.uptime,
-		                 memory: infos.hasMemory ? InfoReply.MemoryInfo(total: infos.memory.total,
-		                                                                free: infos.memory.free,
-		                                                                used: infos.memory.used) : nil,
-		                 cpuCount: infos.cpuCount,
-		                 ipaddresses: infos.ipaddresses,
-		                 osname: infos.osname,
-		                 hostname: infos.hostname,
-		                 release: infos.release)
+		return InfoReply.with {
+			$0.version = infos.version
+			$0.uptime = infos.uptime
+			$0.cpuCount = infos.cpuCount
+			$0.ipaddresses = infos.ipaddresses
+			$0.osname = infos.osname
+			$0.hostname = infos.hostname
+			$0.release = infos.release
+			$0.status = .running
+			$0.memory = infos.hasMemory ? InfoReply.MemoryInfo.with {
+				$0.total = infos.memory.total
+				$0.free = infos.memory.free
+				$0.used = infos.memory.used
+			} : nil
+		}
 	}
 
 	public func exec(command: String,
-					 arguments: [String],
+	                 arguments: [String],
 	                 inputHandle: FileHandle = FileHandle.standardInput,
 	                 outputHandle: FileHandle = FileHandle.standardOutput,
 	                 errorHandle: FileHandle = FileHandle.standardError,
