@@ -18,6 +18,7 @@ public enum Status: String, Sendable, Codable {
 }
 
 public struct InfoReply: Sendable, Codable {
+	public var name: String
 	public var version: String?
 	public var uptime: Int64?
 	public var memory: MemoryInfo?
@@ -30,6 +31,7 @@ public struct InfoReply: Sendable, Codable {
 	public var status: Status
 
 	init() {
+		self.name = ""
 		self.version = nil
 		self.uptime = 0
 		self.memory = nil
@@ -181,6 +183,7 @@ public struct CakeAgentHelper: Sendable {
 		let infos = try response.response.wait()
 
 		return InfoReply.with {
+			$0.name = infos.hostname
 			$0.version = infos.version
 			$0.uptime = infos.uptime
 			$0.cpuCount = infos.cpuCount
