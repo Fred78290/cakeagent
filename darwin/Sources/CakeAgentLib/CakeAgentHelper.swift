@@ -25,6 +25,7 @@ public struct InfoReply: Sendable, Codable {
 	public var osname: String
 	public var hostname: String?
 	public var release: String?
+	public var mounts: [String]?
 	public var status: Status
 
 	init() {
@@ -35,7 +36,8 @@ public struct InfoReply: Sendable, Codable {
 		self.ipaddresses = []
 		self.osname = ""
 		self.hostname = nil
-		self.release = NSFilePathErrorKey
+		self.release = nil
+		self.mounts = nil
 		self.status = .stopped
 	}
 
