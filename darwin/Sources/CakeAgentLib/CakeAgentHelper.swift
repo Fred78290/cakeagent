@@ -9,6 +9,10 @@ extension CakeAgentClient {
 	public func close() async throws {
 		try await self.channel.close().get()
 	}
+
+	public func closeSync() throws {
+		try self.channel.close().wait()
+	}
 }
 
 public enum Status: String, Sendable, Codable {
