@@ -10,6 +10,14 @@ extension CakeAgentClient {
 		try await self.channel.close().get()
 	}
 
+	public func close() -> EventLoopFuture<Void> {
+		self.channel.close()
+	}
+
+	public func close(promise: EventLoopPromise<Void>) {
+		self.channel.close(promise: promise)
+	}
+
 	public func closeSync() throws {
 		try self.channel.close().wait()
 	}
