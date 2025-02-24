@@ -11,6 +11,7 @@ import (
 
 func InstallService(cfg *types.Config) (err error) {
 	args := []string{
+		os.Args[0],
 		fmt.Sprintf("<string>--listen=%s</string>", cfg.Address),
 	}
 
