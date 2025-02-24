@@ -35,7 +35,7 @@ func InstallService(cfg *types.Config) (err error) {
 			<string>com.aldunelabs.cakeagent</string>
 
 		<key>ProgramArguments</key>
-			<array>` + strings.Join(args, " ") + `</array>
+			<array>` + strings.Join(args, "\n") + `</array>
 
 		<key>KeepAlive</key>
 			<dict>
