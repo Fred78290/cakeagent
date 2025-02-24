@@ -16,15 +16,15 @@ func InstallService(cfg *types.Config) (err error) {
 	}
 
 	if cfg.CaCert != "" {
-		args = append(args, fmt.Sprintf("<string>--ca-cert='%s'</string>", cfg.CaCert))
+		args = append(args, fmt.Sprintf("<string>--ca-cert=%s</string>", cfg.CaCert))
 	}
 
 	if cfg.TlsCert != "" {
-		args = append(args, fmt.Sprintf("<string>--tls-cert='%s'</string>", cfg.TlsCert))
+		args = append(args, fmt.Sprintf("<string>--tls-cert=%s</string>", cfg.TlsCert))
 	}
 
 	if cfg.TlsKey != "" {
-		args = append(args, fmt.Sprintf("<string>--tls-key='%s'</string>", cfg.TlsKey))
+		args = append(args, fmt.Sprintf("<string>--tls-key=%s</string>", cfg.TlsKey))
 	}
 
 	plist := `<?xml version="1.0" encoding="UTF-8"?>
