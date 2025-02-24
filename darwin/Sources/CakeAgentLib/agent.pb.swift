@@ -66,7 +66,7 @@ public struct Cakeagent_InfoReply: Sendable {
 
   public var version: String = String()
 
-  public var uptime: Int64 = 0
+  public var uptime: UInt64 = 0
 
   public var memory: Cakeagent_InfoReply.MemoryInfo {
     get {return _memory ?? Cakeagent_InfoReply.MemoryInfo()}
@@ -245,7 +245,7 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.version) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.uptime) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.uptime) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._memory) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.cpuCount) }()
       case 5: try { try decoder.decodeRepeatedStringField(value: &self.ipaddresses) }()
@@ -266,7 +266,7 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       try visitor.visitSingularStringField(value: self.version, fieldNumber: 1)
     }
     if self.uptime != 0 {
-      try visitor.visitSingularInt64Field(value: self.uptime, fieldNumber: 2)
+      try visitor.visitSingularUInt64Field(value: self.uptime, fieldNumber: 2)
     }
     try { if let v = self._memory {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)

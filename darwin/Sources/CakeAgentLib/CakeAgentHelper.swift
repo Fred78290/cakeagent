@@ -32,7 +32,7 @@ public enum Status: String, Sendable, Codable {
 public struct InfoReply: Sendable, Codable {
 	public var name: String
 	public var version: String?
-	public var uptime: Int64?
+	public var uptime: UInt64?
 	public var memory: MemoryInfo?
 	public var cpuCount: Int32
 	public var ipaddresses: [String]

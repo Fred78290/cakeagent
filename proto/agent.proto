@@ -24,7 +24,7 @@ message InfoReply {
 	}
 
 	string version = 1;
-	int64 uptime = 2;
+	uint64 uptime = 2;
 	MemoryInfo memory = 3;
 	int32 cpuCount = 4;
 	repeated string ipaddresses = 5;

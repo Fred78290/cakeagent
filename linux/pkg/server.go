@@ -62,7 +62,7 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 		reply.Osname = info.OS.Name
 		reply.Release = info.OS.Codename
 		reply.Version = info.OS.Version
-		reply.Uptime = int64(time.Now().Nanosecond() - info.BootTime.Nanosecond())
+		reply.Uptime = uint64(time.Now().Nanosecond() - info.BootTime.Nanosecond())
 	}
 
 	// Get IP addresses
