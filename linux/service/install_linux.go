@@ -11,27 +11,21 @@ import (
 
 func InstallService(cfg *types.Config) (err error) {
 	args := []string{
-		"/bin/sh",
-		"-c",
-		"'",
-		"exec",
 		os.Args[0],
 		fmt.Sprintf("--listen=%s", cfg.Address),
 	}
 
 	if cfg.CaCert != "" {
-		args = append(args, fmt.Sprintf("--ca-cert='%s'", cfg.CaCert))
+		args = append(args, fmt.Sprintf("--ca-cert=%s", cfg.CaCert))
 	}
 
 	if cfg.TlsCert != "" {
-		args = append(args, fmt.Sprintf("--tls-cert='%s'", cfg.TlsCert))
+		args = append(args, fmt.Sprintf("--tls-cert=%s", cfg.TlsCert))
 	}
 
 	if cfg.TlsKey != "" {
-		args = append(args, fmt.Sprintf("--tls-key='%s'", cfg.TlsKey))
+		args = append(args, fmt.Sprintf("--tls-key=%s", cfg.TlsKey))
 	}
-
-	args = append(args, "'")
 
 	defaultEnv := ""
 
