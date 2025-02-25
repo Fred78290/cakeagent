@@ -34,6 +34,6 @@ final class Shell: GrpcParsableCommand {
 	}
 
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {				
-		try await CakeAgentHelper(on: on, client: client).shell(callOptions: callOptions)
+		try await CakeAgentHelper(on: on, client: client).shell(callOptions: .init(timeLimit: .none))
 	}
 }
