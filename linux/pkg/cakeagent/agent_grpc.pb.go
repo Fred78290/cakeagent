@@ -23,8 +23,6 @@ const (
 	Agent_Info_FullMethodName    = "/cakeagent.Agent/Info"
 	Agent_Execute_FullMethodName = "/cakeagent.Agent/Execute"
 	Agent_Shell_FullMethodName   = "/cakeagent.Agent/Shell"
-	Agent_Mount_FullMethodName   = "/cakeagent.Agent/Mount"
-	Agent_Umount_FullMethodName  = "/cakeagent.Agent/Umount"
 )
 
 // AgentClient is the client API for Agent service.
@@ -34,8 +32,6 @@ type AgentClient interface {
 	Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error)
 	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteReply, error)
 	Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellMessage, ShellResponse], error)
-	Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
-	Umount(ctx context.Context, in *UmountRequest, opts ...grpc.CallOption) (*MountReply, error)
 }
 
 type agentClient struct {
@@ -79,26 +75,6 @@ func (c *agentClient) Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Agent_ShellClient = grpc.BidiStreamingClient[ShellMessage, ShellResponse]
 
-func (c *agentClient) Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MountReply)
-	err := c.cc.Invoke(ctx, Agent_Mount_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *agentClient) Umount(ctx context.Context, in *UmountRequest, opts ...grpc.CallOption) (*MountReply, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MountReply)
-	err := c.cc.Invoke(ctx, Agent_Umount_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
@@ -106,8 +82,6 @@ type AgentServer interface {
 	Info(context.Context, *emptypb.Empty) (*InfoReply, error)
 	Execute(context.Context, *ExecuteRequest) (*ExecuteReply, error)
 	Shell(grpc.BidiStreamingServer[ShellMessage, ShellResponse]) error
-	Mount(context.Context, *MountRequest) (*MountReply, error)
-	Umount(context.Context, *UmountRequest) (*MountReply, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -126,12 +100,6 @@ func (UnimplementedAgentServer) Execute(context.Context, *ExecuteRequest) (*Exec
 }
 func (UnimplementedAgentServer) Shell(grpc.BidiStreamingServer[ShellMessage, ShellResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Shell not implemented")
-}
-func (UnimplementedAgentServer) Mount(context.Context, *MountRequest) (*MountReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Mount not implemented")
-}
-func (UnimplementedAgentServer) Umount(context.Context, *UmountRequest) (*MountReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Umount not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -197,42 +165,6 @@ func _Agent_Shell_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Agent_ShellServer = grpc.BidiStreamingServer[ShellMessage, ShellResponse]
 
-func _Agent_Mount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MountRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AgentServer).Mount(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Agent_Mount_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Mount(ctx, req.(*MountRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Agent_Umount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UmountRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AgentServer).Umount(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Agent_Umount_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Umount(ctx, req.(*UmountRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -247,14 +179,6 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Execute",
 			Handler:    _Agent_Execute_Handler,
-		},
-		{
-			MethodName: "Mount",
-			Handler:    _Agent_Mount_Handler,
-		},
-		{
-			MethodName: "Umount",
-			Handler:    _Agent_Umount_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
