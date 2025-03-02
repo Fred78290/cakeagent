@@ -91,14 +91,14 @@ class TTY: @unchecked Sendable {
 			tty_path.deallocate()
 		}
 
-		var res = openpty(&tty_fd, &sfd, tty_path, nil, nil);
-		
+		let res = openpty(&tty_fd, &sfd, tty_path, nil, nil);
+
 		if (res < 0) {
 			perror("openpty error")
 			return (-1, -1)
 		}
 
-		res = setupty(tty_fd)
+/*		res = setupty(tty_fd)
 		if (res < 0) {
 			return (res, -1)
 		}
@@ -107,7 +107,7 @@ class TTY: @unchecked Sendable {
 		if (res < 0) {
 			return (res, -1)
 		}
-
+*/
 		return (tty_fd, sfd)
 	}
 }
