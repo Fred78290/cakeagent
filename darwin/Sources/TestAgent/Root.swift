@@ -115,17 +115,6 @@ struct Root: AsyncParsableCommand {
 	}
 
 	public static func main() async throws {
-		// Ensure the default SIGINT handled is disabled,
-		// otherwise there's a race between two handlers
-		signal(SIGINT, SIG_IGN)
-		// Handle cancellation by Ctrl+C ourselves
-		let task = withUnsafeCurrentTask { $0 }!
-		let sigintSrc = DispatchSource.makeSignalSource(signal: SIGINT)
-		sigintSrc.setEventHandler {
-			task.cancel()
-		}
-		sigintSrc.activate()
-
 		// Set line-buffered output for stdout
 		setlinebuf(stdout)
 
