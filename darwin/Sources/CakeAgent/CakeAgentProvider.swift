@@ -382,4 +382,13 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 			}
 		}
 	}
+
+	func mount(request: Cakeagent_MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {
+		Cakeagent_MountReply.with { $0.error = "Not supported" }
+	}
+
+	func umount(request: Cakeagent_UmountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {
+		Cakeagent_MountReply.with { $0.error = "Not supported" }
+	}
+
 }	

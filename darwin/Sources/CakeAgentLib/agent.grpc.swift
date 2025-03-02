@@ -30,6 +30,16 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
     callOptions: CallOptions?,
     handler: @escaping (Cakeagent_ShellResponse) -> Void
   ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>
+
+  func mount(
+    _ request: Cakeagent_MountRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply>
+
+  func umount(
+    _ request: Cakeagent_UmountRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<Cakeagent_UmountRequest, Cakeagent_MountReply>
 }
 
 extension Cakeagent_AgentClientProtocol {
@@ -91,6 +101,42 @@ extension Cakeagent_AgentClientProtocol {
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeShellInterceptors() ?? [],
       handler: handler
+    )
+  }
+
+  /// Unary call to Mount
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Mount.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func mount(
+    _ request: Cakeagent_MountRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply> {
+    return self.makeUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.mount.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeMountInterceptors() ?? []
+    )
+  }
+
+  /// Unary call to Umount
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Umount.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func umount(
+    _ request: Cakeagent_UmountRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<Cakeagent_UmountRequest, Cakeagent_MountReply> {
+    return self.makeUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.umount.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeUmountInterceptors() ?? []
     )
   }
 }
@@ -170,6 +216,16 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
   func makeShellCall(
     callOptions: CallOptions?
   ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>
+
+  func makeMountCall(
+    _ request: Cakeagent_MountRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply>
+
+  func makeUmountCall(
+    _ request: Cakeagent_UmountRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<Cakeagent_UmountRequest, Cakeagent_MountReply>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -213,6 +269,30 @@ extension Cakeagent_AgentAsyncClientProtocol {
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeShellInterceptors() ?? []
+    )
+  }
+
+  public func makeMountCall(
+    _ request: Cakeagent_MountRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply> {
+    return self.makeAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.mount.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeMountInterceptors() ?? []
+    )
+  }
+
+  public func makeUmountCall(
+    _ request: Cakeagent_UmountRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<Cakeagent_UmountRequest, Cakeagent_MountReply> {
+    return self.makeAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.umount.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeUmountInterceptors() ?? []
     )
   }
 }
@@ -266,6 +346,30 @@ extension Cakeagent_AgentAsyncClientProtocol {
       interceptors: self.interceptors?.makeShellInterceptors() ?? []
     )
   }
+
+  public func mount(
+    _ request: Cakeagent_MountRequest,
+    callOptions: CallOptions? = nil
+  ) async throws -> Cakeagent_MountReply {
+    return try await self.performAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.mount.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeMountInterceptors() ?? []
+    )
+  }
+
+  public func umount(
+    _ request: Cakeagent_UmountRequest,
+    callOptions: CallOptions? = nil
+  ) async throws -> Cakeagent_MountReply {
+    return try await self.performAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.umount.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeUmountInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -295,6 +399,12 @@ public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when invoking 'shell'.
   func makeShellInterceptors() -> [ClientInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellResponse>]
+
+  /// - Returns: Interceptors to use when invoking 'mount'.
+  func makeMountInterceptors() -> [ClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
+
+  /// - Returns: Interceptors to use when invoking 'umount'.
+  func makeUmountInterceptors() -> [ClientInterceptor<Cakeagent_UmountRequest, Cakeagent_MountReply>]
 }
 
 public enum Cakeagent_AgentClientMetadata {
@@ -305,6 +415,8 @@ public enum Cakeagent_AgentClientMetadata {
       Cakeagent_AgentClientMetadata.Methods.info,
       Cakeagent_AgentClientMetadata.Methods.execute,
       Cakeagent_AgentClientMetadata.Methods.shell,
+      Cakeagent_AgentClientMetadata.Methods.mount,
+      Cakeagent_AgentClientMetadata.Methods.umount,
     ]
   )
 
@@ -326,6 +438,18 @@ public enum Cakeagent_AgentClientMetadata {
       path: "/cakeagent.Agent/Shell",
       type: GRPCCallType.bidirectionalStreaming
     )
+
+    public static let mount = GRPCMethodDescriptor(
+      name: "Mount",
+      path: "/cakeagent.Agent/Mount",
+      type: GRPCCallType.unary
+    )
+
+    public static let umount = GRPCMethodDescriptor(
+      name: "Umount",
+      path: "/cakeagent.Agent/Umount",
+      type: GRPCCallType.unary
+    )
   }
 }
 
@@ -338,6 +462,10 @@ public protocol Cakeagent_AgentProvider: CallHandlerProvider {
   func execute(request: Cakeagent_ExecuteRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ExecuteReply>
 
   func shell(context: StreamingResponseCallContext<Cakeagent_ShellResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ShellMessage>) -> Void>
+
+  func mount(request: Cakeagent_MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_MountReply>
+
+  func umount(request: Cakeagent_UmountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_MountReply>
 }
 
 extension Cakeagent_AgentProvider {
@@ -379,6 +507,24 @@ extension Cakeagent_AgentProvider {
         observerFactory: self.shell(context:)
       )
 
+    case "Mount":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_MountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        interceptors: self.interceptors?.makeMountInterceptors() ?? [],
+        userFunction: self.mount(request:context:)
+      )
+
+    case "Umount":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_UmountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        interceptors: self.interceptors?.makeUmountInterceptors() ?? [],
+        userFunction: self.umount(request:context:)
+      )
+
     default:
       return nil
     }
@@ -406,6 +552,16 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>,
     context: GRPCAsyncServerCallContext
   ) async throws
+
+  func mount(
+    request: Cakeagent_MountRequest,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> Cakeagent_MountReply
+
+  func umount(
+    request: Cakeagent_UmountRequest,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> Cakeagent_MountReply
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -454,6 +610,24 @@ extension Cakeagent_AgentAsyncProvider {
         wrapping: { try await self.shell(requestStream: $0, responseStream: $1, context: $2) }
       )
 
+    case "Mount":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_MountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        interceptors: self.interceptors?.makeMountInterceptors() ?? [],
+        wrapping: { try await self.mount(request: $0, context: $1) }
+      )
+
+    case "Umount":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_UmountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        interceptors: self.interceptors?.makeUmountInterceptors() ?? [],
+        wrapping: { try await self.umount(request: $0, context: $1) }
+      )
+
     default:
       return nil
     }
@@ -473,6 +647,14 @@ public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
   /// - Returns: Interceptors to use when handling 'shell'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeShellInterceptors() -> [ServerInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellResponse>]
+
+  /// - Returns: Interceptors to use when handling 'mount'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeMountInterceptors() -> [ServerInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
+
+  /// - Returns: Interceptors to use when handling 'umount'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeUmountInterceptors() -> [ServerInterceptor<Cakeagent_UmountRequest, Cakeagent_MountReply>]
 }
 
 public enum Cakeagent_AgentServerMetadata {
@@ -483,6 +665,8 @@ public enum Cakeagent_AgentServerMetadata {
       Cakeagent_AgentServerMetadata.Methods.info,
       Cakeagent_AgentServerMetadata.Methods.execute,
       Cakeagent_AgentServerMetadata.Methods.shell,
+      Cakeagent_AgentServerMetadata.Methods.mount,
+      Cakeagent_AgentServerMetadata.Methods.umount,
     ]
   )
 
@@ -503,6 +687,18 @@ public enum Cakeagent_AgentServerMetadata {
       name: "Shell",
       path: "/cakeagent.Agent/Shell",
       type: GRPCCallType.bidirectionalStreaming
+    )
+
+    public static let mount = GRPCMethodDescriptor(
+      name: "Mount",
+      path: "/cakeagent.Agent/Mount",
+      type: GRPCCallType.unary
+    )
+
+    public static let umount = GRPCMethodDescriptor(
+      name: "Umount",
+      path: "/cakeagent.Agent/Umount",
+      type: GRPCCallType.unary
     )
   }
 }

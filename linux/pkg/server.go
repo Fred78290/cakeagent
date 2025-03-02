@@ -21,6 +21,7 @@ import (
 
 	"github.com/Fred78290/cakeagent/cmd/types"
 	"github.com/Fred78290/cakeagent/pkg/cakeagent"
+	"github.com/Fred78290/cakeagent/pkg/mount"
 	"github.com/Fred78290/cakeagent/pkg/serialport"
 	"github.com/creack/pty"
 	"github.com/elastic/go-sysinfo"
@@ -251,6 +252,13 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 	}
 
 	return
+}
+
+func (s *server) Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
+	return mount.Mount(ctx, request)
+}
+func (s *server) Umount(ctx context.Context, request *cakeagent.UmountRequest) (*cakeagent.MountReply, error) {
+	return mount.Umount(ctx, request)
 }
 
 func createListener(listen string) (listener net.Listener, err error) {
