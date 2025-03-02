@@ -14,6 +14,8 @@ service Agent {
 	rpc Info (google.protobuf.Empty) returns (InfoReply);
 	rpc Execute (ExecuteRequest) returns (ExecuteReply);
 	rpc Shell(stream ShellMessage) returns (stream ShellResponse);
+	rpc Mount(MountRequest) returns (MountReply);
+	rpc Umount(UmountRequest) returns (MountReply);
 }
 
 message InfoReply {
@@ -59,4 +61,26 @@ enum Format {
 message ShellResponse {
 	Format format = 1;
 	optional bytes datas = 2;
+}
+
+message MountVirtioFS {
+	string name = 1;
+	string target = 2;
+	int32 uid = 3;
+	int32 gid = 4;
+}
+
+message MountRequest {
+	repeated MountVirtioFS mounts = 1;
+}
+
+message UmountRequest {
+	repeated MountVirtioFS mounts = 1;
+}
+
+message MountReply {
+	oneof response {
+		string error = 1;
+		bool success = 2;
+	}
 }
