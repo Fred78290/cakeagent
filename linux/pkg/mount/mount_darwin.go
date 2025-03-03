@@ -14,7 +14,7 @@ func mount(_ context.Context, _ *cakeagent.MountRequest) (*cakeagent.MountReply,
 	}, nil
 }
 
-func umount(_ context.Context, _ *cakeagent.UmountRequest) (*cakeagent.MountReply, error) {
+func umount(_ context.Context, _ *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return &cakeagent.MountReply{
 		Response: &cakeagent.MountReply_Error{
 			Error: "method Umount not supported on darwin",

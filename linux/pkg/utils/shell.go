@@ -8,7 +8,7 @@ import (
 )
 
 // Shell execute local command
-func Shell(args ...string) (string, string, error) {
+func Shell(args ...string) (stdOut string, stdErr string, err error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -17,9 +17,15 @@ func Shell(args ...string) (string, string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), fmt.Errorf("%s, %s", err.Error(), strings.TrimSpace(stderr.String()))
+	err = cmd.Run()
+	stdOut = strings.TrimSpace(stdout.String())
+	stdErr = strings.TrimSpace(stderr.String())
+
+	if err == nil {
+		if cmd.ProcessState.ExitCode() != 0 {
+			err = fmt.Errorf("mount failed: %s: %d", stdErr, cmd.ProcessState.ExitCode())
+		}
 	}
 
-	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), nil
+	return
 }

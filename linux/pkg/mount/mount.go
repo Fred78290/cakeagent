@@ -10,6 +10,6 @@ func Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.Mou
 	return mount(ctx, request)
 }
 
-func Umount(ctx context.Context, request *cakeagent.UmountRequest) (*cakeagent.MountReply, error) {
+func Umount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return umount(ctx, request)
 }

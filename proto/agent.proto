@@ -15,7 +15,7 @@ service Agent {
 	rpc Execute (ExecuteRequest) returns (ExecuteReply);
 	rpc Shell(stream ShellMessage) returns (stream ShellResponse);
 	rpc Mount(MountRequest) returns (MountReply);
-	rpc Umount(UmountRequest) returns (MountReply);
+	rpc Umount(MountRequest) returns (MountReply);
 }
 
 message InfoReply {
@@ -68,19 +68,25 @@ message MountVirtioFS {
 	string target = 2;
 	int32 uid = 3;
 	int32 gid = 4;
+	bool readonly = 5;
 }
 
 message MountRequest {
 	repeated MountVirtioFS mounts = 1;
 }
 
-message UmountRequest {
-	repeated MountVirtioFS mounts = 1;
+message MountVirtioFSReply {
+	string name = 1;
+	oneof response {
+		string error = 2;
+		bool success = 3;
+	}
 }
 
 message MountReply {
+	repeated MountVirtioFSReply mounts = 1;
 	oneof response {
-		string error = 1;
-		bool success = 2;
+		string error = 2;
+		bool success = 3;
 	}
 }

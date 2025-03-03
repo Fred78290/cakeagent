@@ -257,7 +257,7 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 func (s *server) Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return mount.Mount(ctx, request)
 }
-func (s *server) Umount(ctx context.Context, request *cakeagent.UmountRequest) (*cakeagent.MountReply, error) {
+func (s *server) Umount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return mount.Umount(ctx, request)
 }
 

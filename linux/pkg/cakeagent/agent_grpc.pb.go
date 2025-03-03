@@ -35,7 +35,7 @@ type AgentClient interface {
 	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteReply, error)
 	Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellMessage, ShellResponse], error)
 	Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
-	Umount(ctx context.Context, in *UmountRequest, opts ...grpc.CallOption) (*MountReply, error)
+	Umount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
 }
 
 type agentClient struct {
@@ -89,7 +89,7 @@ func (c *agentClient) Mount(ctx context.Context, in *MountRequest, opts ...grpc.
 	return out, nil
 }
 
-func (c *agentClient) Umount(ctx context.Context, in *UmountRequest, opts ...grpc.CallOption) (*MountReply, error) {
+func (c *agentClient) Umount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MountReply)
 	err := c.cc.Invoke(ctx, Agent_Umount_FullMethodName, in, out, cOpts...)
@@ -107,7 +107,7 @@ type AgentServer interface {
 	Execute(context.Context, *ExecuteRequest) (*ExecuteReply, error)
 	Shell(grpc.BidiStreamingServer[ShellMessage, ShellResponse]) error
 	Mount(context.Context, *MountRequest) (*MountReply, error)
-	Umount(context.Context, *UmountRequest) (*MountReply, error)
+	Umount(context.Context, *MountRequest) (*MountReply, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -130,7 +130,7 @@ func (UnimplementedAgentServer) Shell(grpc.BidiStreamingServer[ShellMessage, She
 func (UnimplementedAgentServer) Mount(context.Context, *MountRequest) (*MountReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Mount not implemented")
 }
-func (UnimplementedAgentServer) Umount(context.Context, *UmountRequest) (*MountReply, error) {
+func (UnimplementedAgentServer) Umount(context.Context, *MountRequest) (*MountReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Umount not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
@@ -216,7 +216,7 @@ func _Agent_Mount_Handler(srv interface{}, ctx context.Context, dec func(interfa
 }
 
 func _Agent_Umount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UmountRequest)
+	in := new(MountRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func _Agent_Umount_Handler(srv interface{}, ctx context.Context, dec func(interf
 		FullMethod: Agent_Umount_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Umount(ctx, req.(*UmountRequest))
+		return srv.(AgentServer).Umount(ctx, req.(*MountRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
