@@ -346,4 +346,16 @@ public struct CakeAgentHelper: Sendable {
 			}
 		}
 	}
+
+	public func mount(request: Cakeagent_MountRequest, callOptions: CallOptions? = nil) throws -> Cakeagent_MountReply {
+		let response = client.mount(request, callOptions: callOptions)
+		
+		return try response.response.wait()
+	}
+
+	public func umount(request: Cakeagent_UmountRequest, callOptions: CallOptions? = nil) throws -> Cakeagent_MountReply {
+		let response = client.umount(request, callOptions: callOptions)
+		
+		return try response.response.wait()
+	}
 }
