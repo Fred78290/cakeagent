@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+rm -rf ./.build *.o *.d *.swiftdeps
+
 swift build && exec ./.build/debug/cakeagent run \
 	--listen=tcp://127.0.0.1:5000 \
 	--ca-cert="${HOME}/.cake/agent/ca.pem" \

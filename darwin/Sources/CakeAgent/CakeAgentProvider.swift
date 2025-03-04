@@ -23,20 +23,38 @@ extension TaskGroup<Void>: @retroactive @unchecked Sendable {
 
 }
 
+extension Cakeagent_ShellRequest {
+	var isCommand: Bool {
+		guard case .command = self.request else {
+			return false
+		}
+		
+		return true
+	}
+	
+	var isInput: Bool {
+		guard case .input = self.request else {
+			return false
+		}
+		
+		return true
+	}
+}
+
 class TTY: @unchecked Sendable {
-	let fileHandleForReading: FileHandle
-	let fileHandleForWriting: FileHandle
+	let ptx: FileHandle
+	let pty: FileHandle
 
 	init() {
 		let master = Self.createPTY()	
 
-		self.fileHandleForReading = FileHandle(fileDescriptor: master.0, closeOnDealloc: true)
-		self.fileHandleForWriting = FileHandle(fileDescriptor: master.1, closeOnDealloc: true)
+		self.ptx = FileHandle(fileDescriptor: master.0, closeOnDealloc: true)
+		self.pty = FileHandle(fileDescriptor: master.1, closeOnDealloc: true)
 	}
 
 	func close() {
-		self.fileHandleForReading.closeFile()
-		self.fileHandleForWriting.closeFile()
+		self.ptx.closeFile()
+		self.pty.closeFile()
 	}
 
 	private static func setupty(_ fd: Int32) -> Int32 {
@@ -112,49 +130,8 @@ class TTY: @unchecked Sendable {
 	}
 }
 
-
-extension FileHandle {
-	func makeRaw() -> FileHandle {
-		let fd = self.fileDescriptor
-		let TTY_CTRL_OPTS: tcflag_t = tcflag_t(CS8 | CLOCAL | CREAD)
-		let TTY_INPUT_OPTS: tcflag_t = tcflag_t(IGNPAR)
-		let TTY_OUTPUT_OPTS:tcflag_t = 0
-		let TTY_LOCAL_OPTS:tcflag_t = 0
-
-		var termios_ = termios()
-		var res = fcntl(fd, F_GETFL)
-		if res < 0 {
-			perror("fcntl F_GETFL error")
-			fatalError()
-		}
-
-		res = fcntl(fd, F_SETFL, res | O_NONBLOCK)
-		if res < 0 {
-			perror("fcntl F_SETFL error")
-			fatalError()
-		}
-
-		tcgetattr(fd, &termios_)
-		cfsetispeed(&termios_, speed_t(B115200))
-		cfsetospeed(&termios_, speed_t(B115200))
-		cfmakeraw(&termios_)
-
-		// This attempts to replicate the behaviour documented for cfmakeraw in
-		// the termios(3) manpage.
-		termios_.c_iflag = TTY_INPUT_OPTS
-		termios_.c_oflag = TTY_OUTPUT_OPTS
-		termios_.c_lflag = TTY_LOCAL_OPTS
-		termios_.c_cflag = TTY_CTRL_OPTS
-		termios_.c_cc.16 = 1 // Darwin.VMIN
-		termios_.c_cc.17 = 0 // Darwin.VTIME
-
-		tcsetattr(fd, TCSANOW, &termios_)
-
-		return self
-	}
-}
-
 final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
+
 	let group: EventLoopGroup
 	let logger = Logging.Logger(label: "com.aldunelabs.cakeagent")
 
@@ -222,116 +199,47 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		return reply
 	}
 
-	func execute(request: Cakeagent_ExecuteRequest, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_ExecuteReply {
+	func execute(command: Cakeagent_ExecuteCommand, requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
 		let process = Process()
-		let outputPipe = Pipe()
+		let tty = TTY()
 		let errorPipe = Pipe()
-		var outputData = Data()
-		var errorData = Data()
-		var arguments: [String] = [request.command]
-
-		arguments.append(contentsOf: request.args)
-
-		let outputQueue = DispatchQueue(label: "bash-output-queue")
-
-		logger.info("execute \(request.command)")
-
-		process.executableURL = URL(fileURLWithPath: "/bin/sh")
-		process.arguments = ["-c", arguments.joined(separator: " ")]
-		process.standardOutput = outputPipe
-		process.standardError = errorPipe
-		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-
-		if request.hasInput {
-			let inputPipe = Pipe()
-
-			process.standardInput = inputPipe
-
-			inputPipe.fileHandleForWriting.writeabilityHandler = { handler in
-				handler.write(request.input)
-			}	
-		}
-
-		outputPipe.fileHandleForReading.readabilityHandler = { handler in
-			let data = handler.availableData
-
-			if data.isEmpty == false {
-				self.logger.info("outputPipe data \(String(data: data, encoding: .utf8) ?? "")")
-				outputQueue.async {
-					outputData.append(data)
-				}
-			}
-		}
-
-		errorPipe.fileHandleForReading.readabilityHandler = { handler in
-			let data = handler.availableData
-
-			if data.isEmpty == false {
-				self.logger.info("errorPipe data \(String(data: data, encoding: .utf8) ?? "")")
-				outputQueue.async {
-					errorData.append(data)
-				}
-			}
-		}
-
-		try process.run()
-
-		process.waitUntilExit()
-
-		return Cakeagent_ExecuteReply.with { reply in
-			if outputData.isEmpty == false {
-				reply.output = outputData
-			}
-
-			if errorData.isEmpty == false {
-				reply.error = errorData
-			}
-
-			reply.exitCode = Int32(process.terminationStatus)
-		}
-	}
-
-	func shell(requestStream: GRPC.GRPCAsyncRequestStream<CakeAgentLib.Cakeagent_ShellMessage>, responseStream: GRPC.GRPCAsyncResponseStreamWriter<CakeAgentLib.Cakeagent_ShellResponse>, context: GRPC.GRPCAsyncServerCallContext) async throws {
-		let process = Process()
-		let inputPipe = TTY()
-		let outputPipe = Pipe()
-		let errorPipe = Pipe()
-
-		process.executableURL = URL(fileURLWithPath: "/bin/sh")
-		process.arguments = ["-i", "-l"]
-		process.standardInput = inputPipe.fileHandleForReading
-		process.standardOutput = outputPipe.fileHandleForWriting
-		process.standardError = errorPipe.fileHandleForWriting
-		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
 		errorPipe.fileHandleForReading.readabilityHandler = { handler in
 			let data = handler.availableData
 
 			if data.isEmpty == false {
 				Task {
-					_ = try? await responseStream.send(Cakeagent_ShellResponse.with { message in
-						message.format = .stderr
-						message.datas = data
-					})
+					let message = Cakeagent_ShellResponse.with {
+						$0.stderr = data
+					}
+
+					_ = try? await responseStream.send(message)
 				}
 			}
 		}
 
+		process.executableURL = URL(fileURLWithPath: command.command)
+		process.arguments = command.args
+		process.standardInput = tty.pty
+		process.standardOutput = tty.pty
+		process.standardError = errorPipe.fileHandleForWriting
+		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
 		let channel: NIOAsyncChannel<ByteBuffer, ByteBuffer> = try await NIOPipeBootstrap(group: self.group)
-			.takingOwnershipOfDescriptors(input: outputPipe.fileHandleForReading.fileDescriptor, output: inputPipe.fileHandleForWriting.fileDescriptor) { channel in
+			.takingOwnershipOfDescriptor(inputOutput: tty.ptx.fileDescriptor) { channel in
 				return channel.eventLoop.makeCompletedFuture {
 					try NIOAsyncChannel(wrappingChannelSynchronously: channel, configuration: .init(isOutboundHalfClosureEnabled: true))
 				}
 			}
 
 		do {
-			try process.run()
-
 			defer {
 				process.terminate()
 			}
 
 			try await channel.executeThenClose { inbound, outbound in
+				try process.run()
+
 				await withTaskGroup(of: Void.self) { group in
 					let grp = group
 
@@ -342,8 +250,13 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 
 					group.addTask {
 						do {
-							for try await message: Cakeagent_ShellMessage in requestStream {
-								try await outbound.write(ByteBuffer(data: message.datas))
+							for try await request: Cakeagent_ShellRequest in requestStream {
+								if case let .input(message) = request.request {
+									tty.pty.setTermSize(rows: message.rows, cols: message.cols)
+									if message.datas.isEmpty == false {
+										try await outbound.write(ByteBuffer(data: message.datas))
+									}
+								}
 							}
 						} catch {
 							if error is CancellationError == false {
@@ -358,7 +271,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 					group.addTask {
 						do {
 							for try await reply in inbound {
-								try await responseStream.send(Cakeagent_ShellResponse.with { $0.datas = Data(buffer: reply) })
+								try await responseStream.send(Cakeagent_ShellResponse.with { $0.stdout = Data(buffer: reply) })
 							}
 						} catch {
 							if error is CancellationError == false {
@@ -373,14 +286,36 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 				}
 			}
 
-			try await responseStream.send(Cakeagent_ShellResponse.with { $0.format = .end })
+			try await responseStream.send(Cakeagent_ShellResponse.with { $0.exitCode = 0 })
 
 			self.logger.debug("Exit shell")
 		} catch {
 			if error is CancellationError == false {
+				try? await responseStream.send(Cakeagent_ShellResponse.with { $0.stderr = error.localizedDescription.data(using: .utf8)! })
+				try? await responseStream.send(Cakeagent_ShellResponse.with { $0.exitCode = 1 })
+
 				self.logger.error("Shell stopped on error, \(error)")
 			}
 		}
+	}
+
+	func execute(requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
+		guard let request = try await requestStream.first(where: {  $0.isCommand }) else {
+			throw ServiceError("The firt message must be command")
+		}
+			
+		try await self.execute(command: request.command, requestStream: requestStream, responseStream: responseStream, context: context)
+	}
+	
+	func shell(requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
+		let command = Cakeagent_ExecuteCommand.with {
+			$0.cols = 80
+			$0.rows = 24
+			$0.command = "/bin/sh"
+			$0.args = ["-i", "-l"]
+		}
+
+		try await self.execute(command: command, requestStream: requestStream, responseStream: responseStream, context: context)
 	}
 
 	func mount(request: Cakeagent_MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {

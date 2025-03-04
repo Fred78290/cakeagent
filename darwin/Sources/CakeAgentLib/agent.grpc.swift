@@ -22,14 +22,14 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
   ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
 
   func execute(
-    _ request: Cakeagent_ExecuteRequest,
-    callOptions: CallOptions?
-  ) -> UnaryCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply>
+    callOptions: CallOptions?,
+    handler: @escaping (Cakeagent_ShellResponse) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse>
 
   func shell(
     callOptions: CallOptions?,
     handler: @escaping (Cakeagent_ShellResponse) -> Void
-  ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>
+  ) -> BidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse>
 
   func mount(
     _ request: Cakeagent_MountRequest,
@@ -65,21 +65,24 @@ extension Cakeagent_AgentClientProtocol {
     )
   }
 
-  /// Unary call to Execute
+  /// Bidirectional streaming call to Execute
+  ///
+  /// Callers should use the `send` method on the returned object to send messages
+  /// to the server. The caller should send an `.end` after the final message has been sent.
   ///
   /// - Parameters:
-  ///   - request: Request to send to Execute.
   ///   - callOptions: Call options.
-  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  ///   - handler: A closure called when each response is received from the server.
+  /// - Returns: A `ClientStreamingCall` with futures for the metadata and status.
   public func execute(
-    _ request: Cakeagent_ExecuteRequest,
-    callOptions: CallOptions? = nil
-  ) -> UnaryCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply> {
-    return self.makeUnaryCall(
+    callOptions: CallOptions? = nil,
+    handler: @escaping (Cakeagent_ShellResponse) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse> {
+    return self.makeBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.execute.path,
-      request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
+      interceptors: self.interceptors?.makeExecuteInterceptors() ?? [],
+      handler: handler
     )
   }
 
@@ -95,7 +98,7 @@ extension Cakeagent_AgentClientProtocol {
   public func shell(
     callOptions: CallOptions? = nil,
     handler: @escaping (Cakeagent_ShellResponse) -> Void
-  ) -> BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse> {
+  ) -> BidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse> {
     return self.makeBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       callOptions: callOptions ?? self.defaultCallOptions,
@@ -209,13 +212,12 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
   ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
 
   func makeExecuteCall(
-    _ request: Cakeagent_ExecuteRequest,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply>
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse>
 
   func makeShellCall(
     callOptions: CallOptions?
-  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse>
 
   func makeMountCall(
     _ request: Cakeagent_MountRequest,
@@ -251,12 +253,10 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func makeExecuteCall(
-    _ request: Cakeagent_ExecuteRequest,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply> {
-    return self.makeAsyncUnaryCall(
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse> {
+    return self.makeAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.execute.path,
-      request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
     )
@@ -264,7 +264,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
 
   public func makeShellCall(
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse> {
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse> {
     return self.makeAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       callOptions: callOptions ?? self.defaultCallOptions,
@@ -311,13 +311,25 @@ extension Cakeagent_AgentAsyncClientProtocol {
     )
   }
 
-  public func execute(
-    _ request: Cakeagent_ExecuteRequest,
+  public func execute<RequestStream>(
+    _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_ExecuteReply {
-    return try await self.performAsyncUnaryCall(
+  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_ShellRequest {
+    return self.performAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.execute.path,
-      request: request,
+      requests: requests,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
+    )
+  }
+
+  public func execute<RequestStream>(
+    _ requests: RequestStream,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_ShellRequest {
+    return self.performAsyncBidirectionalStreamingCall(
+      path: Cakeagent_AgentClientMetadata.Methods.execute.path,
+      requests: requests,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
     )
@@ -326,7 +338,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func shell<RequestStream>(
     _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_ShellMessage {
+  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_ShellRequest {
     return self.performAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       requests: requests,
@@ -338,7 +350,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func shell<RequestStream>(
     _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_ShellMessage {
+  ) -> GRPCAsyncResponseStream<Cakeagent_ShellResponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_ShellRequest {
     return self.performAsyncBidirectionalStreamingCall(
       path: Cakeagent_AgentClientMetadata.Methods.shell.path,
       requests: requests,
@@ -395,10 +407,10 @@ public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
   func makeInfoInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
   /// - Returns: Interceptors to use when invoking 'execute'.
-  func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply>]
+  func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ShellRequest, Cakeagent_ShellResponse>]
 
   /// - Returns: Interceptors to use when invoking 'shell'.
-  func makeShellInterceptors() -> [ClientInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellResponse>]
+  func makeShellInterceptors() -> [ClientInterceptor<Cakeagent_ShellRequest, Cakeagent_ShellResponse>]
 
   /// - Returns: Interceptors to use when invoking 'mount'.
   func makeMountInterceptors() -> [ClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
@@ -430,7 +442,7 @@ public enum Cakeagent_AgentClientMetadata {
     public static let execute = GRPCMethodDescriptor(
       name: "Execute",
       path: "/cakeagent.Agent/Execute",
-      type: GRPCCallType.unary
+      type: GRPCCallType.bidirectionalStreaming
     )
 
     public static let shell = GRPCMethodDescriptor(
@@ -459,9 +471,9 @@ public protocol Cakeagent_AgentProvider: CallHandlerProvider {
 
   func info(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_InfoReply>
 
-  func execute(request: Cakeagent_ExecuteRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ExecuteReply>
+  func execute(context: StreamingResponseCallContext<Cakeagent_ShellResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ShellRequest>) -> Void>
 
-  func shell(context: StreamingResponseCallContext<Cakeagent_ShellResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ShellMessage>) -> Void>
+  func shell(context: StreamingResponseCallContext<Cakeagent_ShellResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ShellRequest>) -> Void>
 
   func mount(request: Cakeagent_MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_MountReply>
 
@@ -490,18 +502,18 @@ extension Cakeagent_AgentProvider {
       )
 
     case "Execute":
-      return UnaryServerHandler(
+      return BidirectionalStreamingServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_ExecuteRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_ShellRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ShellResponse>(),
         interceptors: self.interceptors?.makeExecuteInterceptors() ?? [],
-        userFunction: self.execute(request:context:)
+        observerFactory: self.execute(context:)
       )
 
     case "Shell":
       return BidirectionalStreamingServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_ShellMessage>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_ShellRequest>(),
         responseSerializer: ProtobufSerializer<Cakeagent_ShellResponse>(),
         interceptors: self.interceptors?.makeShellInterceptors() ?? [],
         observerFactory: self.shell(context:)
@@ -543,12 +555,13 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
   ) async throws -> Cakeagent_InfoReply
 
   func execute(
-    request: Cakeagent_ExecuteRequest,
+    requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>,
+    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_ExecuteReply
+  ) async throws
 
   func shell(
-    requestStream: GRPCAsyncRequestStream<Cakeagent_ShellMessage>,
+    requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>,
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>,
     context: GRPCAsyncServerCallContext
   ) async throws
@@ -595,16 +608,16 @@ extension Cakeagent_AgentAsyncProvider {
     case "Execute":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_ExecuteRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_ShellRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ShellResponse>(),
         interceptors: self.interceptors?.makeExecuteInterceptors() ?? [],
-        wrapping: { try await self.execute(request: $0, context: $1) }
+        wrapping: { try await self.execute(requestStream: $0, responseStream: $1, context: $2) }
       )
 
     case "Shell":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_ShellMessage>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_ShellRequest>(),
         responseSerializer: ProtobufSerializer<Cakeagent_ShellResponse>(),
         interceptors: self.interceptors?.makeShellInterceptors() ?? [],
         wrapping: { try await self.shell(requestStream: $0, responseStream: $1, context: $2) }
@@ -642,11 +655,11 @@ public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when handling 'execute'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeExecuteInterceptors() -> [ServerInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteReply>]
+  func makeExecuteInterceptors() -> [ServerInterceptor<Cakeagent_ShellRequest, Cakeagent_ShellResponse>]
 
   /// - Returns: Interceptors to use when handling 'shell'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeShellInterceptors() -> [ServerInterceptor<Cakeagent_ShellMessage, Cakeagent_ShellResponse>]
+  func makeShellInterceptors() -> [ServerInterceptor<Cakeagent_ShellRequest, Cakeagent_ShellResponse>]
 
   /// - Returns: Interceptors to use when handling 'mount'.
   ///   Defaults to calling `self.makeInterceptors()`.
@@ -680,7 +693,7 @@ public enum Cakeagent_AgentServerMetadata {
     public static let execute = GRPCMethodDescriptor(
       name: "Execute",
       path: "/cakeagent.Agent/Execute",
-      type: GRPCCallType.unary
+      type: GRPCCallType.bidirectionalStreaming
     )
 
     public static let shell = GRPCMethodDescriptor(

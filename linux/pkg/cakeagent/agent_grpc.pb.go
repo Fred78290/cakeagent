@@ -32,8 +32,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentClient interface {
 	Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error)
-	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteReply, error)
-	Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellMessage, ShellResponse], error)
+	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellRequest, ShellResponse], error)
+	Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellRequest, ShellResponse], error)
 	Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
 	Umount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
 }
@@ -56,28 +56,31 @@ func (c *agentClient) Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.
 	return out, nil
 }
 
-func (c *agentClient) Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteReply, error) {
+func (c *agentClient) Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellRequest, ShellResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ExecuteReply)
-	err := c.cc.Invoke(ctx, Agent_Execute_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Agent_ServiceDesc.Streams[0], Agent_Execute_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
-}
-
-func (c *agentClient) Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellMessage, ShellResponse], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Agent_ServiceDesc.Streams[0], Agent_Shell_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[ShellMessage, ShellResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[ShellRequest, ShellResponse]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Agent_ShellClient = grpc.BidiStreamingClient[ShellMessage, ShellResponse]
+type Agent_ExecuteClient = grpc.BidiStreamingClient[ShellRequest, ShellResponse]
+
+func (c *agentClient) Shell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ShellRequest, ShellResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Agent_ServiceDesc.Streams[1], Agent_Shell_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ShellRequest, ShellResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Agent_ShellClient = grpc.BidiStreamingClient[ShellRequest, ShellResponse]
 
 func (c *agentClient) Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -104,8 +107,8 @@ func (c *agentClient) Umount(ctx context.Context, in *MountRequest, opts ...grpc
 // for forward compatibility.
 type AgentServer interface {
 	Info(context.Context, *emptypb.Empty) (*InfoReply, error)
-	Execute(context.Context, *ExecuteRequest) (*ExecuteReply, error)
-	Shell(grpc.BidiStreamingServer[ShellMessage, ShellResponse]) error
+	Execute(grpc.BidiStreamingServer[ShellRequest, ShellResponse]) error
+	Shell(grpc.BidiStreamingServer[ShellRequest, ShellResponse]) error
 	Mount(context.Context, *MountRequest) (*MountReply, error)
 	Umount(context.Context, *MountRequest) (*MountReply, error)
 	mustEmbedUnimplementedAgentServer()
@@ -121,10 +124,10 @@ type UnimplementedAgentServer struct{}
 func (UnimplementedAgentServer) Info(context.Context, *emptypb.Empty) (*InfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
 }
-func (UnimplementedAgentServer) Execute(context.Context, *ExecuteRequest) (*ExecuteReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Execute not implemented")
+func (UnimplementedAgentServer) Execute(grpc.BidiStreamingServer[ShellRequest, ShellResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method Execute not implemented")
 }
-func (UnimplementedAgentServer) Shell(grpc.BidiStreamingServer[ShellMessage, ShellResponse]) error {
+func (UnimplementedAgentServer) Shell(grpc.BidiStreamingServer[ShellRequest, ShellResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Shell not implemented")
 }
 func (UnimplementedAgentServer) Mount(context.Context, *MountRequest) (*MountReply, error) {
@@ -172,30 +175,19 @@ func _Agent_Info_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_Execute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ExecuteRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AgentServer).Execute(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Agent_Execute_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Execute(ctx, req.(*ExecuteRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Agent_Shell_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AgentServer).Shell(&grpc.GenericServerStream[ShellMessage, ShellResponse]{ServerStream: stream})
+func _Agent_Execute_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(AgentServer).Execute(&grpc.GenericServerStream[ShellRequest, ShellResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Agent_ShellServer = grpc.BidiStreamingServer[ShellMessage, ShellResponse]
+type Agent_ExecuteServer = grpc.BidiStreamingServer[ShellRequest, ShellResponse]
+
+func _Agent_Shell_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(AgentServer).Shell(&grpc.GenericServerStream[ShellRequest, ShellResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Agent_ShellServer = grpc.BidiStreamingServer[ShellRequest, ShellResponse]
 
 func _Agent_Mount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MountRequest)
@@ -245,10 +237,6 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Agent_Info_Handler,
 		},
 		{
-			MethodName: "Execute",
-			Handler:    _Agent_Execute_Handler,
-		},
-		{
 			MethodName: "Mount",
 			Handler:    _Agent_Mount_Handler,
 		},
@@ -258,6 +246,12 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Execute",
+			Handler:       _Agent_Execute_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
 		{
 			StreamName:    "Shell",
 			Handler:       _Agent_Shell_Handler,

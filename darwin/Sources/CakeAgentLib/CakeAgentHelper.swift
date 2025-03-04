@@ -112,36 +112,121 @@ public struct InfoReply: Sendable, Codable {
 	}
 }
 
-extension FileHandle {
-	func makeRaw() -> termios {
-		var term: termios = termios()
-		let inputTTY: Bool = isatty(self.fileDescriptor) != 0
+final class CakeChannelStreamer: @unchecked Sendable {
+	let eventLoop: EventLoop
+	let inputHandle: FileHandle
+	let outputHandle: FileHandle
+	let errorHandle: FileHandle
+	var pipeChannel: NIOAsyncChannel<ByteBuffer, ByteBuffer>? = nil
+	var exitCode: Int32 = 0
 
-		if inputTTY {
-			if tcgetattr(self.fileDescriptor, &term) != 0 {
-				perror("tcgetattr error")
+	init(on: EventLoop, inputHandle: FileHandle, outputHandle: FileHandle, errorHandle: FileHandle) {
+		self.eventLoop = on
+		self.inputHandle = inputHandle
+		self.outputHandle = outputHandle
+		self.errorHandle = errorHandle
+	}
+	
+	func handleResponse(response: Cakeagent_ShellResponse) -> Void {
+		if let channel = self.pipeChannel {
+			if case let .exitCode(code) = response.response {
+				self.exitCode = code
+				_ = channel.channel.close()
+			} else {
+				channel.channel.eventLoop.execute {
+					do {
+						if case let .stdout(datas) = response.response {
+							try self.outputHandle.write(contentsOf: datas)
+						} else if case let .stderr(datas) = response.response {
+							try self.errorHandle.write(contentsOf: datas)
+						}
+					} catch {
+						if error is CancellationError == false {
+							guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
+								let errMessage = "error: \(error)\n".data(using: .utf8)!
+								
+								FileHandle.standardError.write(errMessage)
+								self.errorHandle.write(errMessage)
+								return
+							}
+						}
+					}
+				}
 			}
-
-			var newState: termios = term
-
-			newState.c_iflag &= UInt(IGNBRK) | ~UInt(BRKINT | INPCK | ISTRIP | IXON)
-			newState.c_cflag |= UInt(CS8)
-			newState.c_lflag &= ~UInt(ECHO | ICANON | IEXTEN | ISIG)
-			newState.c_cc.16 = 1
-			newState.c_cc.17 = 17
-
-			if tcsetattr(self.fileDescriptor, TCSANOW, &newState) != 0 {
-				perror("tcsetattr error")
-			}
+			
 		}
-
-		return term
 	}
 
-	func restoreState(_ term: UnsafePointer<termios>) {
-		if tcsetattr(self.fileDescriptor, TCSANOW, term) != 0 {
-			perror("tcsetattr error")
+	func stream(handler: @escaping () -> BidirectionalStreamingCall<Cakeagent_ShellRequest, Cakeagent_ShellResponse>) async throws -> Int32 {
+		let stream = handler()
+
+		let sigwinch = DispatchSource.makeSignalSource(signal: SIGWINCH)
+
+		sigwinch.setEventHandler {
+			stream.eventLoop.execute {
+				let size = self.outputHandle.getTermSize()
+				let message = Cakeagent_ShellRequest.with {
+					$0.input = Cakeagent_ShellMessage.with {
+						$0.rows = size.rows
+						$0.cols = size.cols
+					}
+				}
+
+				_ = stream.sendMessage(message)
+			}
 		}
+
+		sigwinch.activate()
+
+		defer {
+			sigwinch.cancel()
+			_ = stream.sendEnd()
+		}
+
+		pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
+			return Task {
+				return try await NIOPipeBootstrap(group: self.eventLoop)
+					.takingOwnershipOfDescriptor(input: dup(self.inputHandle.fileDescriptor)) { pipeChannel in
+						pipeChannel.closeFuture.whenComplete { _ in
+							_ = stream.sendEnd()
+						}
+
+						return pipeChannel.eventLoop.makeCompletedFuture {
+							try NIOAsyncChannel<ByteBuffer, ByteBuffer>(wrappingChannelSynchronously: pipeChannel)
+						}
+					}
+			}
+		}.get().value
+
+		try await pipeChannel!.executeThenClose { inbound, outbound in
+
+			do {
+				for try await buffer: ByteBuffer in inbound {
+					let size = outputHandle.getTermSize()
+					let message = Cakeagent_ShellRequest.with {
+						$0.input = Cakeagent_ShellMessage.with {
+							$0.datas = Data(buffer: buffer)
+							$0.rows = size.rows
+							$0.cols = size.cols
+						}
+					}
+
+					_ = stream.sendMessage(message)
+				}
+			} catch {
+				if error is CancellationError == false {
+					guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
+						let errMessage = "error: \(error)\n".data(using: .utf8)!
+
+						FileHandle.standardError.write(errMessage)
+						errorHandle.write(errMessage)
+						return
+					}
+				}
+			}
+		}
+		
+		return self.exitCode
 	}
 }
 
@@ -237,125 +322,54 @@ public struct CakeAgentHelper: Sendable {
 	                 inputHandle: FileHandle = FileHandle.standardInput,
 	                 outputHandle: FileHandle = FileHandle.standardOutput,
 	                 errorHandle: FileHandle = FileHandle.standardError,
-	                 callOptions: CallOptions? = nil) throws -> Int32 {
-		var state = inputHandle.makeRaw()
+	                 callOptions: CallOptions? = nil) async throws -> Int32 {
+		let size = outputHandle.getTermSize()
 
-		defer {
-			inputHandle.restoreState(&state)
-		}
+		let handler = CakeChannelStreamer(on: self.eventLoopGroup.next(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle)
 
-		let response = try client.execute(Cakeagent_ExecuteRequest.with { req in
-			if isatty(inputHandle.fileDescriptor) == 0 {
-				req.input = inputHandle.readDataToEndOfFile()
+		return try await handler.stream {
+			let stream = client.execute(callOptions: callOptions, handler: handler.handleResponse)
+			let cmd = Cakeagent_ShellRequest.with {
+				$0.command = Cakeagent_ExecuteCommand.with {
+					$0.command = command
+					$0.args = arguments
+					$0.rows = size.rows
+					$0.cols = size.cols
+				}
 			}
 
-			req.command = command
-			req.args = arguments
-		}).response.wait()
+			_ = stream.sendMessage(cmd)
 
-		if response.hasError {
-			errorHandle.write(response.error)
+			return stream
 		}
-
-		if response.hasOutput {
-			outputHandle.write(response.output)
-		}
-
-		return response.exitCode
 	}
 
 	public func shell(inputHandle: FileHandle = FileHandle.standardInput,
 	                  outputHandle: FileHandle = FileHandle.standardOutput,
 	                  errorHandle: FileHandle = FileHandle.standardError,
-	                  callOptions: CallOptions? = nil) async throws {
-		var shellStream: BidirectionalStreamingCall<Cakeagent_ShellMessage, Cakeagent_ShellResponse>?
-		var pipeChannel: NIOAsyncChannel<ByteBuffer, ByteBuffer>?
+	                  callOptions: CallOptions? = nil) async throws -> Int32 {
 		var term = inputHandle.makeRaw()
 
 		defer {
 			inputHandle.restoreState(&term)
 		}
 
-		shellStream = client.shell(callOptions: callOptions, handler: { response in
-			if let channel = pipeChannel {					
-				if response.format == .end {
-					_ = channel.channel.close()
-				} else {
-					channel.channel.eventLoop.execute {
-						do {
-							if response.format == .stdout {
-								try outputHandle.write(contentsOf: response.datas)
-							} else if response.format == .stderr {
-								try errorHandle.write(contentsOf: response.datas)
-							}
-						} catch {
-							if error is CancellationError == false {
-								guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-									let errMessage = "error: \(error)\n".data(using: .utf8)!
+		let handler = CakeChannelStreamer(on: self.eventLoopGroup.next(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle)
 
-									FileHandle.standardError.write(errMessage)
-									errorHandle.write(errMessage)
-									return
-								}
-							}
-						}
-					}
-				}
-			}
-		})
-
-		if let stream = shellStream {
-			pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
-
-				return Task {
-					return try await NIOPipeBootstrap(group: self.eventLoopGroup)
-						.takingOwnershipOfDescriptor(input: dup(inputHandle.fileDescriptor)) { pipeChannel in
-							pipeChannel.closeFuture.whenComplete { _ in
-								_ = stream.sendEnd()
-							}
-
-							return pipeChannel.eventLoop.makeCompletedFuture {
-								try NIOAsyncChannel<ByteBuffer, ByteBuffer>(wrappingChannelSynchronously: pipeChannel)
-							}
-						}
-				}
-			}.get().value
-
-			try await pipeChannel!.executeThenClose { inbound, outbound in
-
-				do {
-					for try await buffer: ByteBuffer in inbound {
-						let message = Cakeagent_ShellMessage.with {
-							$0.datas = Data(buffer: buffer)
-						}
-
-						_ = stream.sendMessage(message)
-					}
-				} catch {
-					if error is CancellationError == false {
-						guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-							let errMessage = "error: \(error)\n".data(using: .utf8)!
-
-							FileHandle.standardError.write(errMessage)
-							errorHandle.write(errMessage)
-							return
-						}
-					}
-				}
-				_ = stream.sendEnd()
-			}
+		return try await handler.stream {
+			client.shell(callOptions: callOptions, handler: handler.handleResponse)
 		}
 	}
 
 	public func mount(request: Cakeagent_MountRequest, callOptions: CallOptions? = nil) throws -> Cakeagent_MountReply {
 		let response = client.mount(request, callOptions: callOptions)
-		
+
 		return try response.response.wait()
 	}
 
 	public func umount(request: Cakeagent_MountRequest, callOptions: CallOptions? = nil) throws -> Cakeagent_MountReply {
 		let response = client.umount(request, callOptions: callOptions)
-		
+
 		return try response.response.wait()
 	}
 }

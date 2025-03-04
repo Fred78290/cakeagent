@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -14,7 +13,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -28,6 +26,7 @@ import (
 	"github.com/mdlayher/vsock"
 	"github.com/pbnjay/memory"
 	glog "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -35,6 +34,21 @@ import (
 
 type server struct {
 	cakeagent.UnimplementedAgentServer
+}
+
+func setTermSize(fd uintptr, rows int32, cols int32) (err error) {
+	dimensions := unix.Winsize{
+		Row:    uint16(rows),
+		Col:    uint16(cols),
+		Xpixel: 0,
+		Ypixel: 0,
+	}
+
+	if err := unix.IoctlSetWinsize(int(fd), unix.TIOCSWINSZ, &dimensions); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.InfoReply, err error) {
@@ -91,57 +105,12 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 	return reply, nil
 }
 
-func (s *server) Execute(ctx context.Context, req *cakeagent.ExecuteRequest) (reply *cakeagent.ExecuteReply, err error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	home, _ := os.UserHomeDir()
-	reply = &cakeagent.ExecuteReply{}
-
-	arguments := append([]string{req.Command}, req.Args...)
-
-	cmd := exec.Command("/bin/sh", "-c", strings.Join(arguments, " "))
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.Dir = home
-	cmd.Env = os.Environ()
-
-	if len(req.Input) > 0 {
-		cmd.Stdin = strings.NewReader(string(req.Input))
-	}
-
-	if err = cmd.Run(); err != nil {
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				reply.ExitCode = int32(status.ExitStatus())
-				err = nil
-			} else {
-				return nil, fmt.Errorf("failed to get exit status: %v", err)
-			}
-		} else {
-			return nil, fmt.Errorf("failed to run command: %v", err)
-		}
-	}
-
-	if b := stdout.Bytes(); len(b) > 0 {
-		reply.Output = b
-	}
-
-	if b := stderr.Bytes(); len(b) > 0 {
-		reply.Error = b
-	}
-
-	return
-}
-
-func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
-	if stdinOutput, stdinIntput, e := pty.Open(); e != nil {
+func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Agent_ExecuteServer) (err error) {
+	if ptx, pty, e := pty.Open(); e != nil {
 		err = fmt.Errorf("failed to open pty: %v", e)
 	} else {
-		stdoutInput, stdoutOutput := io.Pipe()
-		stderrInput, stderrOutput := io.Pipe()
 		ctx, cancel := context.WithCancel(context.Background())
+		stderrInput, stderrOutput := io.Pipe()
 		home, _ := os.UserHomeDir()
 		var wg sync.WaitGroup
 
@@ -153,7 +122,7 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 			}
 		}
 
-		fowardOutput := func(ctx context.Context, format cakeagent.Format, reader io.Reader) {
+		fowardOutput := func(ctx context.Context, channel int, reader io.Reader) {
 			input := bufio.NewReader(reader)
 			buffer := make([]byte, 1024)
 
@@ -170,7 +139,22 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 						}
 						doCancel()
 					} else if available > 0 {
-						if err = stream.Send(&cakeagent.ShellResponse{Format: format, Datas: buffer[:available]}); err != nil {
+						var message *cakeagent.ShellResponse
+						if channel == 0 {
+							message = &cakeagent.ShellResponse{
+								Response: &cakeagent.ShellResponse_Stdout{
+									Stdout: buffer[:available],
+								},
+							}
+						} else {
+							message = &cakeagent.ShellResponse{
+								Response: &cakeagent.ShellResponse_Stderr{
+									Stderr: buffer[:available],
+								},
+							}
+						}
+
+						if err = stream.Send(message); err != nil {
 							glog.Errorf("Failed to send output: %v", err)
 							doCancel()
 						}
@@ -187,14 +171,19 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 				case <-ctx.Done():
 					return
 				default:
-					if msg, err := stream.Recv(); err != nil {
+					if request, err := stream.Recv(); err != nil {
 						if err != io.EOF {
 							glog.Errorf("Failed to receive message: %v", err)
 						}
 						doCancel()
-					} else if _, err := stdinOutput.Write(msg.Datas); err != nil {
-						glog.Errorf("Failed to write to stdin: %v", err)
-						doCancel()
+					} else if msg := request.GetInput(); msg != nil {
+						setTermSize(pty.Fd(), msg.Rows, msg.Cols)
+						if len(msg.Datas) > 0 {
+							if _, err := ptx.Write(msg.Datas); err != nil {
+								glog.Errorf("Failed to write to stdin: %v", err)
+								doCancel()
+							}
+						}
 					}
 				}
 			}
@@ -202,27 +191,21 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 		}
 
 		cleanup := func() {
-			stdoutInput.Close()
+			ptx.Close()
+			pty.Close()
 			stderrInput.Close()
-			stdoutOutput.Close()
 			stderrOutput.Close()
-			stdinOutput.Close()
-			stdinIntput.Close()
 
 			wg.Wait()
 
-			glog.Infof("Shell session ended")
+			glog.Debug("Shell session ended")
 		}
 
-		shell := "bash"
+		setTermSize(pty.Fd(), command.Rows, command.Cols)
 
-		if shell, err = exec.LookPath(shell); err != nil {
-			shell = "/bin/sh"
-		}
-
-		cmd := exec.CommandContext(ctx, shell, "-i", "-l")
-		cmd.Stdin = stdinIntput
-		cmd.Stdout = stdoutOutput
+		cmd := exec.CommandContext(ctx, command.Command, command.Args...)
+		cmd.Stdin = pty
+		cmd.Stdout = pty
 		cmd.Stderr = stderrOutput
 		cmd.Env = os.Environ()
 		cmd.Dir = home
@@ -231,8 +214,8 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 			Setctty: true,
 		}
 
-		go fowardOutput(ctx, cakeagent.Format_stdout, stdoutInput)
-		go fowardOutput(ctx, cakeagent.Format_stderr, stderrInput)
+		go fowardOutput(ctx, 0, ptx)
+		go fowardOutput(ctx, 1, stderrInput)
 		go fowardStdin()
 
 		defer cleanup()
@@ -240,18 +223,68 @@ func (s *server) Shell(stream cakeagent.Agent_ShellServer) (err error) {
 		if err = cmd.Start(); err == nil {
 
 			if err = cmd.Wait(); err != nil {
-				glog.Errorf("Failed to wait for command: %v", err)
+				if err.Error() != "context canceled" {
+					glog.Errorf("Failed to wait for command: %v", err)
+				}
 			}
 
 			doCancel()
 
-			stream.Send(&cakeagent.ShellResponse{Format: cakeagent.Format_end})
+			var message cakeagent.ShellResponse
+
+			message = cakeagent.ShellResponse{
+				Response: &cakeagent.ShellResponse_Stdout{
+					Stdout: []byte("\r"),
+				},
+			}
+
+			stream.Send(&message)
+
+			message = cakeagent.ShellResponse{
+				Response: &cakeagent.ShellResponse_ExitCode{
+					ExitCode: int32(cmd.ProcessState.ExitCode()),
+				},
+			}
+
+			stream.Send(&message)
 		} else {
 			glog.Errorf("Failed to start command: %v", err)
 		}
 	}
 
 	return
+}
+
+func (s *server) Execute(stream cakeagent.Agent_ExecuteServer) (err error) {
+	var request *cakeagent.ShellRequest
+	var command *cakeagent.ExecuteCommand
+
+	if request, err = stream.Recv(); err != nil {
+		glog.Errorf("Failed to receive command message: %v", err)
+		return
+	}
+
+	if command = request.GetCommand(); command == nil {
+		err = fmt.Errorf("empty command")
+		return
+	}
+
+	return s.execute(command, stream)
+}
+
+func (s *server) Shell(stream cakeagent.Agent_ExecuteServer) (err error) {
+	command := &cakeagent.ExecuteCommand{
+		Command: "bash",
+		Args:    []string{"-i", "-l"},
+		Rows:    25,
+		Cols:    80,
+	}
+
+	if command.Command, err = exec.LookPath(command.Command); err != nil {
+		command.Command = "/bin/sh"
+	}
+
+	return s.execute(command, stream)
 }
 
 func (s *server) Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {

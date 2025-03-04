@@ -17,5 +17,5 @@ set -eu
 
 CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-source ${CURDIR}/darwin.sh
 source ${CURDIR}/linux.sh
+source ${CURDIR}/darwin.sh
