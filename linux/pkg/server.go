@@ -113,6 +113,7 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 		stderrInput, stderrOutput := io.Pipe()
 		home, _ := os.UserHomeDir()
 		var wg sync.WaitGroup
+		var message cakeagent.ShellResponse
 
 		wg.Add(3)
 
@@ -221,7 +222,6 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 		defer cleanup()
 
 		if err = cmd.Start(); err == nil {
-
 			if err = cmd.Wait(); err != nil {
 				if err.Error() != "context canceled" {
 					glog.Errorf("Failed to wait for command: %v", err)
@@ -230,8 +230,6 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 
 			doCancel()
 
-			var message cakeagent.ShellResponse
-
 			message = cakeagent.ShellResponse{
 				Response: &cakeagent.ShellResponse_Stdout{
 					Stdout: []byte("\r"),
@@ -239,17 +237,27 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 			}
 
 			stream.Send(&message)
+		} else {
+			glog.Errorf("Failed to start command: %v", err)
+		}
 
+		if err != nil && err.Error() != "context canceled" {
 			message = cakeagent.ShellResponse{
-				Response: &cakeagent.ShellResponse_ExitCode{
-					ExitCode: int32(cmd.ProcessState.ExitCode()),
+				Response: &cakeagent.ShellResponse_Stderr{
+					Stderr: []byte(err.Error() + "\n"),
 				},
 			}
 
 			stream.Send(&message)
-		} else {
-			glog.Errorf("Failed to start command: %v", err)
 		}
+
+		message = cakeagent.ShellResponse{
+			Response: &cakeagent.ShellResponse_ExitCode{
+				ExitCode: int32(cmd.ProcessState.ExitCode()),
+			},
+		}
+
+		stream.Send(&message)
 	}
 
 	return
@@ -308,6 +316,7 @@ func createListener(listen string) (listener net.Listener, err error) {
 			}
 		} else if u.Scheme == "vsock" {
 			var port int
+			const vsockFailed = "failed to listen on vsock: %v"
 
 			if u.Port() == "" {
 				port = 5000
@@ -315,15 +324,15 @@ func createListener(listen string) (listener net.Listener, err error) {
 				err = fmt.Errorf("invalid port: %v", err)
 			} else if hostname == "any" {
 				if listener, err = vsock.Listen(uint32(port), nil); err != nil {
-					err = fmt.Errorf("failed to listen on vsock: %v", err)
+					err = fmt.Errorf(vsockFailed, err)
 				}
 			} else if hostname == "host" {
 				if listener, err = vsock.ListenContextID(vsock.Host, uint32(port), nil); err != nil {
-					err = fmt.Errorf("failed to listen on vsock: %v", err)
+					err = fmt.Errorf(vsockFailed, err)
 				}
 			} else if hostname == "hypervisor" {
 				if listener, err = vsock.ListenContextID(vsock.Hypervisor, uint32(port), nil); err != nil {
-					err = fmt.Errorf("failed to listen on vsock: %v", err)
+					err = fmt.Errorf(vsockFailed, err)
 				}
 			} else {
 				var cid int
@@ -331,7 +340,7 @@ func createListener(listen string) (listener net.Listener, err error) {
 				if cid, err = strconv.Atoi(hostname); err != nil {
 					err = fmt.Errorf("invalid cid: %v", err)
 				} else if listener, err = vsock.ListenContextID(uint32(cid), uint32(port), nil); err != nil {
-					err = fmt.Errorf("failed to listen on vsock: %v", err)
+					err = fmt.Errorf(vsockFailed, err)
 				}
 			}
 		} else if u.Scheme == "tcp" {

@@ -23,20 +23,33 @@ extension TaskGroup<Void>: @retroactive @unchecked Sendable {
 
 }
 
+extension String {
+	func lookupPath() -> String {
+		let paths = ProcessInfo.processInfo.environment["PATH"]?.components(separatedBy: ":") ?? []
+		for path in paths {
+			let fullPath = (path as NSString).appendingPathComponent(self)
+			if FileManager.default.isExecutableFile(atPath: fullPath) {
+				return fullPath
+			}
+		}
+
+		return self
+	}
+}
 extension Cakeagent_ShellRequest {
 	var isCommand: Bool {
 		guard case .command = self.request else {
 			return false
 		}
-		
+
 		return true
 	}
-	
+
 	var isInput: Bool {
 		guard case .input = self.request else {
 			return false
 		}
-		
+
 		return true
 	}
 }
@@ -116,16 +129,16 @@ class TTY: @unchecked Sendable {
 			return (-1, -1)
 		}
 
-/*		res = setupty(tty_fd)
-		if (res < 0) {
-			return (res, -1)
-		}
+		/*		res = setupty(tty_fd)
+		 if (res < 0) {
+		 	return (res, -1)
+		 }
 
-		res = setupty(sfd)
-		if (res < 0) {
-			return (res, -1)
-		}
-*/
+		 res = setupty(sfd)
+		 if (res < 0) {
+		 	return (res, -1)
+		 }
+		 */
 		return (tty_fd, sfd)
 	}
 }
@@ -199,11 +212,12 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		return reply
 	}
 
-	func execute(command: Cakeagent_ExecuteCommand, requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
+	func execute(shell: Cakeagent_ExecuteCommand? = nil, requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
 		let process = Process()
 		let tty = TTY()
 		let errorPipe = Pipe()
-
+		var launched = false
+	
 		errorPipe.fileHandleForReading.readabilityHandler = { handler in
 			let data = handler.availableData
 
@@ -218,12 +232,16 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 			}
 		}
 
-		process.executableURL = URL(fileURLWithPath: command.command)
-		process.arguments = command.args
+		process.environment = ProcessInfo.processInfo.environment
 		process.standardInput = tty.pty
 		process.standardOutput = tty.pty
 		process.standardError = errorPipe.fileHandleForWriting
 		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
+		if let command = shell {
+			process.executableURL = URL(fileURLWithPath: command.command.lookupPath())
+			process.arguments = command.args
+		}
 
 		let channel: NIOAsyncChannel<ByteBuffer, ByteBuffer> = try await NIOPipeBootstrap(group: self.group)
 			.takingOwnershipOfDescriptor(inputOutput: tty.ptx.fileDescriptor) { channel in
@@ -233,12 +251,17 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 			}
 
 		do {
-			defer {
-				process.terminate()
-			}
-
 			try await channel.executeThenClose { inbound, outbound in
-				try process.run()
+				if shell != nil {
+					try process.run()
+					launched = true
+				}
+
+				defer {
+					if launched {
+						process.terminate()
+					}
+				}
 
 				await withTaskGroup(of: Void.self) { group in
 					let grp = group
@@ -251,7 +274,12 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 					group.addTask {
 						do {
 							for try await request: Cakeagent_ShellRequest in requestStream {
-								if case let .input(message) = request.request {
+								if case let .command(command) = request.request {
+									process.executableURL = URL(fileURLWithPath: command.command.lookupPath())
+									process.arguments = command.args
+									try process.run()
+									launched = true
+								} else if case let .input(message) = request.request {
 									tty.pty.setTermSize(rows: message.rows, cols: message.cols)
 									if message.datas.isEmpty == false {
 										try await outbound.write(ByteBuffer(data: message.datas))
@@ -291,7 +319,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 			self.logger.debug("Exit shell")
 		} catch {
 			if error is CancellationError == false {
-				try? await responseStream.send(Cakeagent_ShellResponse.with { $0.stderr = error.localizedDescription.data(using: .utf8)! })
+				try? await responseStream.send(Cakeagent_ShellResponse.with { $0.stderr = "\(error.localizedDescription)\n".data(using: .utf8)! })
 				try? await responseStream.send(Cakeagent_ShellResponse.with { $0.exitCode = 1 })
 
 				self.logger.error("Shell stopped on error, \(error)")
@@ -300,13 +328,9 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 	}
 
 	func execute(requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
-		guard let request = try await requestStream.first(where: {  $0.isCommand }) else {
-			throw ServiceError("The firt message must be command")
-		}
-			
-		try await self.execute(command: request.command, requestStream: requestStream, responseStream: responseStream, context: context)
+		try await self.execute(requestStream: requestStream, responseStream: responseStream, context: context)
 	}
-	
+
 	func shell(requestStream: GRPCAsyncRequestStream<Cakeagent_ShellRequest>, responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ShellResponse>, context: GRPCAsyncServerCallContext) async throws {
 		let command = Cakeagent_ExecuteCommand.with {
 			$0.cols = 80
@@ -315,7 +339,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 			$0.args = ["-i", "-l"]
 		}
 
-		try await self.execute(command: command, requestStream: requestStream, responseStream: responseStream, context: context)
+		try await self.execute(shell: command, requestStream: requestStream, responseStream: responseStream, context: context)
 	}
 
 	func mount(request: Cakeagent_MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {
