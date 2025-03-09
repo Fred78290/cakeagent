@@ -20,11 +20,13 @@ let package = Package(
 		.package(url: "https://github.com/apple/swift-nio.git", from: "2.79.0"),
 		.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.28.2"),
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
+		.package(url: "https://github.com/groue/Semaphore", from: "0.0.8"),
 	],
 	targets: [
 		.target(name: "CakeAgentLib",
 			dependencies: [
 				.product(name: "GRPC", package: "grpc-swift"),
+				.product(name: "Semaphore", package: "Semaphore"),
 			],
 			path: "darwin/Sources/CakeAgentLib"),
 		.executableTarget(name: "CakeAgent",

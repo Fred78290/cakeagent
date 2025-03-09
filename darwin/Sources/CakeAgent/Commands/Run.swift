@@ -108,9 +108,9 @@ struct Run: ParsableCommand {
 		// Start the server and print its address once it has started.
 		let server = try Self.createServer(on: group,
 		                                   listeningAddress: URL(string: listenAddress),
-		                                   caCert: self.caCert,
-		                                   tlsCert: self.tlsCert,
-		                                   tlsKey: self.tlsKey).wait()
+										   caCert: self.caCert?.expandingTildeInPath,
+		                                   tlsCert: self.tlsCert?.expandingTildeInPath,
+		                                   tlsKey: self.tlsKey?.expandingTildeInPath).wait()
 
 		signal(SIGINT, SIG_IGN)
 

@@ -161,7 +161,7 @@ struct Service: ParsableCommand {
 			]
 
 			if self.insecure == false {
-				if let ca = caCert, let key = tlsKey, let cert = tlsCert {
+				if let ca = caCert?.expandingTildeInPath, let key = tlsKey?.expandingTildeInPath, let cert = tlsCert?.expandingTildeInPath {
 					if FileManager.default.fileExists(atPath: ca) == false {
 						throw InstallError.caNotFound(ca)
 					}

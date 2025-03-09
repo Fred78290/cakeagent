@@ -1,4 +1,5 @@
 import Foundation
+import NIOPosix
 
 public extension FileHandle {
 	func getTermSize() -> (rows: Int32, cols: Int32) {
@@ -18,9 +19,6 @@ public extension FileHandle {
 	}
 
 	func setTermSize(rows: Int32, cols: Int32) {
-		print("""
-			Setting terminal size to \(rows) rows and \(cols) columns
-			""")
 		if self.isTTY() {
 			var size = winsize()
 
@@ -63,5 +61,20 @@ public extension FileHandle {
 				perror("tcsetattr error")
 			}
 		}
+	}
+
+	func fileDescriptorIsFile() -> Bool{
+        var s: stat = .init()
+		
+		if Darwin.fstat(self.fileDescriptor, &s) != 0 {
+			perror("fstat error")
+		}
+
+        switch s.st_mode & S_IFMT {
+        case S_IFREG, S_IFDIR, S_IFLNK, S_IFBLK:
+            return true
+        default:
+            return false
+        }
 	}
 }

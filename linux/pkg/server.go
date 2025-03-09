@@ -36,19 +36,143 @@ type server struct {
 	cakeagent.UnimplementedAgentServer
 }
 
-func setTermSize(fd uintptr, rows int32, cols int32) (err error) {
-	dimensions := unix.Winsize{
-		Row:    uint16(rows),
-		Col:    uint16(cols),
-		Xpixel: 0,
-		Ypixel: 0,
+type pipe struct {
+	input  *io.PipeReader
+	output *io.PipeWriter
+}
+
+func (p *pipe) Close() {
+	p.input.Close()
+	p.output.Close()
+}
+
+type pseudoTTY struct {
+	pty    *os.File
+	ptx    *os.File
+	stdin  *pipe
+	stdout *pipe
+}
+
+func newPipe() (p *pipe) {
+	p = &pipe{}
+	p.input, p.output = io.Pipe()
+	return
+}
+
+func newTTY(termSize *cakeagent.TerminalSize) (tty *pseudoTTY, err error) {
+	tty = &pseudoTTY{}
+
+	if termSize.Cols > 0 && termSize.Rows > 0 {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Tracef("Opening pty with size %dx%d", termSize.Rows, termSize.Cols)
+		}
+
+		if tty.ptx, tty.pty, err = pty.Open(); err == nil {
+			tty.SetTermSize(termSize.Rows, termSize.Cols)
+		}
+	} else {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace("Opening pty without size")
+		}
+
+		tty.stdin = newPipe()
+		tty.stdout = newPipe()
 	}
 
-	if err := unix.IoctlSetWinsize(int(fd), unix.TIOCSWINSZ, &dimensions); err != nil {
-		return err
+	return
+}
+
+func (t *pseudoTTY) IsTTY() bool {
+	return t.pty != nil
+}
+
+func (t *pseudoTTY) EOF() {
+	if glog.GetLevel() >= glog.TraceLevel {
+		glog.Trace("EOF")
 	}
 
-	return nil
+	if t.ptx != nil {
+		t.ptx.Close()
+	} else if t.stdin != nil {
+		t.stdin.output.Close()
+	}
+}
+
+func (t *pseudoTTY) Close() {
+	if t.pty != nil || t.stdin != nil {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace("Closing pty")
+		}
+
+		if t.pty != nil {
+			t.pty.Close()
+		}
+
+		if t.ptx != nil {
+			t.ptx.Close()
+		}
+
+		if t.stdin != nil {
+			t.stdin.Close()
+		}
+
+		if t.stdout != nil {
+			t.stdout.Close()
+		}
+	}
+
+	t.ptx = nil
+	t.pty = nil
+	t.stdin = nil
+	t.stdout = nil
+}
+
+func (t *pseudoTTY) Stdin() io.Reader {
+	if t.pty != nil {
+		return t.pty
+	}
+
+	return t.stdin.input
+}
+
+func (t *pseudoTTY) Stdout() io.Writer {
+	if t.pty != nil {
+		return t.pty
+	}
+
+	return t.stdout.output
+}
+
+func (t *pseudoTTY) Input() io.Reader {
+	if t.ptx != nil {
+		return t.ptx
+	}
+
+	return t.stdout.input
+}
+
+func (t *pseudoTTY) SetTermSize(rows int32, cols int32) (err error) {
+	if t.pty != nil {
+		dimensions := unix.Winsize{
+			Row:    uint16(rows),
+			Col:    uint16(cols),
+			Xpixel: 0,
+			Ypixel: 0,
+		}
+
+		err = unix.IoctlSetWinsize(int(t.pty.Fd()), unix.TIOCSWINSZ, &dimensions)
+	}
+
+	return
+}
+
+func (t *pseudoTTY) Write(data []byte) (n int, err error) {
+	if t.ptx != nil {
+		n, err = t.ptx.Write(data)
+	} else if t.stdin != nil {
+		n, err = t.stdin.output.Write(data)
+	}
+	return
 }
 
 func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.InfoReply, err error) {
@@ -105,22 +229,26 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 	return reply, nil
 }
 
-func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Agent_ExecuteServer) (err error) {
-	if ptx, pty, e := pty.Open(); e != nil {
+func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.TerminalSize, stream cakeagent.Agent_ExecuteServer) (err error) {
+	if tty, e := newTTY(termSize); e != nil {
 		err = fmt.Errorf("failed to open pty: %v", e)
 	} else {
 		ctx, cancel := context.WithCancel(context.Background())
-		stderrInput, stderrOutput := io.Pipe()
+		stderr := newPipe()
 		home, _ := os.UserHomeDir()
 		var wg sync.WaitGroup
-		var message cakeagent.ShellResponse
-
-		wg.Add(3)
+		var message cakeagent.ExecuteResponse
+		var cmd *exec.Cmd
 
 		doCancel := func() {
 			if ctx.Err() == nil {
+				if glog.GetLevel() >= glog.TraceLevel {
+					glog.Trace("Canceling context")
+				}
 				cancel()
 			}
+			tty.Close()
+			stderr.Close()
 		}
 
 		fowardOutput := func(ctx context.Context, channel int, reader io.Reader) {
@@ -132,24 +260,36 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 			for {
 				select {
 				case <-ctx.Done():
+					if glog.GetLevel() >= glog.TraceLevel {
+						glog.Tracef("Closing output %d", channel)
+					}
 					return
 				default:
 					if available, err := input.Read(buffer); err != nil {
 						if err != io.EOF && err != io.ErrClosedPipe {
 							glog.Errorf("Error reading output: %v", err)
+							doCancel()
 						}
-						doCancel()
+
+						if glog.GetLevel() >= glog.TraceLevel {
+							glog.Tracef("EOF reading output %d", channel)
+						}
+						return
 					} else if available > 0 {
-						var message *cakeagent.ShellResponse
+						if glog.GetLevel() >= glog.TraceLevel {
+							glog.Tracef("reading output: %d", len(buffer[:available]))
+						}
+
+						var message *cakeagent.ExecuteResponse
 						if channel == 0 {
-							message = &cakeagent.ShellResponse{
-								Response: &cakeagent.ShellResponse_Stdout{
+							message = &cakeagent.ExecuteResponse{
+								Response: &cakeagent.ExecuteResponse_Stdout{
 									Stdout: buffer[:available],
 								},
 							}
 						} else {
-							message = &cakeagent.ShellResponse{
-								Response: &cakeagent.ShellResponse_Stderr{
+							message = &cakeagent.ExecuteResponse{
+								Response: &cakeagent.ExecuteResponse_Stderr{
 									Stderr: buffer[:available],
 								},
 							}
@@ -159,6 +299,12 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 							glog.Errorf("Failed to send output: %v", err)
 							doCancel()
 						}
+
+						if glog.GetLevel() >= glog.TraceLevel {
+							glog.Tracef("Sent output: %d", len(buffer[:available]))
+						}
+					} else if glog.GetLevel() >= glog.TraceLevel {
+						glog.Trace("No data to read")
 					}
 				}
 			}
@@ -170,102 +316,155 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, stream cakeagent.Age
 			for {
 				select {
 				case <-ctx.Done():
+					if glog.GetLevel() >= glog.TraceLevel {
+						glog.Trace("Closing stdin")
+					}
 					return
 				default:
 					if request, err := stream.Recv(); err != nil {
-						if err != io.EOF {
+						if err != io.EOF && err != context.Canceled {
 							glog.Errorf("Failed to receive message: %v", err)
+							doCancel()
 						}
-						doCancel()
-					} else if msg := request.GetInput(); msg != nil {
-						setTermSize(pty.Fd(), msg.Rows, msg.Cols)
-						if len(msg.Datas) > 0 {
-							if _, err := ptx.Write(msg.Datas); err != nil {
-								glog.Errorf("Failed to write to stdin: %v", err)
-								doCancel()
+					} else {
+						if size := request.GetSize(); size != nil {
+							tty.SetTermSize(size.Rows, size.Cols)
+						} else if input := request.GetInput(); input != nil {
+							if len(input) > 0 {
+								if _, err := tty.Write(input); err != nil {
+									glog.Errorf("Failed to write to stdin: %v", err)
+									doCancel()
+								}
+								if glog.GetLevel() >= glog.TraceLevel {
+									glog.Tracef("Wrote to stdin: %d", len(input))
+								}
 							}
+						} else if request.GetEof() {
+							tty.EOF()
+							return
+						} else {
+							glog.Error("Unknown message")
 						}
 					}
 				}
 			}
-
 		}
 
 		cleanup := func() {
-			ptx.Close()
-			pty.Close()
-			stderrInput.Close()
-			stderrOutput.Close()
+			doCancel()
 
 			wg.Wait()
 
-			glog.Debug("Shell session ended")
+			if glog.GetLevel() >= glog.TraceLevel {
+				glog.Trace("Shell session ended")
+			}
 		}
 
-		setTermSize(pty.Fd(), command.Rows, command.Cols)
+		if command.GetShell() {
+			shell := "bash"
 
-		cmd := exec.CommandContext(ctx, command.Command, command.Args...)
-		cmd.Stdin = pty
-		cmd.Stdout = pty
-		cmd.Stderr = stderrOutput
-		cmd.Env = os.Environ()
-		cmd.Dir = home
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid:  true,
-			Setctty: true,
-		}
-
-		go fowardOutput(ctx, 0, ptx)
-		go fowardOutput(ctx, 1, stderrInput)
-		go fowardStdin()
-
-		defer cleanup()
-
-		if err = cmd.Start(); err == nil {
-			if err = cmd.Wait(); err != nil {
-				if err.Error() != "context canceled" {
-					glog.Errorf("Failed to wait for command: %v", err)
-				}
+			if shell, err = exec.LookPath(shell); err != nil {
+				shell = "/bin/sh"
 			}
-
-			doCancel()
-
-			message = cakeagent.ShellResponse{
-				Response: &cakeagent.ShellResponse_Stdout{
-					Stdout: []byte("\r"),
-				},
-			}
-
-			stream.Send(&message)
+			cmd = exec.CommandContext(ctx, shell, "-i", "-l")
+		} else if exc := command.GetCommand(); exc != nil {
+			cmd = exec.CommandContext(ctx, exc.GetCommand(), exc.GetArgs()...)
 		} else {
-			glog.Errorf("Failed to start command: %v", err)
+			err = fmt.Errorf("wrong protocol")
 		}
 
-		if err != nil && err.Error() != "context canceled" {
-			message = cakeagent.ShellResponse{
-				Response: &cakeagent.ShellResponse_Stderr{
-					Stderr: []byte(err.Error() + "\n"),
+		if err == nil {
+			isTTY := tty.IsTTY()
+
+			cmd.Stdin = tty.Stdin()
+			cmd.Stdout = tty.Stdout()
+			cmd.Stderr = stderr.output
+			cmd.Env = os.Environ()
+			cmd.Dir = home
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				Setsid:  isTTY,
+				Setctty: isTTY,
+				//Noctty:  !isTTY,
+			}
+
+			wg.Add(3)
+
+			go fowardOutput(ctx, 0, tty.Input())
+			go fowardOutput(ctx, 1, stderr.input)
+			go fowardStdin()
+
+			defer cleanup()
+
+			if err = cmd.Start(); err == nil {
+				if err = cmd.Wait(); err != nil {
+					if err != io.EOF && err != io.ErrClosedPipe && err != context.Canceled {
+						glog.Errorf("Failed to wait for command: %v", err)
+					}
+				} else if glog.GetLevel() >= glog.TraceLevel {
+					glog.Trace("Command exited")
+				}
+			} else {
+				glog.Errorf("Failed to start command: %v", err)
+			}
+
+			if command.GetShell() {
+				message = cakeagent.ExecuteResponse{
+					Response: &cakeagent.ExecuteResponse_Stderr{
+						Stderr: []byte("\r"),
+					},
+				}
+
+				stream.Send(&message)
+			}
+		}
+
+		if err != nil && err != io.EOF && err != io.ErrClosedPipe && err != context.Canceled {
+			message = cakeagent.ExecuteResponse{
+				Response: &cakeagent.ExecuteResponse_Stderr{
+					Stderr: []byte(err.Error() + "\r\n"),
 				},
 			}
 
 			stream.Send(&message)
 		}
 
-		message = cakeagent.ShellResponse{
-			Response: &cakeagent.ShellResponse_ExitCode{
-				ExitCode: int32(cmd.ProcessState.ExitCode()),
-			},
+		if cmd != nil {
+			message = cakeagent.ExecuteResponse{
+				Response: &cakeagent.ExecuteResponse_ExitCode{
+					ExitCode: int32(cmd.ProcessState.ExitCode()),
+				},
+			}
+		} else {
+			message = cakeagent.ExecuteResponse{
+				Response: &cakeagent.ExecuteResponse_ExitCode{
+					ExitCode: 1,
+				},
+			}
 		}
 
-		stream.Send(&message)
+		if err = stream.Send(&message); err != nil {
+			glog.Errorf("Failed to send exit code: %v", err)
+		}
 	}
+
+	glog.Debug("Leave execute")
 
 	return
 }
 
 func (s *server) Execute(stream cakeagent.Agent_ExecuteServer) (err error) {
-	var request *cakeagent.ShellRequest
+	var request *cakeagent.ExecuteRequest
 	var command *cakeagent.ExecuteCommand
+	var termSize *cakeagent.TerminalSize
+
+	if request, err = stream.Recv(); err != nil {
+		glog.Errorf("Failed to receive command message: %v", err)
+		return
+	}
+
+	if termSize = request.GetSize(); termSize == nil {
+		return fmt.Errorf("empty term size")
+	}
 
 	if request, err = stream.Recv(); err != nil {
 		glog.Errorf("Failed to receive command message: %v", err)
@@ -273,31 +472,16 @@ func (s *server) Execute(stream cakeagent.Agent_ExecuteServer) (err error) {
 	}
 
 	if command = request.GetCommand(); command == nil {
-		err = fmt.Errorf("empty command")
-		return
+		return fmt.Errorf("empty command")
 	}
 
-	return s.execute(command, stream)
-}
-
-func (s *server) Shell(stream cakeagent.Agent_ExecuteServer) (err error) {
-	command := &cakeagent.ExecuteCommand{
-		Command: "bash",
-		Args:    []string{"-i", "-l"},
-		Rows:    25,
-		Cols:    80,
-	}
-
-	if command.Command, err = exec.LookPath(command.Command); err != nil {
-		command.Command = "/bin/sh"
-	}
-
-	return s.execute(command, stream)
+	return s.execute(command, termSize, stream)
 }
 
 func (s *server) Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return mount.Mount(ctx, request)
 }
+
 func (s *server) Umount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return mount.Umount(ctx, request)
 }

@@ -1,5 +1,5 @@
 {
-  "originHash" : "99f9567274db31b609254d9fe4a8814e0c80406b15ebbb9f4452e0f4a0e0f659",
+  "originHash" : "9360ba9fe0c0125cf8835e1917f20615058498cd293b034f7da977d8312107c2",
   "pins" : [
     {
       "identity" : "grpc-swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "8c5e99d0255c373e0330730d191a3423c57373fb",
         "version" : "1.24.2"
+      }
+    },
+    {
+      "identity" : "semaphore",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/groue/Semaphore",
+      "state" : {
+        "revision" : "2543679282aa6f6c8ecf2138acd613ed20790bc2",
+        "version" : "0.1.0"
       }
     },
     {
