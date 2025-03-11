@@ -31,7 +31,7 @@ func mountEndpoint(name, target string, uid, gid int32, readonly bool) (err erro
 			mode = "ro"
 		}
 
-		utils.Shell("sed", "-i", fmt.Sprintf("/%s/d", m.Name), "/etc/fstab")
+		utils.Shell("sed", "-i", fmt.Sprintf("/%s/d", name), "/etc/fstab")
 		utils.Shell("echo", fmt.Sprintf("%s %s virtiofs relatime,%s 0 0", name, target, mode), ">>", "/etc/fstab")
 	}
 
