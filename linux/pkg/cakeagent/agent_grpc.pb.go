@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Agent_Info_FullMethodName    = "/cakeagent.Agent/Info"
+	Agent_Run_FullMethodName     = "/cakeagent.Agent/Run"
 	Agent_Execute_FullMethodName = "/cakeagent.Agent/Execute"
 	Agent_Mount_FullMethodName   = "/cakeagent.Agent/Mount"
 	Agent_Umount_FullMethodName  = "/cakeagent.Agent/Umount"
@@ -31,6 +32,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentClient interface {
 	Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error)
+	Run(ctx context.Context, in *RunCommand, opts ...grpc.CallOption) (*ExecuteReply, error)
 	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecuteRequest, ExecuteResponse], error)
 	Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
 	Umount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
@@ -48,6 +50,16 @@ func (c *agentClient) Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InfoReply)
 	err := c.cc.Invoke(ctx, Agent_Info_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) Run(ctx context.Context, in *RunCommand, opts ...grpc.CallOption) (*ExecuteReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExecuteReply)
+	err := c.cc.Invoke(ctx, Agent_Run_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +104,7 @@ func (c *agentClient) Umount(ctx context.Context, in *MountRequest, opts ...grpc
 // for forward compatibility.
 type AgentServer interface {
 	Info(context.Context, *emptypb.Empty) (*InfoReply, error)
+	Run(context.Context, *RunCommand) (*ExecuteReply, error)
 	Execute(grpc.BidiStreamingServer[ExecuteRequest, ExecuteResponse]) error
 	Mount(context.Context, *MountRequest) (*MountReply, error)
 	Umount(context.Context, *MountRequest) (*MountReply, error)
@@ -107,6 +120,9 @@ type UnimplementedAgentServer struct{}
 
 func (UnimplementedAgentServer) Info(context.Context, *emptypb.Empty) (*InfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
+}
+func (UnimplementedAgentServer) Run(context.Context, *RunCommand) (*ExecuteReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Run not implemented")
 }
 func (UnimplementedAgentServer) Execute(grpc.BidiStreamingServer[ExecuteRequest, ExecuteResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Execute not implemented")
@@ -152,6 +168,24 @@ func _Agent_Info_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AgentServer).Info(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_Run_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).Run(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_Run_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).Run(ctx, req.(*RunCommand))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -209,6 +243,10 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Info",
 			Handler:    _Agent_Info_Handler,
+		},
+		{
+			MethodName: "Run",
+			Handler:    _Agent_Run_Handler,
 		},
 		{
 			MethodName: "Mount",

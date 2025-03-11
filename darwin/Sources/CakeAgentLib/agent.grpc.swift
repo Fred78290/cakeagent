@@ -21,6 +21,11 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
 
+  func run(
+    _ request: Cakeagent_RunCommand,
+    callOptions: CallOptions?
+  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply>
+
   func execute(
     callOptions: CallOptions?,
     handler: @escaping (Cakeagent_ExecuteResponse) -> Void
@@ -57,6 +62,24 @@ extension Cakeagent_AgentClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
+    )
+  }
+
+  /// Unary call to Run
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Run.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func run(
+    _ request: Cakeagent_RunCommand,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply> {
+    return self.makeUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.run.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeRunInterceptors() ?? []
     )
   }
 
@@ -185,6 +208,11 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
 
+  func makeRunCall(
+    _ request: Cakeagent_RunCommand,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply>
+
   func makeExecuteCall(
     callOptions: CallOptions?
   ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>
@@ -219,6 +247,18 @@ extension Cakeagent_AgentAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
+    )
+  }
+
+  public func makeRunCall(
+    _ request: Cakeagent_RunCommand,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply> {
+    return self.makeAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.run.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeRunInterceptors() ?? []
     )
   }
 
@@ -268,6 +308,18 @@ extension Cakeagent_AgentAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
+    )
+  }
+
+  public func run(
+    _ request: Cakeagent_RunCommand,
+    callOptions: CallOptions? = nil
+  ) async throws -> Cakeagent_ExecuteReply {
+    return try await self.performAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.run.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeRunInterceptors() ?? []
     )
   }
 
@@ -342,6 +394,9 @@ public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
   /// - Returns: Interceptors to use when invoking 'info'.
   func makeInfoInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
+  /// - Returns: Interceptors to use when invoking 'run'.
+  func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_ExecuteReply>]
+
   /// - Returns: Interceptors to use when invoking 'execute'.
   func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>]
 
@@ -358,6 +413,7 @@ public enum Cakeagent_AgentClientMetadata {
     fullName: "cakeagent.Agent",
     methods: [
       Cakeagent_AgentClientMetadata.Methods.info,
+      Cakeagent_AgentClientMetadata.Methods.run,
       Cakeagent_AgentClientMetadata.Methods.execute,
       Cakeagent_AgentClientMetadata.Methods.mount,
       Cakeagent_AgentClientMetadata.Methods.umount,
@@ -368,6 +424,12 @@ public enum Cakeagent_AgentClientMetadata {
     public static let info = GRPCMethodDescriptor(
       name: "Info",
       path: "/cakeagent.Agent/Info",
+      type: GRPCCallType.unary
+    )
+
+    public static let run = GRPCMethodDescriptor(
+      name: "Run",
+      path: "/cakeagent.Agent/Run",
       type: GRPCCallType.unary
     )
 
@@ -397,6 +459,8 @@ public protocol Cakeagent_AgentProvider: CallHandlerProvider {
 
   func info(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_InfoReply>
 
+  func run(request: Cakeagent_RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ExecuteReply>
+
   func execute(context: StreamingResponseCallContext<Cakeagent_ExecuteResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ExecuteRequest>) -> Void>
 
   func mount(request: Cakeagent_MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_MountReply>
@@ -423,6 +487,15 @@ extension Cakeagent_AgentProvider {
         responseSerializer: ProtobufSerializer<Cakeagent_InfoReply>(),
         interceptors: self.interceptors?.makeInfoInterceptors() ?? [],
         userFunction: self.info(request:context:)
+      )
+
+    case "Run":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_RunCommand>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteReply>(),
+        interceptors: self.interceptors?.makeRunInterceptors() ?? [],
+        userFunction: self.run(request:context:)
       )
 
     case "Execute":
@@ -469,6 +542,11 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_InfoReply
 
+  func run(
+    request: Cakeagent_RunCommand,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> Cakeagent_ExecuteReply
+
   func execute(
     requestStream: GRPCAsyncRequestStream<Cakeagent_ExecuteRequest>,
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ExecuteResponse>,
@@ -514,6 +592,15 @@ extension Cakeagent_AgentAsyncProvider {
         wrapping: { try await self.info(request: $0, context: $1) }
       )
 
+    case "Run":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_RunCommand>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteReply>(),
+        interceptors: self.interceptors?.makeRunInterceptors() ?? [],
+        wrapping: { try await self.run(request: $0, context: $1) }
+      )
+
     case "Execute":
       return GRPCAsyncServerHandler(
         context: context,
@@ -553,6 +640,10 @@ public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeInfoInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
+  /// - Returns: Interceptors to use when handling 'run'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeRunInterceptors() -> [ServerInterceptor<Cakeagent_RunCommand, Cakeagent_ExecuteReply>]
+
   /// - Returns: Interceptors to use when handling 'execute'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeExecuteInterceptors() -> [ServerInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>]
@@ -572,6 +663,7 @@ public enum Cakeagent_AgentServerMetadata {
     fullName: "cakeagent.Agent",
     methods: [
       Cakeagent_AgentServerMetadata.Methods.info,
+      Cakeagent_AgentServerMetadata.Methods.run,
       Cakeagent_AgentServerMetadata.Methods.execute,
       Cakeagent_AgentServerMetadata.Methods.mount,
       Cakeagent_AgentServerMetadata.Methods.umount,
@@ -582,6 +674,12 @@ public enum Cakeagent_AgentServerMetadata {
     public static let info = GRPCMethodDescriptor(
       name: "Info",
       path: "/cakeagent.Agent/Info",
+      type: GRPCCallType.unary
+    )
+
+    public static let run = GRPCMethodDescriptor(
+      name: "Run",
+      path: "/cakeagent.Agent/Run",
       type: GRPCCallType.unary
     )
 

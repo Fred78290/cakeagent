@@ -140,6 +140,77 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		return reply
 	}
 
+	func run(request: Cakeagent_RunCommand, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_ExecuteReply {
+		let process = Process()
+		let outputPipe = Pipe()
+		let errorPipe = Pipe()
+		var outputData = Data()
+		var errorData = Data()
+		var arguments: [String] = [request.command.command]
+
+		arguments.append(contentsOf: request.command.args)
+
+		let outputQueue = DispatchQueue(label: "bash-output-queue")
+
+		logger.info("execute \(request.command)")
+
+		process.executableURL = URL(fileURLWithPath: "/bin/sh")
+		process.arguments = ["-c", arguments.joined(separator: " ")]
+		process.standardOutput = outputPipe
+		process.standardError = errorPipe
+		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
+		if request.hasInput {
+			let inputPipe = Pipe()
+
+			process.standardInput = inputPipe
+
+			inputPipe.fileHandleForWriting.writeabilityHandler = { handler in
+				handler.write(request.input)
+			}	
+		} else {
+			process.standardInput = FileHandle.nullDevice
+		}
+
+		outputPipe.fileHandleForReading.readabilityHandler = { handler in
+			let data = handler.availableData
+
+			if data.isEmpty == false {
+				self.logger.info("outputPipe data \(String(data: data, encoding: .utf8) ?? "")")
+				outputQueue.async {
+					outputData.append(data)
+				}
+			}
+		}
+
+		errorPipe.fileHandleForReading.readabilityHandler = { handler in
+			let data = handler.availableData
+
+			if data.isEmpty == false {
+				self.logger.info("errorPipe data \(String(data: data, encoding: .utf8) ?? "")")
+				outputQueue.async {
+					errorData.append(data)
+				}
+			}
+		}
+
+		try process.run()
+
+		process.waitUntilExit()
+
+		return Cakeagent_ExecuteReply.with { reply in
+			if outputData.isEmpty == false {
+				reply.stdout = outputData
+			}
+
+			if errorData.isEmpty == false {
+				reply.stdout = errorData
+			}
+
+			reply.exitCode = Int32(process.terminationStatus)
+		}
+	}
+
 	func execute(requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream, context: GRPCAsyncServerCallContext) async throws {
 		let process = ExecuteHandleStream(on: self.group.next())
 		try await process.stream2(requestStream: requestStream, responseStream: responseStream)

@@ -86,6 +86,37 @@ public struct Cakeagent_Command: Sendable {
   public init() {}
 }
 
+public struct Cakeagent_RunCommand: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var command: Cakeagent_Command {
+    get {return _command ?? Cakeagent_Command()}
+    set {_command = newValue}
+  }
+  /// Returns true if `command` has been explicitly set.
+  public var hasCommand: Bool {return self._command != nil}
+  /// Clears the value of `command`. Subsequent reads from it will return its default value.
+  public mutating func clearCommand() {self._command = nil}
+
+  public var input: Data {
+    get {return _input ?? Data()}
+    set {_input = newValue}
+  }
+  /// Returns true if `input` has been explicitly set.
+  public var hasInput: Bool {return self._input != nil}
+  /// Clears the value of `input`. Subsequent reads from it will return its default value.
+  public mutating func clearInput() {self._input = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _command: Cakeagent_Command? = nil
+  fileprivate var _input: Data? = nil
+}
+
 public struct Cakeagent_ExecuteCommand: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -182,6 +213,22 @@ public struct Cakeagent_ExecuteRequest: @unchecked Sendable {
     case eof(Bool)
 
   }
+
+  public init() {}
+}
+
+public struct Cakeagent_ExecuteReply: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var exitCode: Int32 = 0
+
+  public var stdout: Data = Data()
+
+  public var stderr: Data = Data()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
@@ -497,6 +544,48 @@ extension Cakeagent_Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
+extension Cakeagent_RunCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RunCommand"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "command"),
+    2: .same(proto: "input"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._command) }()
+      case 2: try { try decoder.decodeSingularBytesField(value: &self._input) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._command {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._input {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_RunCommand, rhs: Cakeagent_RunCommand) -> Bool {
+    if lhs._command != rhs._command {return false}
+    if lhs._input != rhs._input {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Cakeagent_ExecuteCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ExecuteCommand"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -691,6 +780,50 @@ extension Cakeagent_ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
   public static func ==(lhs: Cakeagent_ExecuteRequest, rhs: Cakeagent_ExecuteRequest) -> Bool {
     if lhs.request != rhs.request {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_ExecuteReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ExecuteReply"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "exitCode"),
+    2: .same(proto: "stdout"),
+    3: .same(proto: "stderr"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.exitCode) }()
+      case 2: try { try decoder.decodeSingularBytesField(value: &self.stdout) }()
+      case 3: try { try decoder.decodeSingularBytesField(value: &self.stderr) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.exitCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.exitCode, fieldNumber: 1)
+    }
+    if !self.stdout.isEmpty {
+      try visitor.visitSingularBytesField(value: self.stdout, fieldNumber: 2)
+    }
+    if !self.stderr.isEmpty {
+      try visitor.visitSingularBytesField(value: self.stderr, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_ExecuteReply, rhs: Cakeagent_ExecuteReply) -> Bool {
+    if lhs.exitCode != rhs.exitCode {return false}
+    if lhs.stdout != rhs.stdout {return false}
+    if lhs.stderr != rhs.stderr {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

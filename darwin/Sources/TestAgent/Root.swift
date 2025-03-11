@@ -74,6 +74,7 @@ struct Root: AsyncParsableCommand {
 	                                                subcommands: [
 	                                                	Shell.self,
 	                                                	Exec.self,
+	                                                	Run.self,
 	                                                	Infos.self,
 	                                                ])
 	public static func getHome(asSystem: Bool = false) throws -> URL {

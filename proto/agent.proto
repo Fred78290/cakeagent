@@ -12,6 +12,7 @@ import "google/protobuf/empty.proto";
 
 service Agent {
 	rpc Info (google.protobuf.Empty) returns (InfoReply);
+	rpc Run (RunCommand) returns (ExecuteReply);
 	rpc Execute (stream ExecuteRequest) returns (stream ExecuteResponse);
 	rpc Mount(MountRequest) returns (MountReply);
 	rpc Umount(MountRequest) returns (MountReply);
@@ -39,6 +40,11 @@ message Command {
 	repeated string args = 2;
 }
 
+message RunCommand {
+	Command command = 1;
+	optional bytes input = 2;
+}
+
 message ExecuteCommand {
 	oneof execute {
 		Command command = 1;
@@ -58,6 +64,12 @@ message ExecuteRequest {
 		TerminalSize size = 3;
 		bool eof = 4;
 	}
+}
+
+message ExecuteReply {
+	int32 exitCode = 1;
+	bytes stdout = 2;
+	bytes stderr = 3;
 }
 
 message ExecuteResponse {

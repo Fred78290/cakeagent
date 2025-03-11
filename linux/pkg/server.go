@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -227,6 +229,50 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 	}
 
 	return reply, nil
+}
+
+func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cakeagent.ExecuteReply, err error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	home, _ := os.UserHomeDir()
+	reply = &cakeagent.ExecuteReply{}
+
+	arguments := append([]string{req.Command.GetCommand()}, req.Command.Args...)
+
+	cmd := exec.Command("/bin/sh", "-c", strings.Join(arguments, " "))
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.Dir = home
+	cmd.Env = os.Environ()
+
+	if len(req.Input) > 0 {
+		cmd.Stdin = bytes.NewReader(req.Input)
+	}
+
+	if err = cmd.Run(); err != nil {
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				reply.ExitCode = int32(status.ExitStatus())
+				err = nil
+			} else {
+				return nil, fmt.Errorf("failed to get exit status: %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to run command: %v", err)
+		}
+	}
+
+	if b := stdout.Bytes(); len(b) > 0 {
+		reply.Stdout = b
+	}
+
+	if b := stderr.Bytes(); len(b) > 0 {
+		reply.Stderr = b
+	}
+
+	return
 }
 
 func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.TerminalSize, stream cakeagent.Agent_ExecuteServer) (err error) {

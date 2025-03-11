@@ -4,8 +4,8 @@ import GRPC
 import CakeAgentLib
 import NIO
 
-final class Exec: GrpcParsableCommand {
-	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "exec", abstract: "Test execute")
+final class Run: GrpcParsableCommand {
+	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "run", abstract: "Test run")
 
 	@OptionGroup var options: CakeAgentClientOptions
 
@@ -23,6 +23,6 @@ final class Exec: GrpcParsableCommand {
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
 		let command = self.arguments.remove(at: 0)
 
-		Foundation.exit(try await CakeAgentHelper(on: on, client: client).exec(command: command, arguments: self.arguments, callOptions: callOptions))
+		Foundation.exit(try CakeAgentHelper(on: on, client: client).run(command: command, arguments: self.arguments, callOptions: callOptions))
 	}
 }

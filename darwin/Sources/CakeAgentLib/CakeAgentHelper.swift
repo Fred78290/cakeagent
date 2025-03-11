@@ -398,6 +398,12 @@ public struct CakeAgentHelper: Sendable {
 	internal let eventLoopGroup: EventLoopGroup
 	internal let client: CakeAgentClient
 
+	public struct RunReply: Sendable {
+		public var exitCode: Int32
+		public var stdout: Data
+		public var stderr: Data
+	}
+
 	public init(on: EventLoopGroup, client: CakeAgentClient) {
 		self.eventLoopGroup = on
 		self.client = client
@@ -479,6 +485,53 @@ public struct CakeAgentHelper: Sendable {
 				$0.used = infos.memory.used
 			} : nil
 		}
+	}
+
+	public func run(command: String,
+	                arguments: [String],
+	                input: Data? = nil,
+	                callOptions: CallOptions? = nil) throws -> RunReply {
+
+		let response = try client.run(Cakeagent_RunCommand.with { req in
+			if let input = input {
+				req.input = input
+			}
+
+			req.command = Cakeagent_Command.with { 
+				$0.command = command
+				$0.args = arguments
+			}
+		}).response.wait()
+
+		return RunReply(exitCode: response.exitCode, stdout: response.stdout, stderr: response.stderr)
+	}
+
+	public func run(command: String,
+	                arguments: [String],
+	                inputHandle: FileHandle = FileHandle.standardInput,
+	                outputHandle: FileHandle = FileHandle.standardOutput,
+	                errorHandle: FileHandle = FileHandle.standardError,
+	                callOptions: CallOptions? = nil) throws -> Int32 {
+		let response = try client.run(Cakeagent_RunCommand.with { req in
+			if isatty(inputHandle.fileDescriptor) == 0 {
+				req.input = inputHandle.readDataToEndOfFile()
+			}
+
+			req.command = Cakeagent_Command.with { 
+				$0.command = command
+				$0.args = arguments
+			}
+		}).response.wait()
+
+		if response.stderr.isEmpty == false {
+			errorHandle.write(response.stderr)
+		}
+
+		if response.stdout.isEmpty == false {
+			outputHandle.write(response.stdout)
+		}
+
+		return response.exitCode
 	}
 
 	func exec(command: CakeChannelStreamer.ExecuteCommand,
