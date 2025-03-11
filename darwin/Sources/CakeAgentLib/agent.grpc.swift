@@ -24,7 +24,7 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
   func run(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions?
-  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply>
+  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply>
 
   func execute(
     callOptions: CallOptions?,
@@ -74,7 +74,7 @@ extension Cakeagent_AgentClientProtocol {
   public func run(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply> {
+  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply> {
     return self.makeUnaryCall(
       path: Cakeagent_AgentClientMetadata.Methods.run.path,
       request: request,
@@ -211,7 +211,7 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
   func makeRunCall(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply>
 
   func makeExecuteCall(
     callOptions: CallOptions?
@@ -253,7 +253,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func makeRunCall(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_ExecuteReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply> {
     return self.makeAsyncUnaryCall(
       path: Cakeagent_AgentClientMetadata.Methods.run.path,
       request: request,
@@ -314,7 +314,7 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func run(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_ExecuteReply {
+  ) async throws -> Cakeagent_RunReply {
     return try await self.performAsyncUnaryCall(
       path: Cakeagent_AgentClientMetadata.Methods.run.path,
       request: request,
@@ -395,7 +395,7 @@ public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
   func makeInfoInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
   /// - Returns: Interceptors to use when invoking 'run'.
-  func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_ExecuteReply>]
+  func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>]
 
   /// - Returns: Interceptors to use when invoking 'execute'.
   func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>]
@@ -459,7 +459,7 @@ public protocol Cakeagent_AgentProvider: CallHandlerProvider {
 
   func info(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_InfoReply>
 
-  func run(request: Cakeagent_RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ExecuteReply>
+  func run(request: Cakeagent_RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_RunReply>
 
   func execute(context: StreamingResponseCallContext<Cakeagent_ExecuteResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ExecuteRequest>) -> Void>
 
@@ -493,7 +493,7 @@ extension Cakeagent_AgentProvider {
       return UnaryServerHandler(
         context: context,
         requestDeserializer: ProtobufDeserializer<Cakeagent_RunCommand>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteReply>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
         interceptors: self.interceptors?.makeRunInterceptors() ?? [],
         userFunction: self.run(request:context:)
       )
@@ -545,7 +545,7 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
   func run(
     request: Cakeagent_RunCommand,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_ExecuteReply
+  ) async throws -> Cakeagent_RunReply
 
   func execute(
     requestStream: GRPCAsyncRequestStream<Cakeagent_ExecuteRequest>,
@@ -596,7 +596,7 @@ extension Cakeagent_AgentAsyncProvider {
       return GRPCAsyncServerHandler(
         context: context,
         requestDeserializer: ProtobufDeserializer<Cakeagent_RunCommand>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteReply>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
         interceptors: self.interceptors?.makeRunInterceptors() ?? [],
         wrapping: { try await self.run(request: $0, context: $1) }
       )
@@ -642,7 +642,7 @@ public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when handling 'run'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeRunInterceptors() -> [ServerInterceptor<Cakeagent_RunCommand, Cakeagent_ExecuteReply>]
+  func makeRunInterceptors() -> [ServerInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>]
 
   /// - Returns: Interceptors to use when handling 'execute'.
   ///   Defaults to calling `self.makeInterceptors()`.

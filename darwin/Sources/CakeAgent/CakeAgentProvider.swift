@@ -140,7 +140,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		return reply
 	}
 
-	func run(request: Cakeagent_RunCommand, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_ExecuteReply {
+	func run(request: Cakeagent_RunCommand, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_RunReply {
 		let process = Process()
 		let outputPipe = Pipe()
 		let errorPipe = Pipe()
@@ -198,7 +198,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 
 		process.waitUntilExit()
 
-		return Cakeagent_ExecuteReply.with { reply in
+		return Cakeagent_RunReply.with { reply in
 			if outputData.isEmpty == false {
 				reply.stdout = outputData
 			}

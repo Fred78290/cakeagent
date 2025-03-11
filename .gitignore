@@ -14,3 +14,5 @@ DerivedData/
 _artifacts/
 
 *.pkg
+
+linux/cakeagent

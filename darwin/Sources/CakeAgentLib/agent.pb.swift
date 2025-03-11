@@ -217,7 +217,7 @@ public struct Cakeagent_ExecuteRequest: @unchecked Sendable {
   public init() {}
 }
 
-public struct Cakeagent_ExecuteReply: @unchecked Sendable {
+public struct Cakeagent_RunReply: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -785,8 +785,8 @@ extension Cakeagent_ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension Cakeagent_ExecuteReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ExecuteReply"
+extension Cakeagent_RunReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RunReply"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "exitCode"),
     2: .same(proto: "stdout"),
@@ -820,7 +820,7 @@ extension Cakeagent_ExecuteReply: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_ExecuteReply, rhs: Cakeagent_ExecuteReply) -> Bool {
+  public static func ==(lhs: Cakeagent_RunReply, rhs: Cakeagent_RunReply) -> Bool {
     if lhs.exitCode != rhs.exitCode {return false}
     if lhs.stdout != rhs.stdout {return false}
     if lhs.stderr != rhs.stderr {return false}

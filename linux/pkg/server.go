@@ -231,12 +231,12 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 	return reply, nil
 }
 
-func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cakeagent.ExecuteReply, err error) {
+func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cakeagent.RunReply, err error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	home, _ := os.UserHomeDir()
-	reply = &cakeagent.ExecuteReply{}
+	reply = &cakeagent.RunReply{}
 
 	arguments := append([]string{req.Command.GetCommand()}, req.Command.Args...)
 
