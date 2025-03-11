@@ -2,6 +2,7 @@ package mount
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Fred78290/cakeagent/pkg/cakeagent"
 )
@@ -20,4 +21,8 @@ func umount(_ context.Context, _ *cakeagent.MountRequest) (*cakeagent.MountReply
 			Error: "method Umount not supported on darwin",
 		},
 	}, nil
+}
+
+func mountEndpoints(mounts []string) error {
+	return fmt.Errorf("method MountEndpoints not supported on darwin")
 }

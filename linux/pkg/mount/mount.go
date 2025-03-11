@@ -13,3 +13,7 @@ func Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.Mou
 func Umount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return umount(ctx, request)
 }
+
+func MountEndpoints(mounts []string) error {
+	return mountEndpoints(mounts)
+}

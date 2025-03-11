@@ -15,6 +15,7 @@ const (
 
 type Config struct {
 	InstallService bool
+	Mounts         []string
 	Address        string
 	CaCert         string
 	TlsCert        string
@@ -57,6 +58,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.DefaultEnvars()
 
 	app.Flag("install", "Install as service").Default("false").BoolVar(&cfg.InstallService)
+	app.Flag("mount", "Mount endpoint").StringsVar(&cfg.Mounts)
 	app.Flag("listen", "Listen on address").Default(cfg.Address).StringVar(&cfg.Address)
 
 	app.Flag("ca-cert", "CA TLS certificate").Default(cfg.CaCert).StringVar(&cfg.CaCert)

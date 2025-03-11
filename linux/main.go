@@ -5,6 +5,7 @@ import (
 
 	"github.com/Fred78290/cakeagent/cmd/types"
 	"github.com/Fred78290/cakeagent/pkg"
+	"github.com/Fred78290/cakeagent/pkg/mount"
 	"github.com/Fred78290/cakeagent/version"
 
 	// Remplacez par le chemin de votre module
@@ -34,10 +35,18 @@ func main() {
 
 	if cfg.DisplayVersion {
 		glog.Infof("The current version is: %s, build at: %s", version.VERSION, version.BUILD_DATE)
-	} else if cfg.InstallService {
-		err = service.InstallService(cfg)
 	} else {
-		_, err = pkg.StartServer(cfg)
+		if len(cfg.Mounts) > 0 {
+			err = mount.MountEndpoints(cfg.Mounts)
+		}
+
+		if err == nil {
+			if cfg.InstallService {
+				err = service.InstallService(cfg)
+			} else {
+				_, err = pkg.StartServer(cfg)
+			}
+		}
 	}
 
 	if err != nil {
