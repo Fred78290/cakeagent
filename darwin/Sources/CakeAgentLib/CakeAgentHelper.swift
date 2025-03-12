@@ -259,6 +259,13 @@ final class CakeChannelStreamer: @unchecked Sendable {
 	func stream(command: ExecuteCommand, handler: @escaping () -> CakeAgentExecuteStream) async throws -> Int32 {
 		let stream: CakeAgentExecuteStream = handler()
 		let sigwinch: DispatchSourceSignal?
+		var term: termios? = nil
+		
+		defer {
+			if var term = term {
+				inputHandle.restoreState(&term)
+			}
+		}
 
 		if self.isTTY {
 			let sig = DispatchSource.makeSignalSource(signal: SIGWINCH)
@@ -313,6 +320,10 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		}
 
 		self.pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
+			if self.inputHandle.isTTY() {
+				term = self.inputHandle.makeRaw()
+			}
+
 			return Task {
 				return try await NIOPipeBootstrap(group: self.eventLoop)
 					.takingOwnershipOfDescriptor(input: fd) { pipeChannel in
