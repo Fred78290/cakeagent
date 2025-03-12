@@ -12,7 +12,7 @@ import (
 )
 
 func mountEndpoint(name, target string, uid, gid int32, readonly bool) (err error) {
-	var stdout, stderr string
+	var stderr string
 
 	glog.Infof("Mounting %s to %s with uid=%d, gid=%d, readonly=%t", name, target, uid, gid, readonly)
 
@@ -26,7 +26,7 @@ func mountEndpoint(name, target string, uid, gid int32, readonly bool) (err erro
 	utils.Shell("chown", fmt.Sprintf("%d:%d", uid, gid), name)
 
 	// mount virtiofs
-	if stdout, stderr, err = utils.Shell("mount", "-t", "virtiofs", name, target); err != nil {
+	if _, stderr, err = utils.Shell("mount", "-t", "virtiofs", name, target); err != nil {
 		glog.Errorf("Failed to mount %s to %s: %v\n%s", name, target, err, stderr)
 		// if mount failed, remove target directory
 		utils.Shell("rm", "-rf", target)
