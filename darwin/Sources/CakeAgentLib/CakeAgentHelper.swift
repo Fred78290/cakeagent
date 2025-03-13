@@ -420,14 +420,16 @@ public struct CakeAgentHelper: Sendable {
 		self.client = client
 	}
 
-	public init(on: EventLoopGroup, listeningAddress: URL, connectionTimeout: Int64, caCert: String?, tlsCert: String?, tlsKey: String?) throws {
+	public init(on: EventLoopGroup, listeningAddress: URL, connectionTimeout: Int64, caCert: String?, tlsCert: String?, tlsKey: String?, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws {
 		self.eventLoopGroup = on
-		self.client = try! Self.createClient(on: on,
+		self.client = try Self.createClient(on: on,
 		                                     listeningAddress: listeningAddress,
 		                                     connectionTimeout: connectionTimeout,
 		                                     caCert: caCert,
 		                                     tlsCert: tlsCert,
-		                                     tlsKey: tlsKey)
+		                                     tlsKey: tlsKey,
+											 retries: retries,
+											 interceptors: interceptors)
 	}
 
 	public static func createClient(on: EventLoopGroup,
@@ -436,7 +438,8 @@ public struct CakeAgentHelper: Sendable {
 	                                caCert: String?,
 	                                tlsCert: String?,
 	                                tlsKey: String?,
-	                                retries: ConnectionBackoff.Retries = .unlimited) throws -> CakeAgentClient {
+	                                retries: ConnectionBackoff.Retries = .unlimited,
+									interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -473,7 +476,7 @@ public struct CakeAgentHelper: Sendable {
 			clientConfiguration.connectionBackoff = ConnectionBackoff(maximumBackoff: TimeInterval(connectionTimeout))
 		}
 
-		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration))
+		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration), interceptors: interceptors)
 	}
 
 	public func info(callOptions: CallOptions? = nil) throws -> InfoReply {
