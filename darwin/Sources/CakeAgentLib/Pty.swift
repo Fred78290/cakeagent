@@ -57,6 +57,30 @@ public extension FileHandle {
 
 			var newState: termios = term
 
+			newState.c_iflag &= UInt(IGNBRK) | ~UInt(BRKINT | INPCK | ISTRIP | IXON)
+			newState.c_cflag |= UInt(CS8)
+			newState.c_lflag &= ~UInt(ECHO | ICANON | IEXTEN | ISIG)
+			newState.c_cc.16 = 1
+			newState.c_cc.17 = 17
+
+			if tcsetattr(self.fileDescriptor, TCSANOW, &newState) != 0 {
+				perror("tcsetattr error")
+			}
+		}
+
+		return term
+	}
+
+	func cfmakeRaw() -> termios {
+		var term: termios = termios()
+
+		if self.isTTY() {
+			if tcgetattr(self.fileDescriptor, &term) != 0 {
+				perror("tcgetattr error")
+			}
+
+			var newState: termios = term
+
 			cfmakeraw(&newState)
 
 			if tcsetattr(self.fileDescriptor, TCSANOW, &newState) != 0 {
