@@ -56,7 +56,7 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		}
 	}
 
-	public init(inputHandle: FileHandle, state: termios) {
+	internal init(inputHandle: FileHandle, state: termios) {
 		self.inputHandle = inputHandle
 		self.state = state
 	}
@@ -67,7 +67,7 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		}
 
 		self.inputHandle = inputHandle
-		self.state = inputHandle.makeRaw()
+		self.state = inputHandle.getState()
 	}
 
 	public func restoreState() {
