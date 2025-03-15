@@ -30,14 +30,6 @@ extension GrpcParsableCommand {
 	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { nil }
 	var retries: ConnectionBackoff.Retries { .unlimited }
 
-	static func interceptorFactory(inputHandle: FileHandle) -> Cakeagent_AgentClientInterceptorFactoryProtocol? {
-		guard FileHandle.standardInput.isTTY() else {
-			return nil
-		}
-
-		return CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput, state: FileHandle.standardInput.makeRaw())
-	}
-
 	func execute(command: GrpcParsableCommand) async throws {
 		let command = command
 		let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)

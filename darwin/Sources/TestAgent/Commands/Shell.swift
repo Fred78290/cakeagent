@@ -30,7 +30,7 @@ final class Shell: GrpcParsableCommand {
 	@OptionGroup var options: CakeAgentClientOptions
 
 	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
-		Self.interceptorFactory(inputHandle: FileHandle.standardInput)
+		CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)
 	}
 
 	func validate() throws {

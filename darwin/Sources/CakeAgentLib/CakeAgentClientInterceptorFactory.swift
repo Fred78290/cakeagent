@@ -61,6 +61,15 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		self.state = state
 	}
 
+	public init?(inputHandle: FileHandle) {
+		guard inputHandle.isTTY() else {
+			return nil
+		}
+
+		self.inputHandle = inputHandle
+		self.state = inputHandle.makeRaw()
+	}
+
 	public func restoreState() {
 		var state = self.state
 
