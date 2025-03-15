@@ -103,9 +103,14 @@ struct Service: ParsableCommand {
 				WantedBy=multi-user.target
 				"""
 
+				let serviceURL = URL(fileURLWithPath: "/etc/systemd/system/\(cakerSignature).service")
+
+				if FileManager.default.fileExists(atPath: serviceURL.path) {
+					throw InstallError.failedToWriteLaunchAgentPlist("File already exists")
+				}
+
 				do {
-					let serviceFilePath = "/etc/systemd/system/\(cakerSignature).service"
-					try service.write(toFile: serviceFilePath, atomically: true, encoding: .utf8)
+					try service.write(to: serviceURL, atomically: true, encoding: .ascii)
 
 					try Process.run("systemctl", ["daemon-reload"]).waitUntilExit()
 					try Process.run("systemctl", ["enable", "\(cakedSignature).service"]).waitUntilExit()
@@ -116,6 +121,12 @@ struct Service: ParsableCommand {
 			}
 		#else
 			func install(arguments: [String]) throws {
+				let agentURL = URL(fileURLWithPath: "/Library/LaunchDaemons/\(cakerSignature).plist")
+
+				if FileManager.default.fileExists(atPath: agentURL.path) {
+					throw InstallError.failedToWriteLaunchAgentPlist("File already exists")
+				}
+
 				let agent = LaunchAgent(label: cakerSignature,
 				                        programArguments: arguments,
 				                        keepAlive: [
@@ -132,8 +143,6 @@ struct Service: ParsableCommand {
 				                        standardErrorPath: "/Library/Logs/cakeagent.log",
 				                        standardOutPath: "/Library/Logs/cakeagent.log",
 				                        processType: "Background")
-
-				let agentURL = URL(fileURLWithPath: "/Library/LaunchDaemons/\(cakerSignature).plist")
 
 				do {
 					try agent.write(to: agentURL)

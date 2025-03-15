@@ -10,6 +10,12 @@ import (
 )
 
 func InstallService(cfg *types.Config) (err error) {
+	plistPath := "/Library/LaunchDaemons/com.aldunelabs.cakeagent.plist"
+
+	if _, err := os.Stat(plistPath); err == nil {
+		return fmt.Errorf("service is already installed")
+	}
+
 	args := []string{
 		fmt.Sprintf("<string>%s</string>", os.Args[0]),
 		fmt.Sprintf("<string>--listen=%s</string>", cfg.Address),
@@ -74,8 +80,6 @@ func InstallService(cfg *types.Config) (err error) {
 			</dict>
 	</dict>
 </plist>`
-
-	plistPath := "/Library/LaunchDaemons/com.aldunelabs.cakeagent.plist"
 
 	if e := os.WriteFile(plistPath, []byte(plist), 0644); e != nil {
 		err = fmt.Errorf("failed to write plist: %w", e)

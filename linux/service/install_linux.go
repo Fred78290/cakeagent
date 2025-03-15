@@ -10,6 +10,12 @@ import (
 )
 
 func InstallService(cfg *types.Config) (err error) {
+	servicePath := "/etc/systemd/system/cakeagent.service"
+
+	if _, err := os.Stat(servicePath); err == nil {
+		return fmt.Errorf("service is already installed")
+	}
+
 	args := []string{
 		os.Args[0],
 		fmt.Sprintf("--listen=%s", cfg.Address),
@@ -45,8 +51,6 @@ ExecStart=` + strings.Join(args, " ") + `
 [Install]
 WantedBy=multi-user.target
 `
-
-	servicePath := "/etc/systemd/system/cakeagent.service"
 
 	if err := os.WriteFile("/etc/default/cakeagent", []byte(defaultEnv), 0644); err != nil {
 		err = fmt.Errorf("Failed to write env file: %v", err)
