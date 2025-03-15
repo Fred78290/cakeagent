@@ -35,6 +35,18 @@ public extension FileHandle {
 		return isatty(self.fileDescriptor) != 0
 	}
 
+	func getState() -> termios {
+		var term: termios = termios()
+
+		if self.isTTY() {
+			if tcgetattr(self.fileDescriptor, &term) != 0 {
+				perror("tcgetattr error")
+			}
+		}
+
+		return term
+	}
+
 	func makeRaw() -> termios {
 		var term: termios = termios()
 
