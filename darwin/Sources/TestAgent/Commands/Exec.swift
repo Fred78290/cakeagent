@@ -12,6 +12,10 @@ final class Exec: GrpcParsableCommand {
 	@Argument(help: "Command to execute")
 	var arguments: [String]
 
+	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
+		Self.interceptorFactory(inputHandle: FileHandle.standardInput)
+	}
+
 	func validate() throws {
 		try self.options.validate(try Root.getDefaultServerAddress())
 

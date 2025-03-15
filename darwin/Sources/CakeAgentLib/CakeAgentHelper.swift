@@ -8,6 +8,10 @@ import Semaphore
 
 typealias CakeAgentExecuteStream = BidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>
 
+public protocol CakeAgentClientInterceptorState {
+	func restoreState()
+}
+
 #if TRACE
 	func redbold(_ string: String) {
 		print("\u{001B}[0;31m\u{001B}[1m\(string)\u{001B}[0m")
@@ -260,7 +264,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		let stream: CakeAgentExecuteStream = handler()
 		let sigwinch: DispatchSourceSignal?
 		var term: termios? = nil
-		
+
 		defer {
 			if var term = term {
 				inputHandle.restoreState(&term)
@@ -423,13 +427,13 @@ public struct CakeAgentHelper: Sendable {
 	public init(on: EventLoopGroup, listeningAddress: URL, connectionTimeout: Int64, caCert: String?, tlsCert: String?, tlsKey: String?, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws {
 		self.eventLoopGroup = on
 		self.client = try Self.createClient(on: on,
-		                                     listeningAddress: listeningAddress,
-		                                     connectionTimeout: connectionTimeout,
-		                                     caCert: caCert,
-		                                     tlsCert: tlsCert,
-		                                     tlsKey: tlsKey,
-											 retries: retries,
-											 interceptors: interceptors)
+		                                    listeningAddress: listeningAddress,
+		                                    connectionTimeout: connectionTimeout,
+		                                    caCert: caCert,
+		                                    tlsCert: tlsCert,
+		                                    tlsKey: tlsKey,
+		                                    retries: retries,
+		                                    interceptors: interceptors)
 	}
 
 	public static func createClient(on: EventLoopGroup,
@@ -439,7 +443,7 @@ public struct CakeAgentHelper: Sendable {
 	                                tlsCert: String?,
 	                                tlsKey: String?,
 	                                retries: ConnectionBackoff.Retries = .unlimited,
-									interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
+	                                interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -554,14 +558,14 @@ public struct CakeAgentHelper: Sendable {
 	          errorHandle: FileHandle = FileHandle.standardError,
 	          callOptions: CallOptions? = nil) async throws -> Int32 {
 		let handler = CakeChannelStreamer(on: self.eventLoopGroup.next(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle)
-		var term = inputHandle.makeRaw()
-
 		defer {
-			inputHandle.restoreState(&term)
+			if let factory = client.interceptors as? CakeAgentClientInterceptorState {
+				factory.restoreState()
+			}
 		}
 
 		return try await handler.stream(command: command) {
-			client.execute(callOptions: callOptions, handler: handler.handleResponse)
+			return client.execute(callOptions: callOptions, handler: handler.handleResponse)
 		}
 	}
 

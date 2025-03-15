@@ -20,17 +20,30 @@ class GrpcError: Error {
 
 protocol GrpcParsableCommand: AsyncParsableCommand {
 	var options: CakeAgentClientOptions { get }
+	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { get }
+	var retries: ConnectionBackoff.Retries { get }
 
 	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws
 }
 
 extension GrpcParsableCommand {
+	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { nil }
+	var retries: ConnectionBackoff.Retries { .unlimited }
+
+	static func interceptorFactory(inputHandle: FileHandle) -> Cakeagent_AgentClientInterceptorFactoryProtocol? {
+		guard FileHandle.standardInput.isTTY() else {
+			return nil
+		}
+
+		return CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput, state: FileHandle.standardInput.makeRaw())
+	}
+
 	func execute(command: GrpcParsableCommand) async throws {
 		let command = command
 		let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
 		do {
-			let grpcClient = try self.options.createClient(on: group)
+			let grpcClient = try self.options.createClient(on: group, retries: self.retries, interceptors: self.interceptors)
 
 			do {
 				try await command.run(on: group,

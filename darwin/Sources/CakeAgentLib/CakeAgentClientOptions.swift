@@ -84,12 +84,14 @@ public struct CakeAgentClientOptions: ParsableArguments {
 		}
 	}
 
-	public func createClient(on: MultiThreadedEventLoopGroup) throws -> CakeAgentClient {
+	public func createClient(on: MultiThreadedEventLoopGroup, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
 		return try CakeAgentHelper.createClient(on: on,
 		                                        listeningAddress: URL(string: self.address!)!,
 		                                        connectionTimeout: self.timeout,
 		                                        caCert: self.caCert,
 		                                        tlsCert: self.tlsCert,
-		                                        tlsKey: self.tlsKey)
+		                                        tlsKey: self.tlsKey,
+		                                        retries: retries,
+		                                        interceptors: interceptors)
 	}
 }
