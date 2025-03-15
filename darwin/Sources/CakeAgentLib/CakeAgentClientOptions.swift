@@ -84,7 +84,7 @@ public struct CakeAgentClientOptions: ParsableArguments {
 		}
 	}
 
-	public func createClient(on: MultiThreadedEventLoopGroup, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
+	public func createClient(on: EventLoopGroup, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
 		return try CakeAgentHelper.createClient(on: on,
 		                                        listeningAddress: URL(string: self.address!)!,
 		                                        connectionTimeout: self.timeout,
