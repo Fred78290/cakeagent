@@ -11,7 +11,7 @@ import (
 	glog "github.com/sirupsen/logrus"
 )
 
-func mountEndpoint(name, target string, uid, gid int32, readonly bool) (err error) {
+func mountEndpoint(name, target string, uid, gid int32, readonly, early bool) (err error) {
 	var stderr string
 
 	glog.Infof("Mounting %s to %s with uid=%d, gid=%d, readonly=%t", name, target, uid, gid, readonly)
@@ -26,7 +26,7 @@ func mountEndpoint(name, target string, uid, gid int32, readonly bool) (err erro
 	utils.Shell("chown", fmt.Sprintf("%d:%d", uid, gid), name)
 
 	// mount virtiofs
-	if _, stderr, err = utils.Shell("mount", "-t", "virtiofs", name, target); err != nil {
+	if _, stderr, err = utils.Shell("mount", "-t", "virtiofs", name, target); !early && err != nil {
 		glog.Errorf("Failed to mount %s to %s: %v\n%s", name, target, err, stderr)
 		// if mount failed, remove target directory
 		utils.Shell("rm", "-rf", target)
@@ -38,7 +38,7 @@ func mountEndpoint(name, target string, uid, gid int32, readonly bool) (err erro
 		}
 
 		utils.Shell("sed", "-i", fmt.Sprintf("/%s/d", name), "/etc/fstab")
-		utils.Shell("bash", "-c", fmt.Sprintf("echo '%s %s virtiofs relatime,%s 0 0' >> /etc/fstab", name, target, mode))
+		utils.Shell("bash", "-c", fmt.Sprintf("echo '%s %s virtiofs relatime,nofail,%s 0 0' >> /etc/fstab", name, target, mode))
 	}
 
 	return
@@ -49,7 +49,7 @@ func mount(_ context.Context, request *cakeagent.MountRequest) (*cakeagent.Mount
 
 	for _, m := range request.Mounts {
 		// mount virtiofs
-		if err := mountEndpoint(m.Name, m.Target, m.Uid, m.Gid, m.Readonly); err != nil {
+		if err := mountEndpoint(m.Name, m.Target, m.Uid, m.Gid, m.Readonly, m.Early); err != nil {
 			// if mount failed, remove target directory
 			utils.Shell("rm", "-rf", m.Target)
 
@@ -135,7 +135,7 @@ func mountEndpoints(mounts []string) (err error) {
 			}
 		}
 
-		if err = mountEndpoint(name, target, uid, gid, readonly); err != nil {
+		if err = mountEndpoint(name, target, uid, gid, readonly, false); err != nil {
 			return
 		}
 	}

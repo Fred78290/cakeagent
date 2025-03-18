@@ -291,6 +291,8 @@ public struct Cakeagent_MountVirtioFS: Sendable {
 
   public var readonly: Bool = false
 
+  public var early: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -910,6 +912,7 @@ extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._Message
     3: .same(proto: "uid"),
     4: .same(proto: "gid"),
     5: .same(proto: "readonly"),
+    6: .same(proto: "early"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -923,6 +926,7 @@ extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.uid) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.gid) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.readonly) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.early) }()
       default: break
       }
     }
@@ -944,6 +948,9 @@ extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._Message
     if self.readonly != false {
       try visitor.visitSingularBoolField(value: self.readonly, fieldNumber: 5)
     }
+    if self.early != false {
+      try visitor.visitSingularBoolField(value: self.early, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -953,6 +960,7 @@ extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs.uid != rhs.uid {return false}
     if lhs.gid != rhs.gid {return false}
     if lhs.readonly != rhs.readonly {return false}
+    if lhs.early != rhs.early {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

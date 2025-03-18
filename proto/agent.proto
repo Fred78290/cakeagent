@@ -86,6 +86,7 @@ message MountVirtioFS {
 	int32 uid = 3;
 	int32 gid = 4;
 	bool readonly = 5;
+	bool early = 6;
 }
 
 message MountRequest {
