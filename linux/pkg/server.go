@@ -442,7 +442,16 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 			defer cleanup()
 
 			if err = cmd.Start(); err == nil {
-				if err = cmd.Wait(); err != nil {
+				message = cakeagent.ExecuteResponse{
+					Response: &cakeagent.ExecuteResponse_Established{
+						Established: true,
+					},
+				}
+
+				if err = stream.Send(&message); err != nil {
+					glog.Errorf("Failed to send established message: %v", err)
+					cmd.Process.Signal(syscall.SIGKILL)
+				} else if err = cmd.Wait(); err != nil {
 					if err != io.EOF && err != io.ErrClosedPipe && err != context.Canceled {
 						glog.Errorf("Failed to wait for command: %v", err)
 					}

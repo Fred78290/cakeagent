@@ -200,6 +200,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 	var pipeChannel: NIOAsyncChannel<ByteBuffer, ByteBuffer>? = nil
 	var exitCode: Int32 = 0
 	var receivedLength: UInt64 = 0
+	var term: termios? = nil
 
 	enum ExecuteCommand: Equatable, Sendable {
 		case execute(String, [String])
@@ -236,6 +237,10 @@ final class CakeChannelStreamer: @unchecked Sendable {
 				#endif
 			} else if case let .stderr(datas) = response.response {
 				try self.errorHandle.write(contentsOf: datas)
+			} else if case .established = response.response {
+				if self.inputHandle.isTTY() {
+					self.term = self.inputHandle.makeRaw()
+				}
 			}
 		} catch {
 			if error is CancellationError == false {
@@ -263,10 +268,9 @@ final class CakeChannelStreamer: @unchecked Sendable {
 	func stream(command: ExecuteCommand, handler: @escaping () -> CakeAgentExecuteStream) async throws -> Int32 {
 		let stream: CakeAgentExecuteStream = handler()
 		let sigwinch: DispatchSourceSignal?
-		var term: termios? = nil
 
 		defer {
-			if var term = term {
+			if var term = self.term {
 				inputHandle.restoreState(&term)
 			}
 		}
@@ -324,10 +328,6 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		}
 
 		self.pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
-			if self.inputHandle.isTTY() {
-				term = self.inputHandle.makeRaw()
-			}
-
 			return Task {
 				return try await NIOPipeBootstrap(group: self.eventLoop)
 					.takingOwnershipOfDescriptor(input: fd) { pipeChannel in

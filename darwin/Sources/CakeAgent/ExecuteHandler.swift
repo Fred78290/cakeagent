@@ -97,8 +97,7 @@ public class ExecuteHandleStream {
 							}
 							
 							process = Process()
-							print("cmd=\(cmd)")
-							print("args=\(args)")
+
 							if let process = process {
 								process.executableURL = URL(fileURLWithPath: cmd.lookupPath())
 								process.arguments = args
@@ -124,6 +123,10 @@ public class ExecuteHandleStream {
 								}
 
 								try process.run()
+
+								_ = try await responseStream.send(Cakeagent_ExecuteResponse.with {
+									$0.established = true
+								})
 							}
 
 							var grp = grp
@@ -290,6 +293,9 @@ public class ExecuteHandleStream {
 								}
 
 								try process.run()
+								_ = try await responseStream.send(Cakeagent_ExecuteResponse.with {
+									$0.established = true
+								})
 							}
 
 							channel = try await tty.bootstrap(group: self.eventLoop)

@@ -264,12 +264,21 @@ public struct Cakeagent_ExecuteResponse: @unchecked Sendable {
     set {response = .stderr(newValue)}
   }
 
+  public var established: Bool {
+    get {
+      if case .established(let v)? = response {return v}
+      return false
+    }
+    set {response = .established(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum OneOf_Response: Equatable, @unchecked Sendable {
     case exitCode(Int32)
     case stdout(Data)
     case stderr(Data)
+    case established(Bool)
 
   }
 
@@ -837,6 +846,7 @@ extension Cakeagent_ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._Messa
     1: .same(proto: "exitCode"),
     2: .same(proto: "stdout"),
     3: .same(proto: "stderr"),
+    4: .same(proto: "established"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -869,6 +879,14 @@ extension Cakeagent_ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._Messa
           self.response = .stderr(v)
         }
       }()
+      case 4: try {
+        var v: Bool?
+        try decoder.decodeSingularBoolField(value: &v)
+        if let v = v {
+          if self.response != nil {try decoder.handleConflictingOneOf()}
+          self.response = .established(v)
+        }
+      }()
       default: break
       }
     }
@@ -891,6 +909,10 @@ extension Cakeagent_ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._Messa
     case .stderr?: try {
       guard case .stderr(let v)? = self.response else { preconditionFailure() }
       try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
+    }()
+    case .established?: try {
+      guard case .established(let v)? = self.response else { preconditionFailure() }
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
     }()
     case nil: break
     }
