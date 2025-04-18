@@ -24,11 +24,16 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		}
 
 		func printError(_ error: Error) {
+			var error = error
 			let description: String
+
+			if let status: any GRPCStatusTransformable = error as? GRPCStatusTransformable {
+				error = status.makeGRPCStatus()
+			}
 
 			if let err: GRPCStatus = error as? GRPCStatus {
 				if err.code == .unavailable || err.code == .cancelled{
-					description = "closed connection"
+					description = "Connection refused"
 				} else {
 					description = err.description
 				}
