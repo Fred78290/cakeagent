@@ -12,6 +12,7 @@ import "google/protobuf/empty.proto";
 
 service Agent {
 	rpc Info (google.protobuf.Empty) returns (InfoReply);
+	rpc Shutdown (google.protobuf.Empty) returns (RunReply);
 	rpc Run (RunCommand) returns (RunReply);
 	rpc Execute (stream ExecuteRequest) returns (stream ExecuteResponse);
 	rpc Mount(MountRequest) returns (MountReply);

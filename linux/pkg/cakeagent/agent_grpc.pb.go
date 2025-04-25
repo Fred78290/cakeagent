@@ -20,11 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agent_Info_FullMethodName    = "/cakeagent.Agent/Info"
-	Agent_Run_FullMethodName     = "/cakeagent.Agent/Run"
-	Agent_Execute_FullMethodName = "/cakeagent.Agent/Execute"
-	Agent_Mount_FullMethodName   = "/cakeagent.Agent/Mount"
-	Agent_Umount_FullMethodName  = "/cakeagent.Agent/Umount"
+	Agent_Info_FullMethodName     = "/cakeagent.Agent/Info"
+	Agent_Shutdown_FullMethodName = "/cakeagent.Agent/Shutdown"
+	Agent_Run_FullMethodName      = "/cakeagent.Agent/Run"
+	Agent_Execute_FullMethodName  = "/cakeagent.Agent/Execute"
+	Agent_Mount_FullMethodName    = "/cakeagent.Agent/Mount"
+	Agent_Umount_FullMethodName   = "/cakeagent.Agent/Umount"
 )
 
 // AgentClient is the client API for Agent service.
@@ -32,6 +33,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentClient interface {
 	Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error)
+	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RunReply, error)
 	Run(ctx context.Context, in *RunCommand, opts ...grpc.CallOption) (*RunReply, error)
 	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecuteRequest, ExecuteResponse], error)
 	Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
@@ -50,6 +52,16 @@ func (c *agentClient) Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InfoReply)
 	err := c.cc.Invoke(ctx, Agent_Info_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RunReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunReply)
+	err := c.cc.Invoke(ctx, Agent_Shutdown_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +116,7 @@ func (c *agentClient) Umount(ctx context.Context, in *MountRequest, opts ...grpc
 // for forward compatibility.
 type AgentServer interface {
 	Info(context.Context, *emptypb.Empty) (*InfoReply, error)
+	Shutdown(context.Context, *emptypb.Empty) (*RunReply, error)
 	Run(context.Context, *RunCommand) (*RunReply, error)
 	Execute(grpc.BidiStreamingServer[ExecuteRequest, ExecuteResponse]) error
 	Mount(context.Context, *MountRequest) (*MountReply, error)
@@ -120,6 +133,9 @@ type UnimplementedAgentServer struct{}
 
 func (UnimplementedAgentServer) Info(context.Context, *emptypb.Empty) (*InfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
+}
+func (UnimplementedAgentServer) Shutdown(context.Context, *emptypb.Empty) (*RunReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
 func (UnimplementedAgentServer) Run(context.Context, *RunCommand) (*RunReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Run not implemented")
@@ -168,6 +184,24 @@ func _Agent_Info_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AgentServer).Info(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).Shutdown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_Shutdown_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).Shutdown(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -243,6 +277,10 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Info",
 			Handler:    _Agent_Info_Handler,
+		},
+		{
+			MethodName: "Shutdown",
+			Handler:    _Agent_Shutdown_Handler,
 		},
 		{
 			MethodName: "Run",

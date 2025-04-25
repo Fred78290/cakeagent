@@ -21,6 +21,11 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
 
+  func shutdown(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions?
+  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>
+
   func run(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions?
@@ -62,6 +67,24 @@ extension Cakeagent_AgentClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
+    )
+  }
+
+  /// Unary call to Shutdown
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Shutdown.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func shutdown(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply> {
+    return self.makeUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.shutdown.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeShutdownInterceptors() ?? []
     )
   }
 
@@ -208,6 +231,11 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
 
+  func makeShutdownCall(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>
+
   func makeRunCall(
     _ request: Cakeagent_RunCommand,
     callOptions: CallOptions?
@@ -247,6 +275,18 @@ extension Cakeagent_AgentAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
+    )
+  }
+
+  public func makeShutdownCall(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply> {
+    return self.makeAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.shutdown.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeShutdownInterceptors() ?? []
     )
   }
 
@@ -308,6 +348,18 @@ extension Cakeagent_AgentAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
+    )
+  }
+
+  public func shutdown(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions? = nil
+  ) async throws -> Cakeagent_RunReply {
+    return try await self.performAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.shutdown.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeShutdownInterceptors() ?? []
     )
   }
 
@@ -394,6 +446,9 @@ public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
   /// - Returns: Interceptors to use when invoking 'info'.
   func makeInfoInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
+  /// - Returns: Interceptors to use when invoking 'shutdown'.
+  func makeShutdownInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>]
+
   /// - Returns: Interceptors to use when invoking 'run'.
   func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>]
 
@@ -413,6 +468,7 @@ public enum Cakeagent_AgentClientMetadata {
     fullName: "cakeagent.Agent",
     methods: [
       Cakeagent_AgentClientMetadata.Methods.info,
+      Cakeagent_AgentClientMetadata.Methods.shutdown,
       Cakeagent_AgentClientMetadata.Methods.run,
       Cakeagent_AgentClientMetadata.Methods.execute,
       Cakeagent_AgentClientMetadata.Methods.mount,
@@ -424,6 +480,12 @@ public enum Cakeagent_AgentClientMetadata {
     public static let info = GRPCMethodDescriptor(
       name: "Info",
       path: "/cakeagent.Agent/Info",
+      type: GRPCCallType.unary
+    )
+
+    public static let shutdown = GRPCMethodDescriptor(
+      name: "Shutdown",
+      path: "/cakeagent.Agent/Shutdown",
       type: GRPCCallType.unary
     )
 
@@ -459,6 +521,8 @@ public protocol Cakeagent_AgentProvider: CallHandlerProvider {
 
   func info(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_InfoReply>
 
+  func shutdown(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_RunReply>
+
   func run(request: Cakeagent_RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_RunReply>
 
   func execute(context: StreamingResponseCallContext<Cakeagent_ExecuteResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ExecuteRequest>) -> Void>
@@ -487,6 +551,15 @@ extension Cakeagent_AgentProvider {
         responseSerializer: ProtobufSerializer<Cakeagent_InfoReply>(),
         interceptors: self.interceptors?.makeInfoInterceptors() ?? [],
         userFunction: self.info(request:context:)
+      )
+
+    case "Shutdown":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
+        interceptors: self.interceptors?.makeShutdownInterceptors() ?? [],
+        userFunction: self.shutdown(request:context:)
       )
 
     case "Run":
@@ -542,6 +615,11 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_InfoReply
 
+  func shutdown(
+    request: SwiftProtobuf.Google_Protobuf_Empty,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> Cakeagent_RunReply
+
   func run(
     request: Cakeagent_RunCommand,
     context: GRPCAsyncServerCallContext
@@ -592,6 +670,15 @@ extension Cakeagent_AgentAsyncProvider {
         wrapping: { try await self.info(request: $0, context: $1) }
       )
 
+    case "Shutdown":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
+        interceptors: self.interceptors?.makeShutdownInterceptors() ?? [],
+        wrapping: { try await self.shutdown(request: $0, context: $1) }
+      )
+
     case "Run":
       return GRPCAsyncServerHandler(
         context: context,
@@ -640,6 +727,10 @@ public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeInfoInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
+  /// - Returns: Interceptors to use when handling 'shutdown'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeShutdownInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>]
+
   /// - Returns: Interceptors to use when handling 'run'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeRunInterceptors() -> [ServerInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>]
@@ -663,6 +754,7 @@ public enum Cakeagent_AgentServerMetadata {
     fullName: "cakeagent.Agent",
     methods: [
       Cakeagent_AgentServerMetadata.Methods.info,
+      Cakeagent_AgentServerMetadata.Methods.shutdown,
       Cakeagent_AgentServerMetadata.Methods.run,
       Cakeagent_AgentServerMetadata.Methods.execute,
       Cakeagent_AgentServerMetadata.Methods.mount,
@@ -674,6 +766,12 @@ public enum Cakeagent_AgentServerMetadata {
     public static let info = GRPCMethodDescriptor(
       name: "Info",
       path: "/cakeagent.Agent/Info",
+      type: GRPCCallType.unary
+    )
+
+    public static let shutdown = GRPCMethodDescriptor(
+      name: "Shutdown",
+      path: "/cakeagent.Agent/Shutdown",
       type: GRPCCallType.unary
     )
 

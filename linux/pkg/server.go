@@ -231,6 +231,67 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 	return reply, nil
 }
 
+func (s *server) Shutdown(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.RunReply, err error) {
+	home, _ := os.UserHomeDir()
+	reply = &cakeagent.RunReply{}
+
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("shutdown", "-h", "+1s")
+
+		cmd.Dir = home
+		cmd.Env = os.Environ()
+
+		if err = cmd.Start(); err != nil {
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					reply.ExitCode = int32(status.ExitStatus())
+				} else {
+					reply.Stderr = []byte(fmt.Sprintf("failed to get exit status: %v", err))
+					reply.ExitCode = 1
+				}
+			} else {
+				reply.Stderr = []byte(fmt.Sprintf("failed to run command: %v", err))
+				reply.ExitCode = 1
+			}
+
+			err = nil
+		}
+	} else {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		cmd := exec.Command("shutdown", "now")
+
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		cmd.Dir = home
+		cmd.Env = os.Environ()
+
+		if err = cmd.Run(); err != nil {
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					reply.ExitCode = int32(status.ExitStatus())
+					err = nil
+				} else {
+					return nil, fmt.Errorf("failed to get exit status: %v", err)
+				}
+			} else {
+				return nil, fmt.Errorf("failed to run command: %v", err)
+			}
+		}
+
+		if b := stdout.Bytes(); len(b) > 0 {
+			reply.Stdout = b
+		}
+
+		if b := stderr.Bytes(); len(b) > 0 {
+			reply.Stderr = b
+		}
+	}
+
+	return
+}
+
 func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cakeagent.RunReply, err error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

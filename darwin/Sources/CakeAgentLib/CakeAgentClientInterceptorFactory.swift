@@ -93,6 +93,14 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		return [CakeAgentClientInterceptor<Google_Protobuf_Empty, Cakeagent_InfoReply>(inputHandle: inputHandle, state: state)]
 	}
 
+	public func makeShutdownInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_RunReply>] {
+		if callback?(Cakeagent_AgentClientMetadata.Methods.info) == false {
+			return []
+		}
+
+		return [CakeAgentClientInterceptor<Google_Protobuf_Empty, Cakeagent_RunReply>(inputHandle: inputHandle, state: state)]
+	}
+
 	public func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>] {
 		if callback?(Cakeagent_AgentClientMetadata.Methods.run) == false {
 			return []

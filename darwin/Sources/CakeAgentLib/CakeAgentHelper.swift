@@ -107,6 +107,24 @@ public enum Status: String, Sendable, Codable {
 	case unknown
 }
 
+public struct ShutdownReply: Sendable, Codable {
+	public let exitCode: Int32
+	public let stdout: String?
+	public let stderr: String?
+
+	public init() {
+		self.exitCode = 0
+		self.stdout = nil
+		self.stderr = nil
+	}
+
+	public init(exitCode: Int32, stdout: String? = nil, stderr: String? = nil) {
+		self.stdout = stdout
+		self.stderr = stderr
+		self.exitCode = exitCode
+	}
+}
+
 public struct InfoReply: Sendable, Codable {
 	public var name: String
 	public var version: String?
@@ -522,6 +540,12 @@ public struct CakeAgentHelper: Sendable {
 		}).response.wait()
 
 		return RunReply(exitCode: response.exitCode, stdout: response.stdout, stderr: response.stderr)
+	}
+
+	public func shutdown(callOptions: CallOptions? = nil) throws -> ShutdownReply {
+		let response = try client.shutdown(.init()).response.wait()
+
+		return ShutdownReply(exitCode: response.exitCode, stdout: String(data: response.stdout, encoding: .utf8), stderr: String(data: response.stderr, encoding: .utf8))
 	}
 
 	public func run(command: String,

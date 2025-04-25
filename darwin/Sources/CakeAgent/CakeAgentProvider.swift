@@ -140,6 +140,37 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		return reply
 	}
 
+    func shutdown(request: Google_Protobuf_Empty, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_RunReply {
+		let process = Process()
+		let arguments: [String] = ["shutdown", "-h", "+1s"]
+
+		logger.info("execute shutdown")
+
+		process.executableURL = URL(fileURLWithPath: "/bin/sh")
+		process.arguments = ["-c", arguments.joined(separator: " ")]
+		process.standardInput = FileHandle.nullDevice
+		process.standardOutput = FileHandle.nullDevice
+		process.standardError = FileHandle.nullDevice
+		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
+		do {
+			try process.run()
+
+			return .init()
+		} catch {
+			logger.error("Failed to run shutdown command: \(error)")
+
+			return Cakeagent_RunReply.with { reply in
+				reply.stderr = error.localizedDescription.data(using: .utf8) ?? Data()
+				reply.stdout = Data()
+				if process.isRunning == false {
+					reply.exitCode = Int32(process.terminationStatus)
+				}
+			}
+		}
+    }
+
+
 	func run(request: Cakeagent_RunCommand, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_RunReply {
 		let process = Process()
 		let outputPipe = Pipe()
@@ -204,7 +235,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 			}
 
 			if errorData.isEmpty == false {
-				reply.stdout = errorData
+				reply.stderr = errorData
 			}
 
 			reply.exitCode = Int32(process.terminationStatus)
