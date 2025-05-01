@@ -14,7 +14,7 @@ public protocol CakeAgentClientInterceptorState {
 
 #if TRACE
 	func redbold(_ string: String) {
-		print("\u{001B}[0;31m\u{001B}[1m\(string)\u{001B}[0m")
+		FileHandle.standardError.write("\u{001B}[0;31m\u{001B}[1m\(string)\u{001B}[0m\n".data(using: .utf8)!)
 	}
 #endif
 
@@ -383,8 +383,16 @@ final class CakeChannelStreamer: @unchecked Sendable {
 			do {
 				var bufLength = fileSize
 
+				#if TRACE
+					redbold("Input size \(fileSize)")
+				#endif
+
 				for try await buffer: ByteBuffer in inbound {
 					stream.sendBuffer(buffer)
+
+					#if TRACE
+						redbold("Read=\(buffer.readableBytes)")
+					#endif
 
 					if fileSize > 0 {
 						bufLength -= UInt64(buffer.readableBytes)
