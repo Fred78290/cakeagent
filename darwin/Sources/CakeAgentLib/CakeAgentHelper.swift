@@ -257,7 +257,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 				try self.errorHandle.write(contentsOf: datas)
 			} else if case .established = response.response {
 				if self.inputHandle.isTTY() {
-					self.term = self.inputHandle.makeRaw()
+					self.term = try self.inputHandle.makeRaw()
 				}
 			}
 		} catch {
@@ -289,7 +289,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 
 		defer {
 			if var term = self.term {
-				inputHandle.restoreState(&term)
+				try? inputHandle.restoreState(&term)
 			}
 		}
 
@@ -315,7 +315,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		let fileProxy: Pipe?
 		let fileSize: UInt64
 
-		if self.inputHandle.fileDescriptorIsFile() {
+		if try self.inputHandle.fileDescriptorIsFile() {
 			let proxy = Pipe()
 			let currentOffset = try self.inputHandle.offset()
 

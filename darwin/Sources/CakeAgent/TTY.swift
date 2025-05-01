@@ -124,10 +124,11 @@ class TTY: @unchecked Sendable {
 	}
 
 	init(tty: Bool) {
+	init(tty: Bool) throws {
 		self.isTTY = tty
 
 		if self.isTTY {
-			let master = Self.createPTY()
+			let master = try Self.createPTY()
 
 			self.ptx = FileHandle(fileDescriptor: master.0, closeOnDealloc: true)
 			self.pty = FileHandle(fileDescriptor: master.1, closeOnDealloc: true)
@@ -136,14 +137,14 @@ class TTY: @unchecked Sendable {
 		} else {
 			self.ptx = nil
 			self.pty = nil
-			self.stdin = Pipe()
-			self.stdout = Pipe()
+			self.stdin = try Self.newPipe(nonblocking: false)
+			self.stdout = try Self.newPipe(nonblocking: true)
 		}
 	}
 
-	func setTermSize(rows: Int32, cols: Int32) {
+	func setTermSize(rows: Int32, cols: Int32) throws {
 		if isTTY {
-			pty!.setTermSize(rows: rows, cols: cols)
+			try pty!.setTermSize(rows: rows, cols: cols)
 		}
 	}
 
@@ -187,7 +188,7 @@ class TTY: @unchecked Sendable {
 		}
 	}
 
-	private static func setupty(_ fd: Int32) -> Int32 {
+	private static func createPTY() throws -> (Int32, Int32) {
 		let TTY_CTRL_OPTS: tcflag_t = tcflag_t(CS8 | CLOCAL | CREAD)
 		let TTY_INPUT_OPTS: tcflag_t = tcflag_t(IGNPAR)
 		let TTY_OUTPUT_OPTS:tcflag_t = 0
@@ -242,8 +243,7 @@ class TTY: @unchecked Sendable {
 		let res = openpty(&tty_fd, &sfd, tty_path, nil, nil);
 
 		if (res < 0) {
-			perror("openpty error")
-			return (-1, -1)
+			throw Errno(rawValue: errno)
 		}
 
 		return (tty_fd, sfd)

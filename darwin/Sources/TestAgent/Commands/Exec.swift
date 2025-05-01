@@ -13,7 +13,7 @@ final class Exec: GrpcParsableCommand {
 	var arguments: [String]
 
 	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
-		CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)
+		try? CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)
 	}
 
 	func validate() throws {
