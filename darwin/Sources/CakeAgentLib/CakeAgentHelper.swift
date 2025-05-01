@@ -348,6 +348,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		self.pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
 			return Task {
 				return try await NIOPipeBootstrap(group: self.eventLoop)
+					.channelOption(.autoRead, value: true)
 					.takingOwnershipOfDescriptor(input: fd) { pipeChannel in
 						if let proxy = fileProxy {
 							proxy.fileHandleForWriting.writeabilityHandler = { handle in
