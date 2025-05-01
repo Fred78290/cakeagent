@@ -243,8 +243,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 	}
 
 	func execute(requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream, context: GRPCAsyncServerCallContext) async throws {
-		let process = ExecuteHandleStream(on: self.group.next())
-		try await process.stream2(requestStream: requestStream, responseStream: responseStream)
+		try await ExecuteHandleStream(on: self.group.next(), requestStream: requestStream, responseStream: responseStream).stream()
 	}
 
 	func mount(request: Cakeagent_MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {
