@@ -1,6 +1,12 @@
 {
 	"configurations": [
 		{
+			"type": "lldb",
+			"request": "attach",
+			"name": "attach process",
+			"pid": "${command:pickProcess}"
+		},
+		{
 			"name": "go cakeagent",
 			"type": "go",
 			"request": "launch",
@@ -8,6 +14,7 @@
 			"program": "${workspaceFolder}/linux",
 			"args": [
 				"--listen=tcp://127.0.0.1:5000",
+				"--log-level=trace",
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
 				"--tls-cert=${env:HOME}/.cake/agent/server.pem",
 				"--tls-key=${env:HOME}/.cake/agent/server.key"
@@ -29,6 +36,7 @@
 			"args": [
 				"run",
 				"--listen=tcp://127.0.0.1:5000",
+				"--log-level=trace",
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
 				"--tls-cert=${env:HOME}/.cake/agent/server.pem",
 				"--tls-key=${env:HOME}/.cake/agent/server.key"
@@ -90,7 +98,7 @@
 			"preLaunchTask": "swift: Build Debug testagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
@@ -99,7 +107,7 @@
 			"preLaunchTask": "swift: Build Release testagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
@@ -117,7 +125,7 @@
 			"preLaunchTask": "swift: Build Debug cakeagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
@@ -126,7 +134,7 @@
 			"preLaunchTask": "swift: Build Release cakeagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
