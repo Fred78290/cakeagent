@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import Logging
 
 enum InstallError: Error {
 	case failedToWriteLaunchAgentPlist(_ message: String)
@@ -69,6 +70,9 @@ struct Service: ParsableCommand {
 
 	struct Install : ParsableCommand { 
 		static let configuration = CommandConfiguration(abstract: "Install cake agent as service")
+
+		@Option(name: [.customLong("log-level")], help: "Log level")
+		var logLevel: Logging.Logger.Level = .info
 
 		@Option(name: [.customLong("listen"), .customShort("l")], help: "Listen on address")
 		var address: String?
@@ -158,6 +162,32 @@ struct Service: ParsableCommand {
 			}
 			
 			return "vsock://any:5000"
+		}
+
+		func validate() throws {
+			Logger.setLevel(self.logLevel)
+
+			if let address: String = self.address {
+				guard let u = URL(string: address) else {
+					throw ValidationError("Invalid address format: \(address)")
+				}
+
+				if ["vsock", "unix", "tcp"].contains(u.scheme) == false {
+					throw ValidationError("unsupported listening address scheme: \(String(describing: u.scheme))")
+				}
+			}
+
+			if let caCert = self.caCert, !FileManager.default.fileExists(atPath: caCert) {
+				throw ValidationError("CA certificate not found at path: \(caCert)")
+			}
+
+			if let tlsCert = self.tlsCert, !FileManager.default.fileExists(atPath: tlsCert) {
+				throw ValidationError("TLS certificate not found at path: \(tlsCert)")
+			}
+
+			if let tlsKey = self.tlsKey, !FileManager.default.fileExists(atPath: tlsKey) {
+				throw ValidationError("TLS key not found at path: \(tlsKey)")
+			}
 		}
 
 		mutating func run() throws {

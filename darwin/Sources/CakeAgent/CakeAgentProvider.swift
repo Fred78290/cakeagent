@@ -74,7 +74,7 @@ extension Cakeagent_ExecuteRequest {
 
 final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 	let group: EventLoopGroup
-	let logger: Logger = Logging.Logger(label: "com.aldunelabs.cakeagent")
+	let logger: Logger = Logger("CakeAgentProvider")
 
 	init(group: EventLoopGroup) {
 		self.group = group
