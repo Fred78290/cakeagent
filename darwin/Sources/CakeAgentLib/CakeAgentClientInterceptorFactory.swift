@@ -22,7 +22,7 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		public func restoreState() {
 			var state = self.state
 
-			inputHandle.restoreState(&state)
+			try? inputHandle.restoreState(&state)
 		}
 
 		func printError(_ error: Error) {
@@ -69,20 +69,20 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		self.callback = callback
 	}
 
-	public init?(inputHandle: FileHandle, callback: CakeAgentClientInterceptorFactoryCallback? = nil) {
+	public init?(inputHandle: FileHandle, callback: CakeAgentClientInterceptorFactoryCallback? = nil) throws {
 		guard inputHandle.isTTY() else {
 			return nil
 		}
 
 		self.inputHandle = inputHandle
-		self.state = inputHandle.getState()
+		self.state = try inputHandle.getState()
 		self.callback = callback
 	}
 
 	public func restoreState() {
 		var state = self.state
 
-		inputHandle.restoreState(&state)
+		try? inputHandle.restoreState(&state)
 	}
 
 	public func makeInfoInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_InfoReply>] {

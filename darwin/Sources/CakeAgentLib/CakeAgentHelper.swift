@@ -14,7 +14,7 @@ public protocol CakeAgentClientInterceptorState {
 
 #if TRACE
 	func redbold(_ string: String) {
-		print("\u{001B}[0;31m\u{001B}[1m\(string)\u{001B}[0m")
+		FileHandle.standardError.write("\u{001B}[0;31m\u{001B}[1m\(string)\u{001B}[0m\n".data(using: .utf8)!)
 	}
 #endif
 
@@ -257,7 +257,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 				try self.errorHandle.write(contentsOf: datas)
 			} else if case .established = response.response {
 				if self.inputHandle.isTTY() {
-					self.term = self.inputHandle.makeRaw()
+					self.term = try self.inputHandle.makeRaw()
 				}
 			}
 		} catch {
@@ -289,7 +289,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 
 		defer {
 			if var term = self.term {
-				inputHandle.restoreState(&term)
+				try? inputHandle.restoreState(&term)
 			}
 		}
 
@@ -315,7 +315,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		let fileProxy: Pipe?
 		let fileSize: UInt64
 
-		if self.inputHandle.fileDescriptorIsFile() {
+		if try self.inputHandle.fileDescriptorIsFile() {
 			let proxy = Pipe()
 			let currentOffset = try self.inputHandle.offset()
 
@@ -348,6 +348,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		self.pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
 			return Task {
 				return try await NIOPipeBootstrap(group: self.eventLoop)
+					.channelOption(.autoRead, value: true)
 					.takingOwnershipOfDescriptor(input: fd) { pipeChannel in
 						if let proxy = fileProxy {
 							proxy.fileHandleForWriting.writeabilityHandler = { handle in
@@ -357,13 +358,6 @@ final class CakeChannelStreamer: @unchecked Sendable {
 									}
 								}
 							}
-						}
-
-						pipeChannel.closeFuture.whenComplete { _ in
-							#if TRACE
-								redbold("pipeChannel closed")
-							#endif
-							stream.sendEof()
 						}
 
 						return pipeChannel.eventLoop.makeCompletedFuture {
@@ -383,8 +377,16 @@ final class CakeChannelStreamer: @unchecked Sendable {
 			do {
 				var bufLength = fileSize
 
+				#if TRACE
+					redbold("Input size \(fileSize)")
+				#endif
+
 				for try await buffer: ByteBuffer in inbound {
 					stream.sendBuffer(buffer)
+
+					#if TRACE
+						redbold("Read=\(buffer.readableBytes)")
+					#endif
 
 					if fileSize > 0 {
 						bufLength -= UInt64(buffer.readableBytes)
@@ -398,6 +400,8 @@ final class CakeChannelStreamer: @unchecked Sendable {
 						bufLength += UInt64(buffer.readableBytes)
 					}
 				}
+
+				stream.sendEof()
 
 				#if TRACE
 					redbold("EOF bufLength=\(bufLength), receivedLength=\(self.receivedLength)")

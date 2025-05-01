@@ -19,361 +19,267 @@ public typealias CakeAgentExecuteStream = NIOAsyncChannel<ByteBuffer, ByteBuffer
 public typealias Cakeagent_ExecuteRequestStream = GRPCAsyncRequestStream<Cakeagent_ExecuteRequest>
 public typealias Cakeagent_ExecuteResponseStream = GRPCAsyncResponseStreamWriter<Cakeagent_ExecuteResponse>
 
+final class OutputAsyncStream: Sendable {
+	let name: String
+	let (stream, continuation) = AsyncStream.makeStream(of: Cakeagent_ExecuteResponse.self)
+
+	init(name: String) {
+		self.name = name
+	}
+}
+
+
 public class ExecuteHandleStream {
+	let requestStream: Cakeagent_ExecuteRequestStream
+	let responseStream: Cakeagent_ExecuteResponseStream
 	let eventLoop: EventLoop
-	let logger: Logger = Logging.Logger(label: "com.aldunelabs.cakeagent")
-//	var outBytes: Int = 0
-//	var receivedBytes: Int = 0
 
-	init(on: EventLoop) {
+	private struct OuputStream {
+		let fileHandle: FileHandle
+		let fd: Int32
+		let name: String
+		let channel: Int32
+		var outBytes: Int = 0
+
+		init(fileHandle: FileHandle, channel: Int32, name: String) {
+			self.fileHandle = fileHandle
+			self.name = name
+			self.channel = channel
+			self.fd = fileHandle.fileDescriptor
+		}
+	}
+
+	init(on: EventLoop, requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream) {
 		self.eventLoop = on
+		self.requestStream = requestStream
+		self.responseStream = responseStream
 	}
 
-	func stream2(requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream) async throws {
-		let errorPipe = Pipe()
-		var exitCode: Int32 = -1
-		var process: Process? = nil
-		var tty: TTY? = nil
+	private func createTTY(size: Cakeagent_TerminalSize) throws -> TTY {
+		let tty = try TTY(tty: size.rows + size.cols > 0)
 
-		errorPipe.fileHandleForReading.readabilityHandler = { handle in
-			let data = handle.availableData
+		try tty.setTermSize(rows: size.rows, cols: size.cols)
 
-			if data.isEmpty == false {
-				Task {
-					let message = Cakeagent_ExecuteResponse.with {
-						$0.stderr = data
-					}
-
-					_ = try? await responseStream.send(message)
-				}
-			}
-		}
-
-		await withTaskGroup(of: Void.self) { group in
-			let (outboundStream, outboundContinuation) = AsyncStream.makeStream(of: Data.self)
-			let grp = group
-			var outBytes: Int = 0
-
-			group.addTask {
-				do {
-					var receivedBytes: Int = 0
-
-					for try await request: Cakeagent_ExecuteRequest in requestStream {
-						self.logger.debug("Request: \(request)")
-						
-						if case let .size(size) = request.request {
-							tty = TTY(tty: size.rows + size.cols > 0)
-							tty!.setTermSize(rows: size.rows, cols: size.cols)
-						} else if case let .command(command) = request.request {
-							guard let tty: TTY = tty else {
-								throw ServiceError("No TTY")
-							}
-							
-							tty.fileHandleForOutput.readabilityHandler = { handle in
-								let datas = handle.availableData
-
-								if datas.isEmpty == false {
-									self.logger.trace("yield outbound: \(datas.count), [\(String(data: datas, encoding: .utf8) ?? "<unknown>")]")
-									outboundContinuation.yield(datas)
-								}
-							}
-							
-							// Launch the process
-							let cmd: String
-							let args: [String]
-							let shell: Bool
-
-							switch command.execute {
-							case .shell:
-								cmd = "/bin/zsh".shell()
-								args = ["-i", "-l"]
-								shell = true
-							case let .command(exec):
-								cmd = exec.command
-								args = exec.args
-								shell = false
-							default:
-								throw ServiceError("No command")
-							}
-							
-							process = Process()
-
-							if let process = process {
-								process.executableURL = URL(fileURLWithPath: cmd.lookupPath())
-								process.arguments = args
-								process.environment = ProcessInfo.processInfo.environment
-								process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-								process.standardInput = tty.fileHandleForReading
-								process.standardOutput = tty.fileHandleForWriting
-								
-								if shell {
-									process.standardError = tty.fileHandleForWriting
-								} else {
-									process.standardError = errorPipe.fileHandleForWriting
-								}
-
-								process.terminationHandler = { p in
-									self.logger.debug("Shell exited")
-
-									if tty.isTTY {
-										grp.cancelAll()
-									} else {
-										outboundContinuation.finish()
-									}
-								}
-
-								try process.run()
-
-								_ = try await responseStream.send(Cakeagent_ExecuteResponse.with {
-									$0.established = true
-								})
-							}
-
-							var grp = grp
-
-							grp.addTask {
-								do {
-									self.logger.debug("enter outboundStream")
-									for try await datas in outboundStream {
-										outBytes += datas.count
-										self.logger.info("outbound: \(datas.count), outBytes: \(outBytes) [\(String(data: datas, encoding: .utf8) ?? "<unknown>")]")
-										
-										_ = try await responseStream.send(Cakeagent_ExecuteResponse.with {
-											$0.stdout = datas
-										})
-									}
-									self.logger.debug("exit outboundStream, outBytes: \(outBytes)")
-								} catch {
-									if error is CancellationError == false {
-										guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-											self.logger.error("Error reading from shell, \(error)")
-											return
-										}
-									}
-								}
-							}
-						} else if case let .input(datas) = request.request {
-							guard let tty = tty else {
-								throw ServiceError("No TTY")
-							}
-							
-							receivedBytes += datas.count
-							self.logger.info("inbound: \(datas.count), receivedBytes: \(receivedBytes) [\(String(data: datas, encoding: .utf8) ?? "<unknown>")]")
-
-							tty.fileHandleForInput.write(datas)
-
-						} else if case .eof = request.request {
-							self.logger.info("received EOF")
-
-							if let tty = tty {
-								self.logger.info("EOF")
-								tty.eof()
-							}
-							break
-						}
-					}
-					
-				} catch {
-					if error is CancellationError == false {
-						guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-							self.logger.error("Error reading from shell, \(error)")
-							return
-						}
-					}
-				}
-				
-				self.logger.info("exit task")
-			}
-
-			await group.waitForAll()
-
-			if let tty = tty {
-				self.logger.info("EOF")
-				tty.eof()
-			}
-
-			self.logger.info("exit group task")
-		}
-
-		self.logger.info("leave group task")
-
-		if let process = process {
-			if process.isRunning {
-				process.waitUntilExit()
-			}
-
-			exitCode = process.terminationStatus
-		}
-
-		try await responseStream.send(Cakeagent_ExecuteResponse.with { $0.exitCode = exitCode })
+		return tty
 	}
-	
-	func stream(requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream) async throws {
-		let errorPipe = Pipe()
-		var exitCode: Int32 = -1
-		var process: Process? = nil
-		var tty: TTY? = nil
-		var outputStream: NIOAsyncChannelOutboundWriter<ByteBuffer>? = nil
 
-		errorPipe.fileHandleForReading.readabilityHandler = { handle in
-			let data = handle.availableData
+	private func createProcess(command: Cakeagent_ExecuteCommand, tty: TTY) async throws -> Process {
+		let process: Process = Process()
+		let cmd: String
+		let args: [String]
+		//let shell: Bool
 
-			if data.isEmpty == false {
-				Task {
-					let message = Cakeagent_ExecuteResponse.with {
-						$0.stderr = data
-					}
+		switch command.execute {
+		case .shell:
+			cmd = "/bin/zsh".shell()
+			args = ["-i", "-l"]
+		//shell = true
+		case let .command(exec):
+			cmd = exec.command
+			args = exec.args
+		//shell = false
+		default:
+			throw ServiceError("No command")
+		}
 
-					_ = try? await responseStream.send(message)
-				}
+		process.executableURL = URL(fileURLWithPath: cmd.lookupPath())
+		process.arguments = args
+		process.environment = ProcessInfo.processInfo.environment
+		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+		process.standardInput = tty.fileHandleForStdinReading
+		process.standardOutput = tty.fileHandleForStdoutWriting
+		process.standardError = tty.fileHandleForStderrWriting
+
+		process.terminationHandler = { p in
+			if Logger.Level() >= .debug {
+				Logger(self).debug("Process exited")
 			}
 		}
 
-		await withTaskGroup(of: Void.self) { group in
-			let (channelStream, channelContinuation) = AsyncStream.makeStream(of: CakeAgentExecuteStream.self)
-			let (outboundStream, outboundContinuation) = AsyncStream.makeStream(of: NIOAsyncChannelOutboundWriter<ByteBuffer>.self)
-			let grp = group
+		try process.run()
 
-			group.addTask {
-				do {
-					var channel: CakeAgentExecuteStream? = nil
-					var receivedBytes: Int = 0
+		if Logger.Level() >= .debug {
+			Logger(self).debug("Shell started")
+		}
 
-					for try await request: Cakeagent_ExecuteRequest in requestStream {
-						self.logger.debug("Request: \(request)")
+		return process
+	}
 
-						if case let .size(size) = request.request {
+	private func forwardOutput(output: OuputStream, process: Process, logger: Logger) async -> OuputStream {
+		var output = output
+		let bufSize = 4096
+		let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufSize)
+		let logLevel = Logger.Level()
 
-							tty = TTY(tty: size.rows + size.cols > 0)
-							tty!.setTermSize(rows: size.rows, cols: size.cols)
+		logger.debug("Enter \(output.name)")
 
-						} else if case let .command(command) = request.request {
-							guard let tty = tty else {
-								throw ServiceError("No TTY")
-							}
+		defer {
+			buffer.deallocate()
+			logger.debug("Leave \(output.name)")
+		}
 
-							// Launch the process
-							let cmd: String
-							let args: [String]
-							let shell: Bool
+		do {
+			while true {
+				var timeout = timeval(tv_sec: 0, tv_usec: 100)
+				var readfds = fd_set()
 
-							switch command.execute {
-							case .shell:
-								cmd = "/bin/zsh".shell()
-								args = ["-i", "-l"]
-								shell = true
-							case let .command(exec):
-								cmd = exec.command
-								args = exec.args
-								shell = false
-							default:
-								throw ServiceError("No command")
-							}
+				__darwin_fd_set(output.fd, &readfds)
 
-							process = Process()
-
-							if let process = process {
-								process.terminationHandler = { p in
-									self.logger.debug("Shell exited")
-									grp.cancelAll()
-								}
-
-								process.executableURL = URL(fileURLWithPath: cmd.lookupPath())
-								process.arguments = args
-								process.environment = ProcessInfo.processInfo.environment
-								process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-								process.standardInput = tty.fileHandleForReading
-								process.standardOutput = tty.fileHandleForWriting
-								process.standardError = errorPipe.fileHandleForWriting
-
-								if shell {
-									process.standardError = tty.fileHandleForWriting
-								} else {
-									process.standardError = errorPipe.fileHandleForWriting
-								}
-
-								try process.run()
-								_ = try await responseStream.send(Cakeagent_ExecuteResponse.with {
-									$0.established = true
-								})
-							}
-
-							channel = try await tty.bootstrap(group: self.eventLoop)
-
-							channelContinuation.yield(channel!)
-							channelContinuation.finish()
-
-							// Wait NIOAsyncChannel to be ready
-							for try await value in outboundStream {
-								outputStream = value
-								break
-							}
-
-						} else if case let .input(datas) = request.request {
-
-							guard let outputStream = outputStream else {
-								throw ServiceError("Fatal error no outbound stream")
-							}
-
-							receivedBytes += datas.count
-							self.logger.info("inbound: \(datas.count), receivedBytes: \(receivedBytes)")
-
-							try await outputStream.write(ByteBuffer(data: datas))
-						} else if case .eof = request.request {
-
-							self.logger.info("received EOF")
-
-							if let tty = tty {
-								self.logger.info("EOF")
-								tty.eof()
-							}
-							break
-						}
-					}
-				} catch {
-					if error is CancellationError == false {
-						guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-							self.logger.error("Error reading from shell, \(error)")
-							return
-						}
-					}
+				if select(output.fd+1, &readfds, nil, nil, &timeout) < 0 {
+					logger.error("Select \(output.name) failed, \(String(cString: strerror(errno)))")
+					break
 				}
-			}
 
-			group.addTask {
-				do {
-					for try await channel in channelStream {
-						try await channel.executeThenClose { inbound, outbound in
-							var outBytes: Int = 0
-							
-							outboundContinuation.yield(outbound)
-							outboundContinuation.finish()
-
-							for try await reply in inbound {
-								outBytes += reply.readableBytes
-								self.logger.info("outbound: \(reply.readableBytes), outBytes=\(outBytes)")
-								try await responseStream.send(Cakeagent_ExecuteResponse.with { $0.stdout = Data(buffer: reply) })
-							}
+				if __darwin_fd_isset(output.fd, &readfds) == 0 {
+					if process.isRunning == false {
+						if logLevel >= .debug {
+							logger.debug("EOF \(output.name), outBytes=\(output.outBytes)")
 						}
 						break
 					}
-				} catch {
-					if error is CancellationError == false {
-						self.logger.error("Error writing to channel, \(error)")
+					continue
+				}
+
+				let bytesRead = read(output.fd, buffer, bufSize)
+
+				if bytesRead > 0 {
+					let data: Data = Data(bytes: buffer, count: bytesRead)
+
+					output.outBytes += bytesRead
+
+					if logLevel >= .trace {
+						logger.trace("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes) [\(String(data: data, encoding: .utf8) ?? "<unknown>")]")
+					} else if logLevel >= .debug {
+						logger.debug("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes)")
 					}
+
+					_ = try await self.responseStream.send(Cakeagent_ExecuteResponse.with {
+						if output.channel == STDOUT_FILENO {
+							$0.stdout = data
+						} else {
+							$0.stderr = data
+						}
+					})
+				} else if bytesRead < 0 {
+					if errno == EBADF || errno == EAGAIN {
+						if process.isRunning == false {
+							if logLevel >= .debug {
+								logger.debug("EOF \(output.name), outBytes=\(output.outBytes)")
+							}
+							break
+						} else if logLevel >= .debug {
+							logger.debug("EAGAIN \(output.name), outBytes=\(output.outBytes)")
+						}
+					} else {
+						logger.error("Error reading from \(output.name): \(String(cString: strerror(errno)))")
+						break
+					}
+				} else if process.isRunning == false {
+					if logLevel >= .debug {
+						logger.debug("EOF reading output, \(output.name)  outBytes=\(output.outBytes), \(String(cString: strerror(errno)))")
+					}
+					break
+				}
+			}
+		} catch {
+			logger.error(error)
+		}
+
+		return output
+	}
+
+	func stream() async throws {
+		var exitCode: Int32 = -1
+		let process: Process
+		let tty: TTY
+		var iterator = requestStream.makeAsyncIterator()
+		let logger = Logger(self)
+
+		// Read terminal size
+		if let request = try await iterator.next() {
+			if case let .size(size) = request.request {
+				tty = try self.createTTY(size: size)
+			} else {
+				throw ServiceError("empty terminal size")
+			}
+		} else {
+			throw ServiceError("Failed to receive terminal size message")
+		}
+
+		// Read request command
+		if let request = try await iterator.next() {
+			if case let .command(command) = request.request {
+				process = try await self.createProcess(command: command, tty: tty)
+			} else {
+				throw ServiceError("empty command")
+			}
+		} else {
+			throw ServiceError("Failed to receive command message")
+		}
+
+		defer {
+			logger.debug("leave stream")
+			tty.close()
+		}
+
+		_ = try await self.responseStream.send(Cakeagent_ExecuteResponse.with {
+			$0.established = true
+		})
+
+		let inputStreamTask = Task {
+			logger.debug("enter inboundStream")
+
+			defer {
+				logger.debug("leave inboundStream")
+			}
+
+			// Handle all messages
+			do {
+				while let request = try await iterator.next(), process.isRunning {
+					if case let .input(datas) = request.request {
+						tty.writeToStdin(datas)
+					} else if case let .size(size) = request.request {
+						try tty.setTermSize(rows: size.rows, cols: size.cols)
+					} else if case .eof = request.request {
+						tty.eof()
+						break
+					}
+				}
+			} catch {
+				if error is CancellationError == false {
+					guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
+						logger.error("Error reading from shell, \(error)")
+						return
+					}
+				}
+			}
+		}
+
+		await withTaskGroup{ group in
+			let outputs = [
+				OuputStream(fileHandle: tty.fileHandleForStdoutReading, channel: STDOUT_FILENO, name: "stdout"),
+				OuputStream(fileHandle: tty.fileHandleForStderrReading, channel: STDERR_FILENO, name: "stderr")
+			]
+
+			outputs.forEach { (output: OuputStream) in
+				group.addTask {
+					await self.forwardOutput(output: output, process: process, logger: logger)
 				}
 			}
 
 			await group.waitForAll()
+
+			inputStreamTask.cancel()
 		}
 
-		if let process = process {
-			if process.isRunning {
-				process.waitUntilExit()
-			}
-
-			exitCode = process.terminationStatus
+		if process.isRunning {
+			logger.debug("process.waitUntilExit")
+			process.waitUntilExit()
 		}
+
+		exitCode = process.terminationStatus
+
+		logger.debug("exitCode: \(exitCode)")
 
 		try await responseStream.send(Cakeagent_ExecuteResponse.with { $0.exitCode = exitCode })
 	}

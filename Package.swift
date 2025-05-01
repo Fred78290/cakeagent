@@ -17,8 +17,8 @@ let package = Package(
 	dependencies: [
 		.package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.1"),
 		.package(url: "https://github.com/grpc/grpc-swift.git", from: "1.24.2"),
-		.package(url: "https://github.com/apple/swift-nio.git", from: "2.79.0"),
-		.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.28.2"),
+		.package(url: "https://github.com/apple/swift-nio.git", from: "2.82.0"),
+		.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.29.0"),
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
 		.package(url: "https://github.com/groue/Semaphore", from: "0.0.8"),
 	],
@@ -28,7 +28,10 @@ let package = Package(
 				.product(name: "GRPC", package: "grpc-swift"),
 				.product(name: "Semaphore", package: "Semaphore"),
 			],
-			path: "darwin/Sources/CakeAgentLib"),
+			path: "darwin/Sources/CakeAgentLib",
+			swiftSettings: [
+				.define("XTRACE")
+			]),
 		.executableTarget(name: "CakeAgent",
 			dependencies: [
 				.product(name: "ArgumentParser", package: "swift-argument-parser"),

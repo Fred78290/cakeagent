@@ -1,5 +1,6 @@
 import Foundation
 import NIOPosix
+import System
 
 public extension FileHandle {
 	func getTermSize() -> (rows: Int32, cols: Int32) {
@@ -18,7 +19,19 @@ public extension FileHandle {
 		return (Int32(rows), Int32(cols))
 	}
 
-	func setTermSize(rows: Int32, cols: Int32) {
+	func closeOnExec() throws {
+		if fcntl(self.fileDescriptor, F_SETFD, FD_CLOEXEC) < 0 {
+			throw Errno(rawValue: errno)
+		}
+	}
+
+	func setNonblock() throws {
+		if fcntl(self.fileDescriptor, F_SETFL, O_NONBLOCK) < 0 {
+			throw Errno(rawValue: errno)
+		}
+	}
+
+	func setTermSize(rows: Int32, cols: Int32) throws {
 		if self.isTTY() {
 			var size = winsize()
 
@@ -26,7 +39,7 @@ public extension FileHandle {
 			size.ws_col = UInt16(cols)
 
 			if ioctl(self.fileDescriptor, TIOCSWINSZ, &size) != 0 {
-				perror("ioctl error")
+				throw Errno(rawValue: errno)
 			}
 		}
 	}
@@ -35,24 +48,24 @@ public extension FileHandle {
 		return isatty(self.fileDescriptor) != 0
 	}
 
-	func getState() -> termios {
+	func getState() throws -> termios {
 		var term: termios = termios()
 
 		if self.isTTY() {
 			if tcgetattr(self.fileDescriptor, &term) != 0 {
-				perror("tcgetattr error")
+				throw Errno(rawValue: errno)
 			}
 		}
 
 		return term
 	}
 
-	func makeRaw() -> termios {
+	func makeRaw() throws -> termios {
 		var term: termios = termios()
 
 		if self.isTTY() {
 			if tcgetattr(self.fileDescriptor, &term) != 0 {
-				perror("tcgetattr error")
+				throw Errno(rawValue: errno)
 			}
 
 			var newState: termios = term
@@ -64,19 +77,19 @@ public extension FileHandle {
 			newState.c_cc.17 = 17
 
 			if tcsetattr(self.fileDescriptor, TCSANOW, &newState) != 0 {
-				perror("tcsetattr error")
+				throw Errno(rawValue: errno)
 			}
 		}
 
 		return term
 	}
 
-	func cfmakeRaw() -> termios {
+	func cfmakeRaw() throws -> termios {
 		var term: termios = termios()
 
-		if self.isTTY() {
+		if self.isTTY(){
 			if tcgetattr(self.fileDescriptor, &term) != 0 {
-				perror("tcgetattr error")
+				throw Errno(rawValue: errno)
 			}
 
 			var newState: termios = term
@@ -84,26 +97,26 @@ public extension FileHandle {
 			cfmakeraw(&newState)
 
 			if tcsetattr(self.fileDescriptor, TCSANOW, &newState) != 0 {
-				perror("tcsetattr error")
+				throw Errno(rawValue: errno)
 			}
 		}
 
 		return term
 	}
 
-	func restoreState(_ term: UnsafePointer<termios>) {
+	func restoreState(_ term: UnsafePointer<termios>) throws {
 		if self.isTTY() {
 			if tcsetattr(self.fileDescriptor, TCSANOW, term) != 0 {
-				perror("tcsetattr error")
+				throw Errno(rawValue: errno)
 			}
 		}
 	}
 
-	func fileDescriptorIsFile() -> Bool{
+	func fileDescriptorIsFile() throws -> Bool {
         var s: stat = .init()
 		
 		if Darwin.fstat(self.fileDescriptor, &s) != 0 {
-			perror("fstat error")
+			throw Errno(rawValue: errno)
 		}
 
         switch s.st_mode & S_IFMT {

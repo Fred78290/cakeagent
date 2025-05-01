@@ -30,8 +30,16 @@ import (
 	glog "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+)
+
+const (
+	strErrFailedToGetExitStatus = "failed to get exit status: %v"
+	strErrFailedToRunCommand    = "failed to run command: %v"
+	strErrFailedToGetExitCode   = "failed to get exit code: %v"
 )
 
 type server struct {
@@ -39,13 +47,28 @@ type server struct {
 }
 
 type pipe struct {
-	input  *io.PipeReader
-	output *io.PipeWriter
+	name   string
+	input  io.ReadCloser
+	output io.WriteCloser
 }
 
 func (p *pipe) Close() {
-	p.input.Close()
-	p.output.Close()
+	if p.input != nil {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace(fmt.Sprintf("Closing %s input pipe", p.name))
+		}
+
+		p.input.Close()
+		p.input = nil
+	}
+
+	if p.output != nil {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace(fmt.Sprintf("Closing %s output pipe", p.name))
+		}
+		p.output.Close()
+		p.output = nil
+	}
 }
 
 type pseudoTTY struct {
@@ -53,16 +76,34 @@ type pseudoTTY struct {
 	ptx    *os.File
 	stdin  *pipe
 	stdout *pipe
+	stderr *pipe
 }
 
-func newPipe() (p *pipe) {
-	p = &pipe{}
-	p.input, p.output = io.Pipe()
+func newPipe(name string, nonblocking bool) (p *pipe, err error) {
+	fds := []int{0, 0}
+
+	if err = unix.Pipe(fds); err != nil {
+		return nil, fmt.Errorf("failed to create pipe: %v", err)
+	}
+
+	p = &pipe{
+		name:   name,
+		input:  os.NewFile(uintptr(fds[0]), fmt.Sprintf("/dev/%s/0", name)),
+		output: os.NewFile(uintptr(fds[1]), fmt.Sprintf("/dev/%s/1", name)),
+	}
+
+	syscall.CloseOnExec(fds[0])
+	syscall.CloseOnExec(fds[1])
+	err = syscall.SetNonblock(fds[0], nonblocking)
 	return
 }
 
 func newTTY(termSize *cakeagent.TerminalSize) (tty *pseudoTTY, err error) {
 	tty = &pseudoTTY{}
+
+	if tty.stderr, err = newPipe("stderr", true); err != nil {
+		return nil, fmt.Errorf("failed to stderr pipe: %v", err)
+	}
 
 	if termSize.Cols > 0 && termSize.Rows > 0 {
 		if glog.GetLevel() >= glog.TraceLevel {
@@ -77,8 +118,14 @@ func newTTY(termSize *cakeagent.TerminalSize) (tty *pseudoTTY, err error) {
 			glog.Trace("Opening pty without size")
 		}
 
-		tty.stdin = newPipe()
-		tty.stdout = newPipe()
+		if tty.stdin, err = newPipe("stdin", false); err != nil {
+			return nil, fmt.Errorf("failed to input pipe pty: %v", err)
+		}
+
+		if tty.stdout, err = newPipe("stdout", true); err != nil {
+			tty.stdin.Close()
+			return nil, fmt.Errorf("failed to stdout pipe: %v", err)
+		}
 	}
 
 	return
@@ -97,6 +144,7 @@ func (t *pseudoTTY) EOF() {
 		t.ptx.Close()
 	} else if t.stdin != nil {
 		t.stdin.output.Close()
+		t.stdin.output = nil
 	}
 }
 
@@ -129,7 +177,7 @@ func (t *pseudoTTY) Close() {
 	t.stdout = nil
 }
 
-func (t *pseudoTTY) Stdin() io.Reader {
+func (t *pseudoTTY) StdinReader() io.Reader {
 	if t.pty != nil {
 		return t.pty
 	}
@@ -137,7 +185,7 @@ func (t *pseudoTTY) Stdin() io.Reader {
 	return t.stdin.input
 }
 
-func (t *pseudoTTY) Stdout() io.Writer {
+func (t *pseudoTTY) StdoutWriter() io.Writer {
 	if t.pty != nil {
 		return t.pty
 	}
@@ -145,7 +193,11 @@ func (t *pseudoTTY) Stdout() io.Writer {
 	return t.stdout.output
 }
 
-func (t *pseudoTTY) Input() io.Reader {
+func (t *pseudoTTY) StderrWriter() io.Writer {
+	return t.stderr.output
+}
+
+func (t *pseudoTTY) StdoutReader() io.Reader {
 	if t.ptx != nil {
 		return t.ptx
 	}
@@ -153,8 +205,20 @@ func (t *pseudoTTY) Input() io.Reader {
 	return t.stdout.input
 }
 
+func (t *pseudoTTY) StderrReader() io.Reader {
+	return t.stderr.input
+}
+
+func (t *pseudoTTY) Input() io.Reader {
+	return t.stderr.input
+}
+
 func (t *pseudoTTY) SetTermSize(rows int32, cols int32) (err error) {
 	if t.pty != nil {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace("SetTermSize")
+		}
+
 		dimensions := unix.Winsize{
 			Row:    uint16(rows),
 			Col:    uint16(cols),
@@ -168,13 +232,63 @@ func (t *pseudoTTY) SetTermSize(rows int32, cols int32) (err error) {
 	return
 }
 
-func (t *pseudoTTY) Write(data []byte) (n int, err error) {
+func (t *pseudoTTY) WriteToStdin(data []byte) (n int, err error) {
 	if t.ptx != nil {
 		n, err = t.ptx.Write(data)
 	} else if t.stdin != nil {
 		n, err = t.stdin.output.Write(data)
 	}
 	return
+}
+
+func (s *server) isGRPCCancel(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if status, ok := status.FromError(err); ok {
+		return status.Code() == codes.Canceled
+	}
+
+	return false
+}
+
+func (s *server) isEAGAIN(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if opErr, ok := err.(*os.PathError); ok {
+		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
+			if syscallErr == syscall.EAGAIN {
+				return true
+			}
+		}
+	}
+
+	if syscallErr, ok := err.(syscall.Errno); ok {
+		if syscallErr == syscall.EAGAIN {
+			return true
+		}
+	}
+
+	if opErr, ok := err.(*os.SyscallError); ok {
+		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
+			if syscallErr == syscall.EAGAIN {
+				return true
+			}
+		}
+	}
+
+	if opErr, ok := err.(*os.LinkError); ok {
+		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
+			if syscallErr == syscall.EAGAIN {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.InfoReply, err error) {
@@ -246,11 +360,11 @@ func (s *server) Shutdown(ctx context.Context, req *emptypb.Empty) (reply *cakea
 				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 					reply.ExitCode = int32(status.ExitStatus())
 				} else {
-					reply.Stderr = []byte(fmt.Sprintf("failed to get exit status: %v", err))
+					reply.Stderr = []byte(fmt.Sprintf(strErrFailedToGetExitStatus, err))
 					reply.ExitCode = 1
 				}
 			} else {
-				reply.Stderr = []byte(fmt.Sprintf("failed to run command: %v", err))
+				reply.Stderr = []byte(fmt.Sprintf(strErrFailedToRunCommand, err))
 				reply.ExitCode = 1
 			}
 
@@ -273,10 +387,10 @@ func (s *server) Shutdown(ctx context.Context, req *emptypb.Empty) (reply *cakea
 					reply.ExitCode = int32(status.ExitStatus())
 					err = nil
 				} else {
-					return nil, fmt.Errorf("failed to get exit status: %v", err)
+					return nil, fmt.Errorf(strErrFailedToGetExitStatus, err)
 				}
 			} else {
-				return nil, fmt.Errorf("failed to run command: %v", err)
+				return nil, fmt.Errorf(strErrFailedToRunCommand, err)
 			}
 		}
 
@@ -318,10 +432,10 @@ func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cak
 				reply.ExitCode = int32(status.ExitStatus())
 				err = nil
 			} else {
-				return nil, fmt.Errorf("failed to get exit status: %v", err)
+				return nil, fmt.Errorf(strErrFailedToGetExitStatus, err)
 			}
 		} else {
-			return nil, fmt.Errorf("failed to run command: %v", err)
+			return nil, fmt.Errorf(strErrFailedToRunCommand, err)
 		}
 	}
 
@@ -341,53 +455,69 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 		err = fmt.Errorf("failed to open pty: %v", e)
 	} else {
 		ctx, cancel := context.WithCancel(context.Background())
-		stderr := newPipe()
 		home, _ := os.UserHomeDir()
 		var wg sync.WaitGroup
 		var message cakeagent.ExecuteResponse
 		var cmd *exec.Cmd
 
-		doCancel := func() {
+		doCancel := func(reason string) {
+			if reason != "" {
+				glog.Error(reason)
+			}
+
 			if ctx.Err() == nil {
 				if glog.GetLevel() >= glog.TraceLevel {
 					glog.Trace("Canceling context")
 				}
 				cancel()
 			}
+
 			tty.Close()
-			stderr.Close()
 		}
 
 		fowardOutput := func(ctx context.Context, channel int, reader io.Reader) {
 			input := bufio.NewReader(reader)
 			buffer := make([]byte, 1024)
+			var totalSent uint64 = 0
 
+			wg.Add(1)
 			defer wg.Done()
 
 			for {
 				select {
 				case <-ctx.Done():
 					if glog.GetLevel() >= glog.TraceLevel {
-						glog.Tracef("Closing output %d", channel)
+						glog.Tracef("Closing output %d, totalSent=%d", channel, totalSent)
 					}
 					return
 				default:
 					if available, err := input.Read(buffer); err != nil {
-						if err != io.EOF && err != io.ErrClosedPipe {
-							glog.Errorf("Error reading output: %v", err)
-							doCancel()
-						}
+						if s.isEAGAIN(err) {
+							if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+								glog.Tracef("EOF reading output %d, totalSent=%d, process exited", channel, totalSent)
+								return
+							}
+							// Sleep a bit to avoid busy waiting
+							time.Sleep(10 * time.Nanosecond)
+						} else {
+							if err != io.EOF && err != io.ErrClosedPipe {
+								doCancel(fmt.Sprintf("Error reading output: %v", err))
+							}
 
-						if glog.GetLevel() >= glog.TraceLevel {
-							glog.Tracef("EOF reading output %d", channel)
+							if glog.GetLevel() >= glog.TraceLevel {
+								glog.Tracef("EOF reading output %d, totalSent=%d", channel, totalSent)
+							}
+							return
 						}
-						return
 					} else if available > 0 {
 						if glog.GetLevel() >= glog.TraceLevel {
 							glog.Tracef("reading output: %d", len(buffer[:available]))
 						}
 
+						totalSent += uint64(len(buffer[:available]))
+
 						var message *cakeagent.ExecuteResponse
+
 						if channel == 0 {
 							message = &cakeagent.ExecuteResponse{
 								Response: &cakeagent.ExecuteResponse_Stdout{
@@ -403,23 +533,30 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 						}
 
 						if err = stream.Send(message); err != nil {
-							glog.Errorf("Failed to send output: %v", err)
-							doCancel()
+							doCancel(fmt.Sprintf("Failed to send output: %v", err))
 						}
 
 						if glog.GetLevel() >= glog.TraceLevel {
 							glog.Tracef("Sent output: %d", len(buffer[:available]))
 						}
-					} else if glog.GetLevel() >= glog.TraceLevel {
-						glog.Trace("No data to read")
+					} else {
+						if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
+							if glog.GetLevel() >= glog.TraceLevel {
+								glog.Trace("Command is still running, no data to read")
+							}
+						} else {
+							if glog.GetLevel() >= glog.TraceLevel {
+								glog.Tracef("EOF reading output %d, totalSent=%d, %v", channel, totalSent, err)
+							}
+
+							return
+						}
 					}
 				}
 			}
 		}
 
 		fowardStdin := func() {
-			defer wg.Done()
-
 			for {
 				select {
 				case <-ctx.Done():
@@ -429,19 +566,20 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 					return
 				default:
 					if request, err := stream.Recv(); err != nil {
-						if err != io.EOF && err != context.Canceled {
-							glog.Errorf("Failed to receive message: %v", err)
-							doCancel()
+						if !s.isGRPCCancel(err) {
+							if err != io.EOF && err != context.Canceled {
+								doCancel(fmt.Sprintf("Failed to receive message: %v", err))
+							}
 						}
 					} else {
 						if size := request.GetSize(); size != nil {
 							tty.SetTermSize(size.Rows, size.Cols)
 						} else if input := request.GetInput(); input != nil {
 							if len(input) > 0 {
-								if _, err := tty.Write(input); err != nil {
-									glog.Errorf("Failed to write to stdin: %v", err)
-									doCancel()
+								if _, err := tty.WriteToStdin(input); err != nil {
+									doCancel(fmt.Sprintf("Failed to write to stdin: %v", err))
 								}
+
 								if glog.GetLevel() >= glog.TraceLevel {
 									glog.Tracef("Wrote to stdin: %d", len(input))
 								}
@@ -458,9 +596,31 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 		}
 
 		cleanup := func() {
-			doCancel()
+			if glog.GetLevel() >= glog.TraceLevel {
+				glog.Trace("Cleanup")
+			}
 
 			wg.Wait()
+			cancel()
+			tty.Close()
+
+			if cmd != nil {
+				message = cakeagent.ExecuteResponse{
+					Response: &cakeagent.ExecuteResponse_ExitCode{
+						ExitCode: int32(cmd.ProcessState.ExitCode()),
+					},
+				}
+			} else {
+				message = cakeagent.ExecuteResponse{
+					Response: &cakeagent.ExecuteResponse_ExitCode{
+						ExitCode: 1,
+					},
+				}
+			}
+
+			if err = stream.Send(&message); err != nil {
+				glog.Errorf("Failed to send exit code: %v", err)
+			}
 
 			if glog.GetLevel() >= glog.TraceLevel {
 				glog.Trace("Shell session ended")
@@ -483,9 +643,9 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 		if err == nil {
 			isTTY := tty.IsTTY()
 
-			cmd.Stdin = tty.Stdin()
-			cmd.Stdout = tty.Stdout()
-			cmd.Stderr = stderr.output
+			cmd.Stdin = tty.StdinReader()
+			cmd.Stdout = tty.StdoutWriter()
+			cmd.Stderr = tty.StderrWriter()
 			cmd.Env = os.Environ()
 			cmd.Dir = home
 			cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -494,15 +654,18 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 				//Noctty:  !isTTY,
 			}
 
-			wg.Add(3)
-
-			go fowardOutput(ctx, 0, tty.Input())
-			go fowardOutput(ctx, 1, stderr.input)
-			go fowardStdin()
-
 			defer cleanup()
 
 			if err = cmd.Start(); err == nil {
+
+				if glog.GetLevel() >= glog.TraceLevel {
+					glog.Trace("Command started")
+				}
+
+				go fowardOutput(ctx, 0, tty.StdoutReader())
+				go fowardOutput(ctx, 1, tty.StderrReader())
+				go fowardStdin()
+
 				message = cakeagent.ExecuteResponse{
 					Response: &cakeagent.ExecuteResponse_Established{
 						Established: true,
@@ -516,7 +679,9 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 					if err != io.EOF && err != io.ErrClosedPipe && err != context.Canceled {
 						glog.Errorf("Failed to wait for command: %v", err)
 					}
-				} else if glog.GetLevel() >= glog.TraceLevel {
+				}
+
+				if glog.GetLevel() >= glog.TraceLevel {
 					glog.Trace("Command exited")
 				}
 			} else {
@@ -542,24 +707,6 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 			}
 
 			stream.Send(&message)
-		}
-
-		if cmd != nil {
-			message = cakeagent.ExecuteResponse{
-				Response: &cakeagent.ExecuteResponse_ExitCode{
-					ExitCode: int32(cmd.ProcessState.ExitCode()),
-				},
-			}
-		} else {
-			message = cakeagent.ExecuteResponse{
-				Response: &cakeagent.ExecuteResponse_ExitCode{
-					ExitCode: 1,
-				},
-			}
-		}
-
-		if err = stream.Send(&message); err != nil {
-			glog.Errorf("Failed to send exit code: %v", err)
 		}
 	}
 
