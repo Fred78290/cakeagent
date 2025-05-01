@@ -360,13 +360,6 @@ final class CakeChannelStreamer: @unchecked Sendable {
 							}
 						}
 
-						pipeChannel.closeFuture.whenComplete { _ in
-							#if TRACE
-								redbold("pipeChannel closed")
-							#endif
-							stream.sendEof()
-						}
-
 						return pipeChannel.eventLoop.makeCompletedFuture {
 							try NIOAsyncChannel<ByteBuffer, ByteBuffer>(wrappingChannelSynchronously: pipeChannel)
 						}
@@ -407,6 +400,8 @@ final class CakeChannelStreamer: @unchecked Sendable {
 						bufLength += UInt64(buffer.readableBytes)
 					}
 				}
+
+				stream.sendEof()
 
 				#if TRACE
 					redbold("EOF bufLength=\(bufLength), receivedLength=\(self.receivedLength)")
