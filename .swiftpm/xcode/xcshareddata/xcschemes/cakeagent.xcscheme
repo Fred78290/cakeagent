@@ -61,15 +61,19 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--ca-cert=~/.cake/agent/ca.pem"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--tls-cert=~/.cake/agent/server.pem"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--tls-key=~/.cake/agent/server.key"
-            isEnabled = "NO">
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--log-level=debug"
+            isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>
