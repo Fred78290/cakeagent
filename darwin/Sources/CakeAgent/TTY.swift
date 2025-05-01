@@ -8,6 +8,81 @@ import Foundation
 import NIO
 import GRPC
 import CakeAgentLib
+import System
+
+struct Pipe {
+	let fileHandleForReading: FileHandle
+	let fileHandleForWriting: FileHandle
+	
+	init() {
+		var fds: [Int32] = [-1, -1]
+		if pipe(&fds) != 0 {
+			fatalError("pipe failed")
+		}
+		
+		fileHandleForReading = FileHandle(fileDescriptor: fds[0], closeOnDealloc: true)
+		fileHandleForWriting = FileHandle(fileDescriptor: fds[1], closeOnDealloc: true)
+	}
+	
+	func close() {
+		try? self.fileHandleForWriting.close()
+		try? self.fileHandleForReading.close()
+	}
+}
+
+extension FileHandle {
+	func dupCloseExec() -> FileHandle {
+		return FileHandle(fileDescriptor: fcntl(self.fileDescriptor, F_DUPFD_CLOEXEC, 0), closeOnDealloc: true)
+	}
+	
+	@discardableResult
+	func setCloseExec(cloexec: Bool) throws -> FileHandle {
+		let fd = self.fileDescriptor
+		let flags = fcntl(fd, F_GETFD, 0)
+		
+		if flags < 0 {
+			throw Errno(rawValue: errno)
+		}
+		
+		if cloexec {
+			if fcntl(fd, F_SETFD, flags|FD_CLOEXEC) < 0 {
+				throw Errno(rawValue: errno)
+			}
+		} else {
+			if fcntl(fd, F_SETFD, flags & ~FD_CLOEXEC) < 0 {
+				throw Errno(rawValue: errno)
+			}
+		}
+
+		return self
+	}
+
+	@discardableResult
+	func SetNonblock(nonblocking: Bool) throws -> FileHandle {
+		let fd = self.fileDescriptor
+		let flags = fcntl(fd, F_GETFD, 0)
+
+		if flags < 0 {
+			throw Errno(rawValue: errno)
+		}
+
+		if (flags & O_NONBLOCK != 0) == nonblocking {
+			return self
+		}
+
+		if nonblocking {
+			if fcntl(fd, F_SETFD, flags|O_NONBLOCK) < 0 {
+				throw Errno(rawValue: errno)
+			}
+		} else {
+			if fcntl(fd, F_SETFD, flags & ~O_NONBLOCK) < 0 {
+				throw Errno(rawValue: errno)
+			}
+		}
+		
+		return self
+	}
+}
 
 class TTY: @unchecked Sendable {
 	let isTTY: Bool
