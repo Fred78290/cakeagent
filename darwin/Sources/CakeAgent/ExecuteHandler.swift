@@ -126,6 +126,9 @@ public class ExecuteHandleStream {
 				__darwin_fd_set(output.fd, &readfds)
 
 				if select(output.fd+1, &readfds, nil, nil, &timeout) < 0 {
+					if errno == EINTR {
+						continue
+					}
 					logger.error("Select \(output.name) failed, \(String(cString: strerror(errno)))")
 					break
 				}
