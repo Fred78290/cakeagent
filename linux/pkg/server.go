@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -48,8 +47,8 @@ type server struct {
 
 type pipe struct {
 	name   string
-	input  io.ReadCloser
-	output io.WriteCloser
+	input  *os.File
+	output *os.File
 }
 
 func (p *pipe) Close() {
@@ -177,7 +176,7 @@ func (t *pseudoTTY) Close() {
 	t.stdout = nil
 }
 
-func (t *pseudoTTY) StdinReader() io.Reader {
+func (t *pseudoTTY) StdinReader() *os.File {
 	if t.pty != nil {
 		return t.pty
 	}
@@ -185,7 +184,7 @@ func (t *pseudoTTY) StdinReader() io.Reader {
 	return t.stdin.input
 }
 
-func (t *pseudoTTY) StdoutWriter() io.Writer {
+func (t *pseudoTTY) StdoutWriter() *os.File {
 	if t.pty != nil {
 		return t.pty
 	}
@@ -193,11 +192,11 @@ func (t *pseudoTTY) StdoutWriter() io.Writer {
 	return t.stdout.output
 }
 
-func (t *pseudoTTY) StderrWriter() io.Writer {
+func (t *pseudoTTY) StderrWriter() *os.File {
 	return t.stderr.output
 }
 
-func (t *pseudoTTY) StdoutReader() io.Reader {
+func (t *pseudoTTY) StdoutReader() *os.File {
 	if t.ptx != nil {
 		return t.ptx
 	}
@@ -205,11 +204,11 @@ func (t *pseudoTTY) StdoutReader() io.Reader {
 	return t.stdout.input
 }
 
-func (t *pseudoTTY) StderrReader() io.Reader {
+func (t *pseudoTTY) StderrReader() *os.File {
 	return t.stderr.input
 }
 
-func (t *pseudoTTY) Input() io.Reader {
+func (t *pseudoTTY) Input() *os.File {
 	return t.stderr.input
 }
 
@@ -251,6 +250,61 @@ func (s *server) isGRPCCancel(err error) bool {
 	}
 
 	return false
+}
+
+func (s *server) isEINTR(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if opErr, ok := err.(*os.PathError); ok {
+		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
+			if syscallErr == syscall.EINTR {
+				return true
+			}
+		}
+	}
+
+	if syscallErr, ok := err.(syscall.Errno); ok {
+		if syscallErr == syscall.EINTR {
+			return true
+		}
+	}
+
+	if opErr, ok := err.(*os.SyscallError); ok {
+		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
+			if syscallErr == syscall.EINTR {
+				return true
+			}
+		}
+	}
+
+	if opErr, ok := err.(*os.LinkError); ok {
+		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
+			if syscallErr == syscall.EINTR {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (s *server) isUnexpectedError(err error) bool {
+
+	if err == nil {
+		return false
+	}
+
+	if _, ok := err.(*exec.ExitError); ok {
+		return false
+	}
+
+	if err == io.EOF || err == io.ErrClosedPipe || err == context.Canceled {
+		return false
+	}
+
+	return true
 }
 
 func (s *server) isEAGAIN(err error) bool {
@@ -475,82 +529,111 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 			tty.Close()
 		}
 
-		fowardOutput := func(ctx context.Context, channel int, reader io.Reader) {
-			input := bufio.NewReader(reader)
+		fowardOutput := func(ctx context.Context, channel int, input *os.File) {
+			var name string
 			buffer := make([]byte, 1024)
 			var totalSent uint64 = 0
+
+			if channel == 0 {
+				name = "stdout"
+			} else {
+				name = "stderr"
+			}
 
 			wg.Add(1)
 			defer wg.Done()
 
 			for {
+				var readfd unix.FdSet
+				var timeout = unix.Timeval{
+					Sec:  0,
+					Usec: 100,
+				}
+
 				select {
 				case <-ctx.Done():
 					if glog.GetLevel() >= glog.TraceLevel {
-						glog.Tracef("Closing output %d, totalSent=%d", channel, totalSent)
+						glog.Tracef("Closing output %s, totalSent=%d", name, totalSent)
 					}
 					return
 				default:
-					if available, err := input.Read(buffer); err != nil {
-						if s.isEAGAIN(err) {
-							if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
-								glog.Tracef("EOF reading output %d, totalSent=%d, process exited", channel, totalSent)
+					readfd.Zero()
+					readfd.Set(int(input.Fd()))
+
+					if _, err := unix.Select(int(input.Fd())+1, &readfd, nil, nil, &timeout); err != nil {
+						if s.isEINTR(err) {
+							continue
+						} else {
+							glog.Errorf("Error selecting %s: %v", name, err)
+							return
+						}
+					}
+
+					if readfd.IsSet(int(input.Fd())) {
+						if available, err := input.Read(buffer); err != nil {
+							if s.isEAGAIN(err) {
+								if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+									glog.Tracef("EOF %s, totalSent=%d, process exited", name, totalSent)
+									return
+								}
+								// Sleep a bit to avoid busy waiting
+								time.Sleep(10 * time.Nanosecond)
+							} else {
+								if err != io.EOF && err != io.ErrClosedPipe {
+									doCancel(fmt.Sprintf("Error reading output: %v", err))
+								}
+
+								if glog.GetLevel() >= glog.TraceLevel {
+									glog.Tracef("EOF %s, totalSent=%d", name, totalSent)
+								}
 								return
 							}
-							// Sleep a bit to avoid busy waiting
-							time.Sleep(10 * time.Nanosecond)
-						} else {
-							if err != io.EOF && err != io.ErrClosedPipe {
-								doCancel(fmt.Sprintf("Error reading output: %v", err))
+						} else if available > 0 {
+							if glog.GetLevel() >= glog.TraceLevel {
+								glog.Tracef("reading %s: %d", name, len(buffer[:available]))
+							}
+
+							totalSent += uint64(len(buffer[:available]))
+
+							var message *cakeagent.ExecuteResponse
+
+							if channel == 0 {
+								message = &cakeagent.ExecuteResponse{
+									Response: &cakeagent.ExecuteResponse_Stdout{
+										Stdout: buffer[:available],
+									},
+								}
+							} else {
+								message = &cakeagent.ExecuteResponse{
+									Response: &cakeagent.ExecuteResponse_Stderr{
+										Stderr: buffer[:available],
+									},
+								}
+							}
+
+							if err = stream.Send(message); err != nil {
+								doCancel(fmt.Sprintf("Failed to send %s: %v", name, err))
 							}
 
 							if glog.GetLevel() >= glog.TraceLevel {
-								glog.Tracef("EOF reading output %d, totalSent=%d", channel, totalSent)
-							}
-							return
-						}
-					} else if available > 0 {
-						if glog.GetLevel() >= glog.TraceLevel {
-							glog.Tracef("reading output: %d", len(buffer[:available]))
-						}
-
-						totalSent += uint64(len(buffer[:available]))
-
-						var message *cakeagent.ExecuteResponse
-
-						if channel == 0 {
-							message = &cakeagent.ExecuteResponse{
-								Response: &cakeagent.ExecuteResponse_Stdout{
-									Stdout: buffer[:available],
-								},
+								glog.Tracef("Sent %s: %d", name, len(buffer[:available]))
 							}
 						} else {
-							message = &cakeagent.ExecuteResponse{
-								Response: &cakeagent.ExecuteResponse_Stderr{
-									Stderr: buffer[:available],
-								},
+							if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
+								if glog.GetLevel() >= glog.TraceLevel {
+									glog.Trace("Command is still running, no data to read")
+								}
+							} else {
+								if glog.GetLevel() >= glog.TraceLevel {
+									glog.Tracef("EOF reading output %d, totalSent=%d, %v", channel, totalSent, err)
+								}
+
+								return
 							}
 						}
-
-						if err = stream.Send(message); err != nil {
-							doCancel(fmt.Sprintf("Failed to send output: %v", err))
-						}
-
-						if glog.GetLevel() >= glog.TraceLevel {
-							glog.Tracef("Sent output: %d", len(buffer[:available]))
-						}
-					} else {
-						if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
-							if glog.GetLevel() >= glog.TraceLevel {
-								glog.Trace("Command is still running, no data to read")
-							}
-						} else {
-							if glog.GetLevel() >= glog.TraceLevel {
-								glog.Tracef("EOF reading output %d, totalSent=%d, %v", channel, totalSent, err)
-							}
-
-							return
-						}
+					} else if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+						glog.Tracef("EOF %s, totalSent=%d, process exited", name, totalSent)
+						return
 					}
 				}
 			}
@@ -676,7 +759,7 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 					glog.Errorf("Failed to send established message: %v", err)
 					cmd.Process.Signal(syscall.SIGKILL)
 				} else if err = cmd.Wait(); err != nil {
-					if err != io.EOF && err != io.ErrClosedPipe && err != context.Canceled {
+					if s.isUnexpectedError(err) {
 						glog.Errorf("Failed to wait for command: %v", err)
 					}
 				}
@@ -699,7 +782,7 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 			}
 		}
 
-		if err != nil && err != io.EOF && err != io.ErrClosedPipe && err != context.Canceled {
+		if s.isUnexpectedError(err) {
 			message = cakeagent.ExecuteResponse{
 				Response: &cakeagent.ExecuteResponse_Stderr{
 					Stderr: []byte(err.Error() + "\r\n"),
