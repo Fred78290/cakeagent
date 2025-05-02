@@ -140,48 +140,47 @@ public class ExecuteHandleStream {
 						}
 						break
 					}
-					continue
-				}
+				} else {
+					let bytesRead = read(output.fd, buffer, bufSize)
 
-				let bytesRead = read(output.fd, buffer, bufSize)
+					if bytesRead > 0 {
+						let data: Data = Data(bytes: buffer, count: bytesRead)
 
-				if bytesRead > 0 {
-					let data: Data = Data(bytes: buffer, count: bytesRead)
+						output.outBytes += bytesRead
 
-					output.outBytes += bytesRead
-
-					if logLevel >= .trace {
-						logger.trace("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes) [\(String(data: data, encoding: .utf8) ?? "<unknown>")]")
-					} else if logLevel >= .debug {
-						logger.debug("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes)")
-					}
-
-					_ = try await self.responseStream.send(Cakeagent_ExecuteResponse.with {
-						if output.channel == STDOUT_FILENO {
-							$0.stdout = data
-						} else {
-							$0.stderr = data
-						}
-					})
-				} else if bytesRead < 0 {
-					if errno == EBADF || errno == EAGAIN {
-						if process.isRunning == false {
-							if logLevel >= .debug {
-								logger.debug("EOF \(output.name), outBytes=\(output.outBytes)")
-							}
-							break
+						if logLevel >= .trace {
+							logger.trace("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes) [\(String(data: data, encoding: .utf8) ?? "<unknown>")]")
 						} else if logLevel >= .debug {
-							logger.debug("EAGAIN \(output.name), outBytes=\(output.outBytes)")
+							logger.debug("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes)")
 						}
-					} else {
-						logger.error("Error reading from \(output.name): \(String(cString: strerror(errno)))")
+
+						_ = try await self.responseStream.send(Cakeagent_ExecuteResponse.with {
+							if output.channel == STDOUT_FILENO {
+								$0.stdout = data
+							} else {
+								$0.stderr = data
+							}
+						})
+					} else if bytesRead < 0 {
+						if errno == EBADF || errno == EAGAIN {
+							if process.isRunning == false {
+								if logLevel >= .debug {
+									logger.debug("EOF \(output.name), outBytes=\(output.outBytes)")
+								}
+								break
+							} else if logLevel >= .debug {
+								logger.debug("EAGAIN \(output.name), outBytes=\(output.outBytes)")
+							}
+						} else {
+							logger.error("Error reading from \(output.name): \(String(cString: strerror(errno)))")
+							break
+						}
+					} else if process.isRunning == false {
+						if logLevel >= .debug {
+							logger.debug("EOF reading output, \(output.name)  outBytes=\(output.outBytes), \(String(cString: strerror(errno)))")
+						}
 						break
 					}
-				} else if process.isRunning == false {
-					if logLevel >= .debug {
-						logger.debug("EOF reading output, \(output.name)  outBytes=\(output.outBytes), \(String(cString: strerror(errno)))")
-					}
-					break
 				}
 			}
 		} catch {
