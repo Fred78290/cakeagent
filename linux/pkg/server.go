@@ -26,7 +26,9 @@ import (
 	"github.com/elastic/go-sysinfo"
 	"github.com/mdlayher/vsock"
 	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/disk"
 	glog "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -346,12 +348,38 @@ func (s *server) isEAGAIN(err error) bool {
 }
 
 func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.InfoReply, err error) {
+	var partitions []disk.PartitionStat
+
 	memoryTotal := memory.TotalMemory()
 	memoryFree := memory.FreeMemory()
+
+	if partitions, err = disk.Partitions(true); err != nil {
+		return nil, err
+	}
+
+	var diskInfos []*cakeagent.InfoReply_DiskInfo = make([]*cakeagent.InfoReply_DiskInfo, 0, len(partitions))
+
+	for _, partition := range partitions {
+		if !slices.Contains(partition.Opts, "nobrowse") && !slices.Contains(partition.Opts, "nodev") {
+			if diskInfo, err := disk.Usage(partition.Mountpoint); err == nil {
+				if diskInfo != nil {
+					diskInfos = append(diskInfos, &cakeagent.InfoReply_DiskInfo{
+						Device: partition.Device,
+						Mount:  partition.Mountpoint,
+						FsType: partition.Fstype,
+						Size:   diskInfo.Total,
+						Free:   diskInfo.Free,
+						Used:   diskInfo.Used,
+					})
+				}
+			}
+		}
+	}
 
 	reply = &cakeagent.InfoReply{
 		Ipaddresses: []string{},
 		CpuCount:    int32(runtime.NumCPU()),
+		DiskInfos:   diskInfos,
 		Memory: &cakeagent.InfoReply_MemoryInfo{
 			Total: memoryTotal,
 			Free:  memoryFree,

@@ -41,6 +41,8 @@ public struct Cakeagent_InfoReply: Sendable {
 
   public var cpuCount: Int32 = 0
 
+  public var diskInfos: [Cakeagent_InfoReply.DiskInfo] = []
+
   public var ipaddresses: [String] = []
 
   public var osname: String = String()
@@ -61,6 +63,28 @@ public struct Cakeagent_InfoReply: Sendable {
     public var free: UInt64 = 0
 
     public var used: UInt64 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public struct DiskInfo: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var device: String = String()
+
+    public var mount: String = String()
+
+    public var fsType: String = String()
+
+    public var size: UInt64 = 0
+
+    public var used: UInt64 = 0
+
+    public var free: UInt64 = 0
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -402,10 +426,11 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     2: .same(proto: "uptime"),
     3: .same(proto: "memory"),
     4: .same(proto: "cpuCount"),
-    5: .same(proto: "ipaddresses"),
-    6: .same(proto: "osname"),
-    7: .same(proto: "hostname"),
-    8: .same(proto: "release"),
+    5: .same(proto: "diskInfos"),
+    6: .same(proto: "ipaddresses"),
+    7: .same(proto: "osname"),
+    8: .same(proto: "hostname"),
+    9: .same(proto: "release"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -418,10 +443,11 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.uptime) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._memory) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.cpuCount) }()
-      case 5: try { try decoder.decodeRepeatedStringField(value: &self.ipaddresses) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self.osname) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.hostname) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.release) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.diskInfos) }()
+      case 6: try { try decoder.decodeRepeatedStringField(value: &self.ipaddresses) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.osname) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.hostname) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.release) }()
       default: break
       }
     }
@@ -444,17 +470,20 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if self.cpuCount != 0 {
       try visitor.visitSingularInt32Field(value: self.cpuCount, fieldNumber: 4)
     }
+    if !self.diskInfos.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.diskInfos, fieldNumber: 5)
+    }
     if !self.ipaddresses.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.ipaddresses, fieldNumber: 5)
+      try visitor.visitRepeatedStringField(value: self.ipaddresses, fieldNumber: 6)
     }
     if !self.osname.isEmpty {
-      try visitor.visitSingularStringField(value: self.osname, fieldNumber: 6)
+      try visitor.visitSingularStringField(value: self.osname, fieldNumber: 7)
     }
     if !self.hostname.isEmpty {
-      try visitor.visitSingularStringField(value: self.hostname, fieldNumber: 7)
+      try visitor.visitSingularStringField(value: self.hostname, fieldNumber: 8)
     }
     if !self.release.isEmpty {
-      try visitor.visitSingularStringField(value: self.release, fieldNumber: 8)
+      try visitor.visitSingularStringField(value: self.release, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -464,6 +493,7 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.uptime != rhs.uptime {return false}
     if lhs._memory != rhs._memory {return false}
     if lhs.cpuCount != rhs.cpuCount {return false}
+    if lhs.diskInfos != rhs.diskInfos {return false}
     if lhs.ipaddresses != rhs.ipaddresses {return false}
     if lhs.osname != rhs.osname {return false}
     if lhs.hostname != rhs.hostname {return false}
@@ -512,6 +542,68 @@ extension Cakeagent_InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.total != rhs.total {return false}
     if lhs.free != rhs.free {return false}
     if lhs.used != rhs.used {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_InfoReply.protoMessageName + ".DiskInfo"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "device"),
+    2: .same(proto: "mount"),
+    3: .same(proto: "fsType"),
+    4: .same(proto: "size"),
+    5: .same(proto: "used"),
+    6: .same(proto: "free"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.device) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.mount) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.fsType) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.size) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.used) }()
+      case 6: try { try decoder.decodeSingularUInt64Field(value: &self.free) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.device.isEmpty {
+      try visitor.visitSingularStringField(value: self.device, fieldNumber: 1)
+    }
+    if !self.mount.isEmpty {
+      try visitor.visitSingularStringField(value: self.mount, fieldNumber: 2)
+    }
+    if !self.fsType.isEmpty {
+      try visitor.visitSingularStringField(value: self.fsType, fieldNumber: 3)
+    }
+    if self.size != 0 {
+      try visitor.visitSingularUInt64Field(value: self.size, fieldNumber: 4)
+    }
+    if self.used != 0 {
+      try visitor.visitSingularUInt64Field(value: self.used, fieldNumber: 5)
+    }
+    if self.free != 0 {
+      try visitor.visitSingularUInt64Field(value: self.free, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_InfoReply.DiskInfo, rhs: Cakeagent_InfoReply.DiskInfo) -> Bool {
+    if lhs.device != rhs.device {return false}
+    if lhs.mount != rhs.mount {return false}
+    if lhs.fsType != rhs.fsType {return false}
+    if lhs.size != rhs.size {return false}
+    if lhs.used != rhs.used {return false}
+    if lhs.free != rhs.free {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

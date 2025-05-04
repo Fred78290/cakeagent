@@ -26,14 +26,24 @@ message InfoReply {
 		uint64 used = 3;
 	}
 
+	message DiskInfo {
+		string device = 1;
+		string mount = 2;
+		string fsType = 3;
+		uint64 size = 4;
+		uint64 used = 5;
+		uint64 free = 6;
+	}
+
 	string version = 1;
 	uint64 uptime = 2;
 	MemoryInfo memory = 3;
 	int32 cpuCount = 4;
-	repeated string ipaddresses = 5;
-	string osname = 6;
-	string hostname = 7;
-	string release = 8;
+	repeated DiskInfo diskInfos = 5;
+	repeated string ipaddresses = 6;
+	string osname = 7;
+	string hostname = 8;
+	string release = 9;
 }
 
 message Command {

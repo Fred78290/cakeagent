@@ -125,12 +125,45 @@ public struct ShutdownReply: Sendable, Codable {
 	}
 }
 
+public enum ResizeReply: Sendable, Codable {
+	case success(Bool)
+	case failure(String)
+}
+
+public struct DiskInfo: Sendable, Codable {
+	public var device: String
+	public var mount: String
+	public var fsType: String
+	public var total: UInt64
+	public var free: UInt64
+	public var used: UInt64
+
+	init() {
+		self.device = ""
+		self.mount = ""
+		self.fsType = ""
+		self.total = 0
+		self.free = 0
+		self.used = 0
+	}
+
+	public init(device: String, mount: String, fsType: String, total: UInt64, free: UInt64, used: UInt64) {
+		self.device = device
+		self.mount = mount
+		self.fsType = fsType
+		self.total = total
+		self.free = free
+		self.used = used
+	}
+}
+
 public struct InfoReply: Sendable, Codable {
 	public var name: String
 	public var version: String?
 	public var uptime: UInt64?
 	public var memory: MemoryInfo?
 	public var cpuCount: Int32
+	public var diskInfos: [DiskInfo]
 	public var ipaddresses: [String]
 	public var osname: String
 	public var hostname: String?
@@ -144,6 +177,7 @@ public struct InfoReply: Sendable, Codable {
 		self.uptime = 0
 		self.memory = nil
 		self.cpuCount = 0
+		self.diskInfos = []
 		self.ipaddresses = []
 		self.osname = ""
 		self.hostname = nil
@@ -162,6 +196,9 @@ public struct InfoReply: Sendable, Codable {
 		self.hostname = info.hostname
 		self.release = info.release
 		self.status = .running
+		self.diskInfos = info.diskInfos.map { diskInfo in
+			DiskInfo(device: diskInfo.device, mount: diskInfo.mount, fsType: diskInfo.fsType, total: diskInfo.size, free: diskInfo.free, used: diskInfo.used)
+		}
 
 		if info.hasMemory {
 			self.memory = MemoryInfo.with {
@@ -507,24 +544,8 @@ public struct CakeAgentHelper: Sendable {
 
 	public func info(callOptions: CallOptions? = nil) throws -> InfoReply {
 		let response = client.info(.init(), callOptions: callOptions)
-		let infos = try response.response.wait()
 
-		return InfoReply.with {
-			$0.name = infos.hostname
-			$0.version = infos.version
-			$0.uptime = infos.uptime
-			$0.cpuCount = infos.cpuCount
-			$0.ipaddresses = infos.ipaddresses
-			$0.osname = infos.osname
-			$0.hostname = infos.hostname
-			$0.release = infos.release
-			$0.status = .running
-			$0.memory = infos.hasMemory ? InfoReply.MemoryInfo.with {
-				$0.total = infos.memory.total
-				$0.free = infos.memory.free
-				$0.used = infos.memory.used
-			} : nil
-		}
+		return InfoReply(info: try response.response.wait())
 	}
 
 	public func run(command: String,
