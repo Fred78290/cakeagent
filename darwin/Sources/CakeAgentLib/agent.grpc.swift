@@ -16,6 +16,11 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
   var serviceName: String { get }
   var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { get }
 
+  func resizeDisk(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions?
+  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>
+
   func info(
     _ request: SwiftProtobuf.Google_Protobuf_Empty,
     callOptions: CallOptions?
@@ -50,6 +55,24 @@ public protocol Cakeagent_AgentClientProtocol: GRPCClient {
 extension Cakeagent_AgentClientProtocol {
   public var serviceName: String {
     return "cakeagent.Agent"
+  }
+
+  /// Unary call to ResizeDisk
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to ResizeDisk.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func resizeDisk(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply> {
+    return self.makeUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.resizeDisk.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? []
+    )
   }
 
   /// Unary call to Info
@@ -226,6 +249,11 @@ public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
   var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { get }
 
+  func makeResizeDiskCall(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>
+
   func makeInfoCall(
     _ request: SwiftProtobuf.Google_Protobuf_Empty,
     callOptions: CallOptions?
@@ -264,6 +292,18 @@ extension Cakeagent_AgentAsyncClientProtocol {
 
   public var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
     return nil
+  }
+
+  public func makeResizeDiskCall(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply> {
+    return self.makeAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.resizeDisk.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? []
+    )
   }
 
   public func makeInfoCall(
@@ -339,6 +379,18 @@ extension Cakeagent_AgentAsyncClientProtocol {
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension Cakeagent_AgentAsyncClientProtocol {
+  public func resizeDisk(
+    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    callOptions: CallOptions? = nil
+  ) async throws -> Cakeagent_ResizeReply {
+    return try await self.performAsyncUnaryCall(
+      path: Cakeagent_AgentClientMetadata.Methods.resizeDisk.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? []
+    )
+  }
+
   public func info(
     _ request: SwiftProtobuf.Google_Protobuf_Empty,
     callOptions: CallOptions? = nil
@@ -443,6 +495,9 @@ public struct Cakeagent_AgentAsyncClient: Cakeagent_AgentAsyncClientProtocol {
 
 public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
 
+  /// - Returns: Interceptors to use when invoking 'resizeDisk'.
+  func makeResizeDiskInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>]
+
   /// - Returns: Interceptors to use when invoking 'info'.
   func makeInfoInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
 
@@ -467,6 +522,7 @@ public enum Cakeagent_AgentClientMetadata {
     name: "Agent",
     fullName: "cakeagent.Agent",
     methods: [
+      Cakeagent_AgentClientMetadata.Methods.resizeDisk,
       Cakeagent_AgentClientMetadata.Methods.info,
       Cakeagent_AgentClientMetadata.Methods.shutdown,
       Cakeagent_AgentClientMetadata.Methods.run,
@@ -477,6 +533,12 @@ public enum Cakeagent_AgentClientMetadata {
   )
 
   public enum Methods {
+    public static let resizeDisk = GRPCMethodDescriptor(
+      name: "ResizeDisk",
+      path: "/cakeagent.Agent/ResizeDisk",
+      type: GRPCCallType.unary
+    )
+
     public static let info = GRPCMethodDescriptor(
       name: "Info",
       path: "/cakeagent.Agent/Info",
@@ -519,6 +581,8 @@ public enum Cakeagent_AgentClientMetadata {
 public protocol Cakeagent_AgentProvider: CallHandlerProvider {
   var interceptors: Cakeagent_AgentServerInterceptorFactoryProtocol? { get }
 
+  func resizeDisk(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ResizeReply>
+
   func info(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_InfoReply>
 
   func shutdown(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_RunReply>
@@ -544,6 +608,15 @@ extension Cakeagent_AgentProvider {
     context: CallHandlerContext
   ) -> GRPCServerHandlerProtocol? {
     switch name {
+    case "ResizeDisk":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ResizeReply>(),
+        interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? [],
+        userFunction: self.resizeDisk(request:context:)
+      )
+
     case "Info":
       return UnaryServerHandler(
         context: context,
@@ -610,6 +683,11 @@ public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
   var interceptors: Cakeagent_AgentServerInterceptorFactoryProtocol? { get }
 
+  func resizeDisk(
+    request: SwiftProtobuf.Google_Protobuf_Empty,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> Cakeagent_ResizeReply
+
   func info(
     request: SwiftProtobuf.Google_Protobuf_Empty,
     context: GRPCAsyncServerCallContext
@@ -661,6 +739,15 @@ extension Cakeagent_AgentAsyncProvider {
     context: CallHandlerContext
   ) -> GRPCServerHandlerProtocol? {
     switch name {
+    case "ResizeDisk":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_ResizeReply>(),
+        interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? [],
+        wrapping: { try await self.resizeDisk(request: $0, context: $1) }
+      )
+
     case "Info":
       return GRPCAsyncServerHandler(
         context: context,
@@ -723,6 +810,10 @@ extension Cakeagent_AgentAsyncProvider {
 
 public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
 
+  /// - Returns: Interceptors to use when handling 'resizeDisk'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeResizeDiskInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>]
+
   /// - Returns: Interceptors to use when handling 'info'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeInfoInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
@@ -753,6 +844,7 @@ public enum Cakeagent_AgentServerMetadata {
     name: "Agent",
     fullName: "cakeagent.Agent",
     methods: [
+      Cakeagent_AgentServerMetadata.Methods.resizeDisk,
       Cakeagent_AgentServerMetadata.Methods.info,
       Cakeagent_AgentServerMetadata.Methods.shutdown,
       Cakeagent_AgentServerMetadata.Methods.run,
@@ -763,6 +855,12 @@ public enum Cakeagent_AgentServerMetadata {
   )
 
   public enum Methods {
+    public static let resizeDisk = GRPCMethodDescriptor(
+      name: "ResizeDisk",
+      path: "/cakeagent.Agent/ResizeDisk",
+      type: GRPCCallType.unary
+    )
+
     public static let info = GRPCMethodDescriptor(
       name: "Info",
       path: "/cakeagent.Agent/Info",

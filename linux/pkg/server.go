@@ -21,6 +21,7 @@ import (
 	"github.com/Fred78290/cakeagent/cmd/types"
 	"github.com/Fred78290/cakeagent/pkg/cakeagent"
 	"github.com/Fred78290/cakeagent/pkg/mount"
+	"github.com/Fred78290/cakeagent/pkg/resize"
 	"github.com/Fred78290/cakeagent/pkg/serialport"
 	"github.com/creack/pty"
 	"github.com/elastic/go-sysinfo"
@@ -858,6 +859,22 @@ func (s *server) Mount(ctx context.Context, request *cakeagent.MountRequest) (*c
 
 func (s *server) Umount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
 	return mount.Umount(ctx, request)
+}
+
+func (s *server) ResizeDisk(context.Context, *emptypb.Empty) (*cakeagent.ResizeReply, error) {
+	if err := resize.ResizeDisk(); err == nil {
+		return &cakeagent.ResizeReply{
+			Response: &cakeagent.ResizeReply_Success{
+				Success: true,
+			},
+		}, nil
+	} else {
+		return &cakeagent.ResizeReply{
+			Response: &cakeagent.ResizeReply_Failure{
+				Failure: err.Error(),
+			},
+		}, nil
+	}
 }
 
 func createListener(listen string) (listener net.Listener, err error) {

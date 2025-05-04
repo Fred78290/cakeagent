@@ -8,6 +8,7 @@ struct Root: AsyncParsableCommand {
 	                                                subcommands: [
 	                                                	Run.self,
 	                                                	Service.self,
+	                                                	ResizeDisk.self,
 	                                                ])
 
 	public static func main() async throws {

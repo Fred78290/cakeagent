@@ -10,6 +10,7 @@ require (
 	github.com/elastic/go-sysinfo v1.15.0
 	github.com/mdlayher/vsock v1.2.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+	github.com/samber/lo v1.49.1
 	github.com/shirou/gopsutil/v4 v4.25.4
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
@@ -17,6 +18,7 @@ require (
 	golang.org/x/sys v0.32.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.5
+	howett.net/plist v1.0.1
 )
 
 require (
@@ -33,7 +35,6 @@ require (
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250224174004-546df14abb99 // indirect
-	howett.net/plist v1.0.1 // indirect
 )
 
 replace github.com/mdlayher/vsock v1.2.1 => github.com/Fred78290/vsock v0.0.1

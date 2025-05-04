@@ -542,6 +542,19 @@ public struct CakeAgentHelper: Sendable {
 		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration), interceptors: interceptors)
 	}
 
+	public func resizeDisk(callOptions: CallOptions? = nil) throws -> ResizeReply {
+		let response = client.resizeDisk(.init(), callOptions: callOptions)
+		let infos = try response.response.wait()
+
+		if case let .success(success) = infos.response {
+			return .success(success)
+		} else if case let .failure(error) = infos.response {
+			return .failure(error)
+		}
+
+		return .failure("unknown error")
+	}
+
 	public func info(callOptions: CallOptions? = nil) throws -> InfoReply {
 		let response = client.info(.init(), callOptions: callOptions)
 

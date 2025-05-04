@@ -20,18 +20,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agent_Info_FullMethodName     = "/cakeagent.Agent/Info"
-	Agent_Shutdown_FullMethodName = "/cakeagent.Agent/Shutdown"
-	Agent_Run_FullMethodName      = "/cakeagent.Agent/Run"
-	Agent_Execute_FullMethodName  = "/cakeagent.Agent/Execute"
-	Agent_Mount_FullMethodName    = "/cakeagent.Agent/Mount"
-	Agent_Umount_FullMethodName   = "/cakeagent.Agent/Umount"
+	Agent_ResizeDisk_FullMethodName = "/cakeagent.Agent/ResizeDisk"
+	Agent_Info_FullMethodName       = "/cakeagent.Agent/Info"
+	Agent_Shutdown_FullMethodName   = "/cakeagent.Agent/Shutdown"
+	Agent_Run_FullMethodName        = "/cakeagent.Agent/Run"
+	Agent_Execute_FullMethodName    = "/cakeagent.Agent/Execute"
+	Agent_Mount_FullMethodName      = "/cakeagent.Agent/Mount"
+	Agent_Umount_FullMethodName     = "/cakeagent.Agent/Umount"
 )
 
 // AgentClient is the client API for Agent service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentClient interface {
+	ResizeDisk(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ResizeReply, error)
 	Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error)
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RunReply, error)
 	Run(ctx context.Context, in *RunCommand, opts ...grpc.CallOption) (*RunReply, error)
@@ -46,6 +48,16 @@ type agentClient struct {
 
 func NewAgentClient(cc grpc.ClientConnInterface) AgentClient {
 	return &agentClient{cc}
+}
+
+func (c *agentClient) ResizeDisk(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ResizeReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResizeReply)
+	err := c.cc.Invoke(ctx, Agent_ResizeDisk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *agentClient) Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error) {
@@ -115,6 +127,7 @@ func (c *agentClient) Umount(ctx context.Context, in *MountRequest, opts ...grpc
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
 type AgentServer interface {
+	ResizeDisk(context.Context, *emptypb.Empty) (*ResizeReply, error)
 	Info(context.Context, *emptypb.Empty) (*InfoReply, error)
 	Shutdown(context.Context, *emptypb.Empty) (*RunReply, error)
 	Run(context.Context, *RunCommand) (*RunReply, error)
@@ -131,6 +144,9 @@ type AgentServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentServer struct{}
 
+func (UnimplementedAgentServer) ResizeDisk(context.Context, *emptypb.Empty) (*ResizeReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResizeDisk not implemented")
+}
 func (UnimplementedAgentServer) Info(context.Context, *emptypb.Empty) (*InfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
 }
@@ -168,6 +184,24 @@ func RegisterAgentServer(s grpc.ServiceRegistrar, srv AgentServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Agent_ServiceDesc, srv)
+}
+
+func _Agent_ResizeDisk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ResizeDisk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ResizeDisk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ResizeDisk(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Agent_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -274,6 +308,10 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "cakeagent.Agent",
 	HandlerType: (*AgentServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ResizeDisk",
+			Handler:    _Agent_ResizeDisk_Handler,
+		},
 		{
 			MethodName: "Info",
 			Handler:    _Agent_Info_Handler,

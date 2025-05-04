@@ -85,6 +85,14 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		try? inputHandle.restoreState(&state)
 	}
 
+	public func makeResizeDiskInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_ResizeReply>] {
+		if callback?(Cakeagent_AgentClientMetadata.Methods.resizeDisk) == false {
+			return []
+		}
+
+		return [CakeAgentClientInterceptor<Google_Protobuf_Empty, Cakeagent_ResizeReply>(inputHandle: inputHandle, state: state)]
+	}
+
 	public func makeInfoInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_InfoReply>] {
 		if callback?(Cakeagent_AgentClientMetadata.Methods.info) == false {
 			return []

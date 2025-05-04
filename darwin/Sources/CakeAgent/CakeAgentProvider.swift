@@ -80,6 +80,20 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		self.group = group
 	}
 
+	func resizeDisk(request: Google_Protobuf_Empty, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_ResizeReply {
+		do {
+			try ResizeHandler.resizeDisk()
+
+			return Cakeagent_ResizeReply.with {
+				$0.success = true
+			}
+		} catch {
+			return Cakeagent_ResizeReply.with {
+				$0.failure = error.localizedDescription
+			}
+		}
+	}
+
 	func info(request: Google_Protobuf_Empty, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_InfoReply {
 		let processInfo = ProcessInfo.processInfo
 		var reply = Cakeagent_InfoReply()

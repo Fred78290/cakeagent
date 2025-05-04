@@ -11,12 +11,20 @@ package cakeagent;
 import "google/protobuf/empty.proto";
 
 service Agent {
+	rpc ResizeDisk (google.protobuf.Empty) returns (ResizeReply);
 	rpc Info (google.protobuf.Empty) returns (InfoReply);
 	rpc Shutdown (google.protobuf.Empty) returns (RunReply);
 	rpc Run (RunCommand) returns (RunReply);
 	rpc Execute (stream ExecuteRequest) returns (stream ExecuteResponse);
 	rpc Mount(MountRequest) returns (MountReply);
 	rpc Umount(MountRequest) returns (MountReply);
+}
+
+message ResizeReply {
+	oneof Response {
+		bool success = 1;
+		string failure = 2;
+	}
 }
 
 message InfoReply {
