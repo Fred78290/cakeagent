@@ -14,7 +14,7 @@ final class Infos: GrpcParsableCommand {
 		try self.options.validate(try Root.getDefaultServerAddress())
 	}
 
-	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
+	func run(on: EventLoopGroup, client: CakeAgentClient, callOptions: CallOptions?) async throws {
 		print(try CakeAgentHelper(on: on, client: client).info(callOptions: callOptions).toJSON())
 	}
 }

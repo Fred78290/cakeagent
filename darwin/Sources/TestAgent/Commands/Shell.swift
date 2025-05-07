@@ -29,7 +29,7 @@ final class Shell: GrpcParsableCommand {
 
 	@OptionGroup var options: CakeAgentClientOptions
 
-	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
+	var interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? {
 		try? CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)
 	}
 
@@ -37,7 +37,7 @@ final class Shell: GrpcParsableCommand {
 		try self.options.validate(try Root.getDefaultServerAddress())
 	}
 
-	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
+	func run(on: EventLoopGroup, client: CakeAgentClient, callOptions: CallOptions?) async throws {
 		Foundation.exit(try await CakeAgentHelper(on: on, client: client).shell(callOptions: .init(timeLimit: .none)))
 	}
 }

@@ -8,123 +8,132 @@ option go_package = "linux/pkg/cakeagent";
 
 package cakeagent;
 
-import "google/protobuf/empty.proto";
-
-service Agent {
-	rpc ResizeDisk (google.protobuf.Empty) returns (ResizeReply);
-	rpc Info (google.protobuf.Empty) returns (InfoReply);
-	rpc Shutdown (google.protobuf.Empty) returns (RunReply);
-	rpc Run (RunCommand) returns (RunReply);
-	rpc Execute (stream ExecuteRequest) returns (stream ExecuteResponse);
-	rpc Mount(MountRequest) returns (MountReply);
-	rpc Umount(MountRequest) returns (MountReply);
+service CakeAgentService {
+	rpc ResizeDisk (CakeAgent.Empty) returns (CakeAgent.ResizeReply);
+	rpc Info (CakeAgent.Empty) returns (CakeAgent.InfoReply);
+	rpc Shutdown (CakeAgent.Empty) returns (CakeAgent.RunReply);
+	rpc Run (CakeAgent.RunCommand) returns (CakeAgent.RunReply);
+	rpc Execute (stream CakeAgent.ExecuteRequest) returns (stream CakeAgent.ExecuteResponse);
+	rpc Mount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
+	rpc Umount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
 }
 
-message ResizeReply {
-	oneof Response {
-		bool success = 1;
-		string failure = 2;
-	}
-}
-
-message InfoReply {
-	message MemoryInfo {
-		uint64 total = 1;
-		uint64 free = 2;
-		uint64 used = 3;
+message CakeAgent {
+	message Empty {
 	}
 
-	message DiskInfo {
-		string device = 1;
-		string mount = 2;
-		string fsType = 3;
-		uint64 size = 4;
-		uint64 used = 5;
-		uint64 free = 6;
+	message ResizeReply {
+		oneof Response {
+			bool success = 1;
+			string failure = 2;
+		}
 	}
 
-	string version = 1;
-	uint64 uptime = 2;
-	MemoryInfo memory = 3;
-	int32 cpuCount = 4;
-	repeated DiskInfo diskInfos = 5;
-	repeated string ipaddresses = 6;
-	string osname = 7;
-	string hostname = 8;
-	string release = 9;
-}
+	message InfoReply {
+		message MemoryInfo {
+			uint64 total = 1;
+			uint64 free = 2;
+			uint64 used = 3;
+		}
 
-message Command {
-	string command = 1;
-	repeated string args = 2;
-}
+		message DiskInfo {
+			string device = 1;
+			string mount = 2;
+			string fsType = 3;
+			uint64 size = 4;
+			uint64 used = 5;
+			uint64 free = 6;
+		}
 
-message RunCommand {
-	Command command = 1;
-	optional bytes input = 2;
-}
+		string version = 1;
+		uint64 uptime = 2;
+		MemoryInfo memory = 3;
+		int32 cpuCount = 4;
+		repeated DiskInfo diskInfos = 5;
+		repeated string ipaddresses = 6;
+		string osname = 7;
+		string hostname = 8;
+		string release = 9;
+	}
 
-message ExecuteCommand {
-	oneof execute {
+	message RunCommand {
+		message Command {
+			string command = 1;
+			repeated string args = 2;
+		}
+
 		Command command = 1;
-		bool shell = 2;
+		optional bytes input = 2;
 	}
-}
 
-message TerminalSize {
-	int32 rows = 1;
-	int32 cols = 2;
-}
-
-message ExecuteRequest {
-	oneof request {
-		ExecuteCommand command = 1;
-		bytes input = 2;
-		TerminalSize size = 3;
-		bool eof = 4;
+	message ExecuteRequest {
+		message ExecuteCommand {
+			message Command {
+				string command = 1;
+				repeated string args = 2;
+			}
+			
+			oneof execute {
+				Command command = 1;
+				bool shell = 2;
+			}
+		}
+		
+		message TerminalSize {
+			int32 rows = 1;
+			int32 cols = 2;
+		}
+		
+		oneof request {
+			ExecuteCommand command = 1;
+			bytes input = 2;
+			TerminalSize size = 3;
+			bool eof = 4;
+		}
 	}
-}
 
-message RunReply {
-	int32 exitCode = 1;
-	bytes stdout = 2;
-	bytes stderr = 3;
-}
-
-message ExecuteResponse {
-	oneof response {
+	message RunReply {
 		int32 exitCode = 1;
 		bytes stdout = 2;
 		bytes stderr = 3;
-		bool established = 4;
 	}
-}
 
-message MountVirtioFS {
-	string name = 1;
-	string target = 2;
-	int32 uid = 3;
-	int32 gid = 4;
-	bool readonly = 5;
-	bool early = 6;
-}
-
-message MountRequest {
-	repeated MountVirtioFS mounts = 1;
-}
-
-message MountVirtioFSReply {
-	string name = 1;
-	oneof response {
-		string error = 2;
-		bool success = 3;
+	message ExecuteResponse {
+		oneof response {
+			int32 exitCode = 1;
+			bytes stdout = 2;
+			bytes stderr = 3;
+			bool established = 4;
+		}
 	}
-}
 
-message MountReply {
-	repeated MountVirtioFSReply mounts = 1;
-	oneof response {
-		string error = 2;
-		bool success = 3;
+	message MountRequest {
+		message MountVirtioFS {
+			string name = 1;
+			string target = 2;
+			int32 uid = 3;
+			int32 gid = 4;
+			bool readonly = 5;
+			bool early = 6;
+		}
+		
+		repeated MountVirtioFS mounts = 1;
+	}
+
+	message MountReply {
+		message MountVirtioFSReply {
+			string name = 1;
+			oneof response {
+				string error = 2;
+				bool success = 3;
+			}
+		}
+		
+		repeated MountVirtioFSReply mounts = 1;
+
+		oneof response {
+			string error = 2;
+			bool success = 3;
+		}
 	}
 }

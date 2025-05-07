@@ -6,7 +6,7 @@ import NIOPosix
 import NIOSSL
 import Semaphore
 
-typealias CakeAgentExecuteStream = BidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>
+typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
 
 public protocol CakeAgentClientInterceptorState {
 	func restoreState()
@@ -21,8 +21,8 @@ public protocol CakeAgentClientInterceptorState {
 extension CakeAgentExecuteStream {
 	@discardableResult
 	func sendTerminalSize(rows: Int32, cols: Int32) -> EventLoopFuture<Void> {
-		let message = Cakeagent_ExecuteRequest.with {
-			$0.size = Cakeagent_TerminalSize.with {
+		let message = CakeAgent.ExecuteRequest.with {
+			$0.size = CakeAgent.ExecuteRequest.TerminalSize.with {
 				$0.rows = rows
 				$0.cols = cols
 			}
@@ -33,9 +33,9 @@ extension CakeAgentExecuteStream {
 
 	@discardableResult
 	func sendCommand(command: String, arguments: [String]) -> EventLoopFuture<Void> {
-		let message = Cakeagent_ExecuteRequest.with {
-			$0.command = Cakeagent_ExecuteCommand.with {
-				$0.command = Cakeagent_Command.with {
+		let message = CakeAgent.ExecuteRequest.with {
+			$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.with {
+				$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.Command.with {
 					$0.command = command
 					$0.args = arguments
 				}
@@ -47,8 +47,8 @@ extension CakeAgentExecuteStream {
 
 	@discardableResult
 	func sendShell() -> EventLoopFuture<Void> {
-		let message = Cakeagent_ExecuteRequest.with {
-			$0.command = Cakeagent_ExecuteCommand.with {
+		let message = CakeAgent.ExecuteRequest.with {
+			$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.with {
 				$0.shell = true
 			}
 		}
@@ -58,7 +58,7 @@ extension CakeAgentExecuteStream {
 
 	@discardableResult
 	func sendBuffer(_ buffer: ByteBuffer) -> EventLoopFuture<Void> {
-		let message = Cakeagent_ExecuteRequest.with {
+		let message = CakeAgent.ExecuteRequest.with {
 			$0.input = Data(buffer: buffer)
 		}
 
@@ -67,7 +67,7 @@ extension CakeAgentExecuteStream {
 
 	@discardableResult
 	func sendEof() -> EventLoopFuture<Void> {
-		let message = Cakeagent_ExecuteRequest.with {
+		let message = CakeAgent.ExecuteRequest.with {
 			$0.eof = true
 		}
 
@@ -186,7 +186,7 @@ public struct InfoReply: Sendable, Codable {
 		self.status = .stopped
 	}
 
-	public init(info: Cakeagent_InfoReply) {
+	public init(info: CakeAgent.InfoReply) {
 		self.name = info.hostname
 		self.version = info.version
 		self.uptime = info.uptime
@@ -270,7 +270,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 		self.isTTY = inputHandle.isTTY() && outputHandle.isTTY()
 	}
 
-	func handleResponse(response: Cakeagent_ExecuteResponse) -> Void {
+	func handleResponse(response: CakeAgent.ExecuteResponse) -> Void {
 		guard let pipeChannel = self.pipeChannel else {
 			return
 		}
@@ -483,7 +483,14 @@ public struct CakeAgentHelper: Sendable {
 		self.client = client
 	}
 
-	public init(on: EventLoopGroup, listeningAddress: URL, connectionTimeout: Int64, caCert: String?, tlsCert: String?, tlsKey: String?, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws {
+	public init(on: EventLoopGroup,
+	            listeningAddress: URL,
+	            connectionTimeout: Int64,
+	            caCert: String?,
+	            tlsCert: String?,
+	            tlsKey: String?,
+	            retries: ConnectionBackoff.Retries = .unlimited,
+	            interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws {
 		self.eventLoopGroup = on
 		self.client = try Self.createClient(on: on,
 		                                    listeningAddress: listeningAddress,
@@ -502,7 +509,7 @@ public struct CakeAgentHelper: Sendable {
 	                                tlsCert: String?,
 	                                tlsKey: String?,
 	                                retries: ConnectionBackoff.Retries = .unlimited,
-	                                interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
+	                                interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws -> CakeAgentClient {
 		let target: ConnectionTarget
 
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
@@ -566,12 +573,12 @@ public struct CakeAgentHelper: Sendable {
 	                input: Data? = nil,
 	                callOptions: CallOptions? = nil) throws -> RunReply {
 
-		let response = try client.run(Cakeagent_RunCommand.with { req in
+		let response = try client.run(CakeAgent.RunCommand.with { req in
 			if let input = input {
 				req.input = input
 			}
 
-			req.command = Cakeagent_Command.with { 
+			req.command = CakeAgent.RunCommand.Command.with { 
 				$0.command = command
 				$0.args = arguments
 			}
@@ -592,12 +599,12 @@ public struct CakeAgentHelper: Sendable {
 	                outputHandle: FileHandle = FileHandle.standardOutput,
 	                errorHandle: FileHandle = FileHandle.standardError,
 	                callOptions: CallOptions? = nil) throws -> Int32 {
-		let response = try client.run(Cakeagent_RunCommand.with { req in
+		let response = try client.run(CakeAgent.RunCommand.with { req in
 			if isatty(inputHandle.fileDescriptor) == 0 {
 				req.input = inputHandle.readDataToEndOfFile()
 			}
 
-			req.command = Cakeagent_Command.with { 
+			req.command = CakeAgent.RunCommand.Command.with { 
 				$0.command = command
 				$0.args = arguments
 			}
@@ -647,13 +654,13 @@ public struct CakeAgentHelper: Sendable {
 		return try await self.exec(command: .shell(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
 	}
 
-	public func mount(request: Cakeagent_MountRequest, callOptions: CallOptions? = nil) throws -> Cakeagent_MountReply {
+	public func mount(request: CakeAgent.MountRequest, callOptions: CallOptions? = nil) throws -> CakeAgent.MountReply {
 		let response = client.mount(request, callOptions: callOptions)
 
 		return try response.response.wait()
 	}
 
-	public func umount(request: Cakeagent_MountRequest, callOptions: CallOptions? = nil) throws -> Cakeagent_MountReply {
+	public func umount(request: CakeAgent.MountRequest, callOptions: CallOptions? = nil) throws -> CakeAgent.MountReply {
 		let response = client.umount(request, callOptions: callOptions)
 
 		return try response.response.wait()

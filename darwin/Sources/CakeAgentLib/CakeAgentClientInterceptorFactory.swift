@@ -2,7 +2,8 @@ import Foundation
 import GRPC
 import NIO
 import SwiftProtobuf
-public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptorState, Cakeagent_AgentClientInterceptorFactoryProtocol {
+
+public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptorState, CakeAgentServiceClientInterceptorFactoryProtocol {
 	public typealias CakeAgentClientInterceptorFactoryCallback = @Sendable (_ method: GRPCMethodDescriptor) -> Bool
 
 	internal let inputHandle: FileHandle
@@ -85,60 +86,60 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		try? inputHandle.restoreState(&state)
 	}
 
-	public func makeResizeDiskInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_ResizeReply>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.resizeDisk) == false {
+	public func makeResizeDiskInterceptors() -> [ClientInterceptor<CakeAgent.Empty, CakeAgent.ResizeReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.resizeDisk) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Google_Protobuf_Empty, Cakeagent_ResizeReply>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.Empty, CakeAgent.ResizeReply>(inputHandle: inputHandle, state: state)]
 	}
 
-	public func makeInfoInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_InfoReply>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.info) == false {
+	public func makeInfoInterceptors() -> [ClientInterceptor<CakeAgent.Empty, CakeAgent.InfoReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.info) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Google_Protobuf_Empty, Cakeagent_InfoReply>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.Empty, CakeAgent.InfoReply>(inputHandle: inputHandle, state: state)]
 	}
 
-	public func makeShutdownInterceptors() -> [ClientInterceptor<Google_Protobuf_Empty, Cakeagent_RunReply>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.info) == false {
+	public func makeShutdownInterceptors() -> [ClientInterceptor<CakeAgent.Empty, CakeAgent.RunReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.info) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Google_Protobuf_Empty, Cakeagent_RunReply>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.Empty, CakeAgent.RunReply>(inputHandle: inputHandle, state: state)]
 	}
 
-	public func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.run) == false {
+	public func makeRunInterceptors() -> [ClientInterceptor<CakeAgent.RunCommand, CakeAgent.RunReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.run) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.RunCommand, CakeAgent.RunReply>(inputHandle: inputHandle, state: state)]
 	}
 
-	public func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.execute) == false {
+	public func makeExecuteInterceptors() -> [ClientInterceptor<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.execute) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>(inputHandle: inputHandle, state: state)]
 	}
 
-	public func makeMountInterceptors() -> [ClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.mount) == false {
+	public func makeMountInterceptors() -> [ClientInterceptor<CakeAgent.MountRequest, CakeAgent.MountReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.mount) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.MountRequest, CakeAgent.MountReply>(inputHandle: inputHandle, state: state)]
 	}
 
-	public func makeUmountInterceptors() -> [ClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>] {
-		if callback?(Cakeagent_AgentClientMetadata.Methods.umount) == false {
+	public func makeUmountInterceptors() -> [ClientInterceptor<CakeAgent.MountRequest, CakeAgent.MountReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.umount) == false {
 			return []
 		}
 
-		return [CakeAgentClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>(inputHandle: inputHandle, state: state)]
+		return [CakeAgentClientInterceptor<CakeAgent.MountRequest, CakeAgent.MountReply>(inputHandle: inputHandle, state: state)]
 	}
 
 }

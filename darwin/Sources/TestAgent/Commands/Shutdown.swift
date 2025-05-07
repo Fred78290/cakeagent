@@ -13,7 +13,7 @@ final class Shutdown: GrpcParsableCommand {
 		try self.options.validate(try Root.getDefaultServerAddress())
 	}
 
-	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
+	func run(on: EventLoopGroup, client: CakeAgentClient, callOptions: CallOptions?) async throws {
 		Foundation.exit(try CakeAgentHelper(on: on, client: client).shutdown(callOptions: callOptions).exitCode)
 	}
 }

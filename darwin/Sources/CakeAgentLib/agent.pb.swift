@@ -21,429 +21,463 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-public struct Cakeagent_ResizeReply: Sendable {
+public struct Cakeagent_CakeAgent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var response: Cakeagent_ResizeReply.OneOf_Response? = nil
-
-  public var success: Bool {
-    get {
-      if case .success(let v)? = response {return v}
-      return false
-    }
-    set {response = .success(newValue)}
-  }
-
-  public var failure: String {
-    get {
-      if case .failure(let v)? = response {return v}
-      return String()
-    }
-    set {response = .failure(newValue)}
-  }
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Response: Equatable, Sendable {
-    case success(Bool)
-    case failure(String)
-
-  }
-
-  public init() {}
-}
-
-public struct Cakeagent_InfoReply: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var version: String = String()
-
-  public var uptime: UInt64 = 0
-
-  public var memory: Cakeagent_InfoReply.MemoryInfo {
-    get {return _memory ?? Cakeagent_InfoReply.MemoryInfo()}
-    set {_memory = newValue}
-  }
-  /// Returns true if `memory` has been explicitly set.
-  public var hasMemory: Bool {return self._memory != nil}
-  /// Clears the value of `memory`. Subsequent reads from it will return its default value.
-  public mutating func clearMemory() {self._memory = nil}
-
-  public var cpuCount: Int32 = 0
-
-  public var diskInfos: [Cakeagent_InfoReply.DiskInfo] = []
-
-  public var ipaddresses: [String] = []
-
-  public var osname: String = String()
-
-  public var hostname: String = String()
-
-  public var release: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public struct MemoryInfo: Sendable {
+  public struct Empty: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
-
-    public var total: UInt64 = 0
-
-    public var free: UInt64 = 0
-
-    public var used: UInt64 = 0
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
   }
 
-  public struct DiskInfo: Sendable {
+  public struct ResizeReply: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    public var device: String = String()
+    public var response: Cakeagent_CakeAgent.ResizeReply.OneOf_Response? = nil
 
-    public var mount: String = String()
+    public var success: Bool {
+      get {
+        if case .success(let v)? = response {return v}
+        return false
+      }
+      set {response = .success(newValue)}
+    }
 
-    public var fsType: String = String()
+    public var failure: String {
+      get {
+        if case .failure(let v)? = response {return v}
+        return String()
+      }
+      set {response = .failure(newValue)}
+    }
 
-    public var size: UInt64 = 0
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-    public var used: UInt64 = 0
+    public enum OneOf_Response: Equatable, Sendable {
+      case success(Bool)
+      case failure(String)
 
-    public var free: UInt64 = 0
+    }
+
+    public init() {}
+  }
+
+  public struct InfoReply: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var version: String = String()
+
+    public var uptime: UInt64 = 0
+
+    public var memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo {
+      get {return _memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
+      set {_memory = newValue}
+    }
+    /// Returns true if `memory` has been explicitly set.
+    public var hasMemory: Bool {return self._memory != nil}
+    /// Clears the value of `memory`. Subsequent reads from it will return its default value.
+    public mutating func clearMemory() {self._memory = nil}
+
+    public var cpuCount: Int32 = 0
+
+    public var diskInfos: [Cakeagent_CakeAgent.InfoReply.DiskInfo] = []
+
+    public var ipaddresses: [String] = []
+
+    public var osname: String = String()
+
+    public var hostname: String = String()
+
+    public var release: String = String()
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public struct MemoryInfo: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var total: UInt64 = 0
+
+      public var free: UInt64 = 0
+
+      public var used: UInt64 = 0
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public struct DiskInfo: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var device: String = String()
+
+      public var mount: String = String()
+
+      public var fsType: String = String()
+
+      public var size: UInt64 = 0
+
+      public var used: UInt64 = 0
+
+      public var free: UInt64 = 0
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public init() {}
+
+    fileprivate var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
+  }
+
+  public struct RunCommand: @unchecked Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var command: Cakeagent_CakeAgent.RunCommand.Command {
+      get {return _command ?? Cakeagent_CakeAgent.RunCommand.Command()}
+      set {_command = newValue}
+    }
+    /// Returns true if `command` has been explicitly set.
+    public var hasCommand: Bool {return self._command != nil}
+    /// Clears the value of `command`. Subsequent reads from it will return its default value.
+    public mutating func clearCommand() {self._command = nil}
+
+    public var input: Data {
+      get {return _input ?? Data()}
+      set {_input = newValue}
+    }
+    /// Returns true if `input` has been explicitly set.
+    public var hasInput: Bool {return self._input != nil}
+    /// Clears the value of `input`. Subsequent reads from it will return its default value.
+    public mutating func clearInput() {self._input = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public struct Command: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var command: String = String()
+
+      public var args: [String] = []
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public init() {}
+
+    fileprivate var _command: Cakeagent_CakeAgent.RunCommand.Command? = nil
+    fileprivate var _input: Data? = nil
+  }
+
+  public struct ExecuteRequest: @unchecked Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var request: Cakeagent_CakeAgent.ExecuteRequest.OneOf_Request? = nil
+
+    public var command: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand {
+      get {
+        if case .command(let v)? = request {return v}
+        return Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand()
+      }
+      set {request = .command(newValue)}
+    }
+
+    public var input: Data {
+      get {
+        if case .input(let v)? = request {return v}
+        return Data()
+      }
+      set {request = .input(newValue)}
+    }
+
+    public var size: Cakeagent_CakeAgent.ExecuteRequest.TerminalSize {
+      get {
+        if case .size(let v)? = request {return v}
+        return Cakeagent_CakeAgent.ExecuteRequest.TerminalSize()
+      }
+      set {request = .size(newValue)}
+    }
+
+    public var eof: Bool {
+      get {
+        if case .eof(let v)? = request {return v}
+        return false
+      }
+      set {request = .eof(newValue)}
+    }
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public enum OneOf_Request: Equatable, @unchecked Sendable {
+      case command(Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand)
+      case input(Data)
+      case size(Cakeagent_CakeAgent.ExecuteRequest.TerminalSize)
+      case eof(Bool)
+
+    }
+
+    public struct ExecuteCommand: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var execute: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.OneOf_Execute? = nil
+
+      public var command: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command {
+        get {
+          if case .command(let v)? = execute {return v}
+          return Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command()
+        }
+        set {execute = .command(newValue)}
+      }
+
+      public var shell: Bool {
+        get {
+          if case .shell(let v)? = execute {return v}
+          return false
+        }
+        set {execute = .shell(newValue)}
+      }
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public enum OneOf_Execute: Equatable, Sendable {
+        case command(Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command)
+        case shell(Bool)
+
+      }
+
+      public struct Command: Sendable {
+        // SwiftProtobuf.Message conformance is added in an extension below. See the
+        // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+        // methods supported on all messages.
+
+        public var command: String = String()
+
+        public var args: [String] = []
+
+        public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+        public init() {}
+      }
+
+      public init() {}
+    }
+
+    public struct TerminalSize: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var rows: Int32 = 0
+
+      public var cols: Int32 = 0
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public init() {}
+  }
+
+  public struct RunReply: @unchecked Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var exitCode: Int32 = 0
+
+    public var stdout: Data = Data()
+
+    public var stderr: Data = Data()
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
   }
 
-  public init() {}
+  public struct ExecuteResponse: @unchecked Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
 
-  fileprivate var _memory: Cakeagent_InfoReply.MemoryInfo? = nil
-}
+    public var response: Cakeagent_CakeAgent.ExecuteResponse.OneOf_Response? = nil
 
-public struct Cakeagent_Command: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var command: String = String()
-
-  public var args: [String] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Cakeagent_RunCommand: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var command: Cakeagent_Command {
-    get {return _command ?? Cakeagent_Command()}
-    set {_command = newValue}
-  }
-  /// Returns true if `command` has been explicitly set.
-  public var hasCommand: Bool {return self._command != nil}
-  /// Clears the value of `command`. Subsequent reads from it will return its default value.
-  public mutating func clearCommand() {self._command = nil}
-
-  public var input: Data {
-    get {return _input ?? Data()}
-    set {_input = newValue}
-  }
-  /// Returns true if `input` has been explicitly set.
-  public var hasInput: Bool {return self._input != nil}
-  /// Clears the value of `input`. Subsequent reads from it will return its default value.
-  public mutating func clearInput() {self._input = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _command: Cakeagent_Command? = nil
-  fileprivate var _input: Data? = nil
-}
-
-public struct Cakeagent_ExecuteCommand: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var execute: Cakeagent_ExecuteCommand.OneOf_Execute? = nil
-
-  public var command: Cakeagent_Command {
-    get {
-      if case .command(let v)? = execute {return v}
-      return Cakeagent_Command()
+    public var exitCode: Int32 {
+      get {
+        if case .exitCode(let v)? = response {return v}
+        return 0
+      }
+      set {response = .exitCode(newValue)}
     }
-    set {execute = .command(newValue)}
-  }
 
-  public var shell: Bool {
-    get {
-      if case .shell(let v)? = execute {return v}
-      return false
+    public var stdout: Data {
+      get {
+        if case .stdout(let v)? = response {return v}
+        return Data()
+      }
+      set {response = .stdout(newValue)}
     }
-    set {execute = .shell(newValue)}
-  }
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Execute: Equatable, Sendable {
-    case command(Cakeagent_Command)
-    case shell(Bool)
-
-  }
-
-  public init() {}
-}
-
-public struct Cakeagent_TerminalSize: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var rows: Int32 = 0
-
-  public var cols: Int32 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Cakeagent_ExecuteRequest: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var request: Cakeagent_ExecuteRequest.OneOf_Request? = nil
-
-  public var command: Cakeagent_ExecuteCommand {
-    get {
-      if case .command(let v)? = request {return v}
-      return Cakeagent_ExecuteCommand()
+    public var stderr: Data {
+      get {
+        if case .stderr(let v)? = response {return v}
+        return Data()
+      }
+      set {response = .stderr(newValue)}
     }
-    set {request = .command(newValue)}
-  }
 
-  public var input: Data {
-    get {
-      if case .input(let v)? = request {return v}
-      return Data()
+    public var established: Bool {
+      get {
+        if case .established(let v)? = response {return v}
+        return false
+      }
+      set {response = .established(newValue)}
     }
-    set {request = .input(newValue)}
-  }
 
-  public var size: Cakeagent_TerminalSize {
-    get {
-      if case .size(let v)? = request {return v}
-      return Cakeagent_TerminalSize()
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public enum OneOf_Response: Equatable, @unchecked Sendable {
+      case exitCode(Int32)
+      case stdout(Data)
+      case stderr(Data)
+      case established(Bool)
+
     }
-    set {request = .size(newValue)}
+
+    public init() {}
   }
 
-  public var eof: Bool {
-    get {
-      if case .eof(let v)? = request {return v}
-      return false
+  public struct MountRequest: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var mounts: [Cakeagent_CakeAgent.MountRequest.MountVirtioFS] = []
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public struct MountVirtioFS: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var name: String = String()
+
+      public var target: String = String()
+
+      public var uid: Int32 = 0
+
+      public var gid: Int32 = 0
+
+      public var readonly: Bool = false
+
+      public var early: Bool = false
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
     }
-    set {request = .eof(newValue)}
+
+    public init() {}
   }
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  public struct MountReply: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
 
-  public enum OneOf_Request: Equatable, @unchecked Sendable {
-    case command(Cakeagent_ExecuteCommand)
-    case input(Data)
-    case size(Cakeagent_TerminalSize)
-    case eof(Bool)
+    public var mounts: [Cakeagent_CakeAgent.MountReply.MountVirtioFSReply] = []
 
-  }
+    public var response: Cakeagent_CakeAgent.MountReply.OneOf_Response? = nil
 
-  public init() {}
-}
-
-public struct Cakeagent_RunReply: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var exitCode: Int32 = 0
-
-  public var stdout: Data = Data()
-
-  public var stderr: Data = Data()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Cakeagent_ExecuteResponse: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var response: Cakeagent_ExecuteResponse.OneOf_Response? = nil
-
-  public var exitCode: Int32 {
-    get {
-      if case .exitCode(let v)? = response {return v}
-      return 0
+    public var error: String {
+      get {
+        if case .error(let v)? = response {return v}
+        return String()
+      }
+      set {response = .error(newValue)}
     }
-    set {response = .exitCode(newValue)}
-  }
 
-  public var stdout: Data {
-    get {
-      if case .stdout(let v)? = response {return v}
-      return Data()
+    public var success: Bool {
+      get {
+        if case .success(let v)? = response {return v}
+        return false
+      }
+      set {response = .success(newValue)}
     }
-    set {response = .stdout(newValue)}
-  }
 
-  public var stderr: Data {
-    get {
-      if case .stderr(let v)? = response {return v}
-      return Data()
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public enum OneOf_Response: Equatable, Sendable {
+      case error(String)
+      case success(Bool)
+
     }
-    set {response = .stderr(newValue)}
-  }
 
-  public var established: Bool {
-    get {
-      if case .established(let v)? = response {return v}
-      return false
+    public struct MountVirtioFSReply: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var name: String = String()
+
+      public var response: Cakeagent_CakeAgent.MountReply.MountVirtioFSReply.OneOf_Response? = nil
+
+      public var error: String {
+        get {
+          if case .error(let v)? = response {return v}
+          return String()
+        }
+        set {response = .error(newValue)}
+      }
+
+      public var success: Bool {
+        get {
+          if case .success(let v)? = response {return v}
+          return false
+        }
+        set {response = .success(newValue)}
+      }
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public enum OneOf_Response: Equatable, Sendable {
+        case error(String)
+        case success(Bool)
+
+      }
+
+      public init() {}
     }
-    set {response = .established(newValue)}
-  }
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Response: Equatable, @unchecked Sendable {
-    case exitCode(Int32)
-    case stdout(Data)
-    case stderr(Data)
-    case established(Bool)
-
-  }
-
-  public init() {}
-}
-
-public struct Cakeagent_MountVirtioFS: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var name: String = String()
-
-  public var target: String = String()
-
-  public var uid: Int32 = 0
-
-  public var gid: Int32 = 0
-
-  public var readonly: Bool = false
-
-  public var early: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Cakeagent_MountRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var mounts: [Cakeagent_MountVirtioFS] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Cakeagent_MountVirtioFSReply: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var name: String = String()
-
-  public var response: Cakeagent_MountVirtioFSReply.OneOf_Response? = nil
-
-  public var error: String {
-    get {
-      if case .error(let v)? = response {return v}
-      return String()
-    }
-    set {response = .error(newValue)}
-  }
-
-  public var success: Bool {
-    get {
-      if case .success(let v)? = response {return v}
-      return false
-    }
-    set {response = .success(newValue)}
-  }
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Response: Equatable, Sendable {
-    case error(String)
-    case success(Bool)
-
-  }
-
-  public init() {}
-}
-
-public struct Cakeagent_MountReply: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var mounts: [Cakeagent_MountVirtioFSReply] = []
-
-  public var response: Cakeagent_MountReply.OneOf_Response? = nil
-
-  public var error: String {
-    get {
-      if case .error(let v)? = response {return v}
-      return String()
-    }
-    set {response = .error(newValue)}
-  }
-
-  public var success: Bool {
-    get {
-      if case .success(let v)? = response {return v}
-      return false
-    }
-    set {response = .success(newValue)}
-  }
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Response: Equatable, Sendable {
-    case error(String)
-    case success(Bool)
-
+    public init() {}
   }
 
   public init() {}
@@ -453,8 +487,46 @@ public struct Cakeagent_MountReply: Sendable {
 
 fileprivate let _protobuf_package = "cakeagent"
 
-extension Cakeagent_ResizeReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ResizeReply"
+extension Cakeagent_CakeAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CakeAgent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent, rhs: Cakeagent_CakeAgent) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.Empty: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".Empty"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.Empty, rhs: Cakeagent_CakeAgent.Empty) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.ResizeReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".ResizeReply"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "success"),
     2: .same(proto: "failure"),
@@ -506,15 +578,15 @@ extension Cakeagent_ResizeReply: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_ResizeReply, rhs: Cakeagent_ResizeReply) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.ResizeReply, rhs: Cakeagent_CakeAgent.ResizeReply) -> Bool {
     if lhs.response != rhs.response {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".InfoReply"
+extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".InfoReply"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "version"),
     2: .same(proto: "uptime"),
@@ -582,7 +654,7 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_InfoReply, rhs: Cakeagent_InfoReply) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.InfoReply, rhs: Cakeagent_CakeAgent.InfoReply) -> Bool {
     if lhs.version != rhs.version {return false}
     if lhs.uptime != rhs.uptime {return false}
     if lhs._memory != rhs._memory {return false}
@@ -597,8 +669,8 @@ extension Cakeagent_InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension Cakeagent_InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = Cakeagent_InfoReply.protoMessageName + ".MemoryInfo"
+extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".MemoryInfo"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "total"),
     2: .same(proto: "free"),
@@ -632,7 +704,7 @@ extension Cakeagent_InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_InfoReply.MemoryInfo, rhs: Cakeagent_InfoReply.MemoryInfo) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.InfoReply.MemoryInfo, rhs: Cakeagent_CakeAgent.InfoReply.MemoryInfo) -> Bool {
     if lhs.total != rhs.total {return false}
     if lhs.free != rhs.free {return false}
     if lhs.used != rhs.used {return false}
@@ -641,8 +713,8 @@ extension Cakeagent_InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension Cakeagent_InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = Cakeagent_InfoReply.protoMessageName + ".DiskInfo"
+extension Cakeagent_CakeAgent.InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".DiskInfo"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "device"),
     2: .same(proto: "mount"),
@@ -691,7 +763,7 @@ extension Cakeagent_InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftProtobuf._Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_InfoReply.DiskInfo, rhs: Cakeagent_InfoReply.DiskInfo) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.InfoReply.DiskInfo, rhs: Cakeagent_CakeAgent.InfoReply.DiskInfo) -> Bool {
     if lhs.device != rhs.device {return false}
     if lhs.mount != rhs.mount {return false}
     if lhs.fsType != rhs.fsType {return false}
@@ -703,46 +775,8 @@ extension Cakeagent_InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension Cakeagent_Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Command"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "command"),
-    2: .same(proto: "args"),
-  ]
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.command) }()
-      case 2: try { try decoder.decodeRepeatedStringField(value: &self.args) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.command.isEmpty {
-      try visitor.visitSingularStringField(value: self.command, fieldNumber: 1)
-    }
-    if !self.args.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.args, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Cakeagent_Command, rhs: Cakeagent_Command) -> Bool {
-    if lhs.command != rhs.command {return false}
-    if lhs.args != rhs.args {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Cakeagent_RunCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RunCommand"
+extension Cakeagent_CakeAgent.RunCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".RunCommand"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "command"),
     2: .same(proto: "input"),
@@ -775,7 +809,7 @@ extension Cakeagent_RunCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_RunCommand, rhs: Cakeagent_RunCommand) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.RunCommand, rhs: Cakeagent_CakeAgent.RunCommand) -> Bool {
     if lhs._command != rhs._command {return false}
     if lhs._input != rhs._input {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -783,11 +817,11 @@ extension Cakeagent_RunCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension Cakeagent_ExecuteCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ExecuteCommand"
+extension Cakeagent_CakeAgent.RunCommand.Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.RunCommand.protoMessageName + ".Command"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "command"),
-    2: .same(proto: "shell"),
+    2: .same(proto: "args"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -796,98 +830,33 @@ extension Cakeagent_ExecuteCommand: SwiftProtobuf.Message, SwiftProtobuf._Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try {
-        var v: Cakeagent_Command?
-        var hadOneofValue = false
-        if let current = self.execute {
-          hadOneofValue = true
-          if case .command(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.execute = .command(v)
-        }
-      }()
-      case 2: try {
-        var v: Bool?
-        try decoder.decodeSingularBoolField(value: &v)
-        if let v = v {
-          if self.execute != nil {try decoder.handleConflictingOneOf()}
-          self.execute = .shell(v)
-        }
-      }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.command) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.args) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    switch self.execute {
-    case .command?: try {
-      guard case .command(let v)? = self.execute else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    }()
-    case .shell?: try {
-      guard case .shell(let v)? = self.execute else { preconditionFailure() }
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    }()
-    case nil: break
+    if !self.command.isEmpty {
+      try visitor.visitSingularStringField(value: self.command, fieldNumber: 1)
+    }
+    if !self.args.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.args, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_ExecuteCommand, rhs: Cakeagent_ExecuteCommand) -> Bool {
-    if lhs.execute != rhs.execute {return false}
+  public static func ==(lhs: Cakeagent_CakeAgent.RunCommand.Command, rhs: Cakeagent_CakeAgent.RunCommand.Command) -> Bool {
+    if lhs.command != rhs.command {return false}
+    if lhs.args != rhs.args {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Cakeagent_TerminalSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TerminalSize"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "rows"),
-    2: .same(proto: "cols"),
-  ]
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.rows) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.cols) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.rows != 0 {
-      try visitor.visitSingularInt32Field(value: self.rows, fieldNumber: 1)
-    }
-    if self.cols != 0 {
-      try visitor.visitSingularInt32Field(value: self.cols, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Cakeagent_TerminalSize, rhs: Cakeagent_TerminalSize) -> Bool {
-    if lhs.rows != rhs.rows {return false}
-    if lhs.cols != rhs.cols {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Cakeagent_ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ExecuteRequest"
+extension Cakeagent_CakeAgent.ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".ExecuteRequest"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "command"),
     2: .same(proto: "input"),
@@ -902,7 +871,7 @@ extension Cakeagent_ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try {
-        var v: Cakeagent_ExecuteCommand?
+        var v: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand?
         var hadOneofValue = false
         if let current = self.request {
           hadOneofValue = true
@@ -923,7 +892,7 @@ extension Cakeagent_ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
         }
       }()
       case 3: try {
-        var v: Cakeagent_TerminalSize?
+        var v: Cakeagent_CakeAgent.ExecuteRequest.TerminalSize?
         var hadOneofValue = false
         if let current = self.request {
           hadOneofValue = true
@@ -975,15 +944,156 @@ extension Cakeagent_ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_ExecuteRequest, rhs: Cakeagent_ExecuteRequest) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteRequest, rhs: Cakeagent_CakeAgent.ExecuteRequest) -> Bool {
     if lhs.request != rhs.request {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Cakeagent_RunReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RunReply"
+extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.protoMessageName + ".ExecuteCommand"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "command"),
+    2: .same(proto: "shell"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command?
+        var hadOneofValue = false
+        if let current = self.execute {
+          hadOneofValue = true
+          if case .command(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.execute = .command(v)
+        }
+      }()
+      case 2: try {
+        var v: Bool?
+        try decoder.decodeSingularBoolField(value: &v)
+        if let v = v {
+          if self.execute != nil {try decoder.handleConflictingOneOf()}
+          self.execute = .shell(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.execute {
+    case .command?: try {
+      guard case .command(let v)? = self.execute else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }()
+    case .shell?: try {
+      guard case .shell(let v)? = self.execute else { preconditionFailure() }
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand, rhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand) -> Bool {
+    if lhs.execute != rhs.execute {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.protoMessageName + ".Command"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "command"),
+    2: .same(proto: "args"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.command) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.args) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.command.isEmpty {
+      try visitor.visitSingularStringField(value: self.command, fieldNumber: 1)
+    }
+    if !self.args.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.args, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command, rhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command) -> Bool {
+    if lhs.command != rhs.command {return false}
+    if lhs.args != rhs.args {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.ExecuteRequest.TerminalSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.protoMessageName + ".TerminalSize"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "rows"),
+    2: .same(proto: "cols"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.rows) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.cols) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.rows != 0 {
+      try visitor.visitSingularInt32Field(value: self.rows, fieldNumber: 1)
+    }
+    if self.cols != 0 {
+      try visitor.visitSingularInt32Field(value: self.cols, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteRequest.TerminalSize, rhs: Cakeagent_CakeAgent.ExecuteRequest.TerminalSize) -> Bool {
+    if lhs.rows != rhs.rows {return false}
+    if lhs.cols != rhs.cols {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.RunReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".RunReply"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "exitCode"),
     2: .same(proto: "stdout"),
@@ -1017,7 +1127,7 @@ extension Cakeagent_RunReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_RunReply, rhs: Cakeagent_RunReply) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.RunReply, rhs: Cakeagent_CakeAgent.RunReply) -> Bool {
     if lhs.exitCode != rhs.exitCode {return false}
     if lhs.stdout != rhs.stdout {return false}
     if lhs.stderr != rhs.stderr {return false}
@@ -1026,8 +1136,8 @@ extension Cakeagent_RunReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension Cakeagent_ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ExecuteResponse"
+extension Cakeagent_CakeAgent.ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".ExecuteResponse"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "exitCode"),
     2: .same(proto: "stdout"),
@@ -1105,15 +1215,47 @@ extension Cakeagent_ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._Messa
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_ExecuteResponse, rhs: Cakeagent_ExecuteResponse) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteResponse, rhs: Cakeagent_CakeAgent.ExecuteResponse) -> Bool {
     if lhs.response != rhs.response {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".MountVirtioFS"
+extension Cakeagent_CakeAgent.MountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".MountRequest"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "mounts"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.mounts) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.mounts.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.mounts, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.MountRequest, rhs: Cakeagent_CakeAgent.MountRequest) -> Bool {
+    if lhs.mounts != rhs.mounts {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.MountRequest.MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.MountRequest.protoMessageName + ".MountVirtioFS"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "name"),
     2: .same(proto: "target"),
@@ -1162,7 +1304,7 @@ extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._Message
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_MountVirtioFS, rhs: Cakeagent_MountVirtioFS) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.MountRequest.MountVirtioFS, rhs: Cakeagent_CakeAgent.MountRequest.MountVirtioFS) -> Bool {
     if lhs.name != rhs.name {return false}
     if lhs.target != rhs.target {return false}
     if lhs.uid != rhs.uid {return false}
@@ -1174,10 +1316,12 @@ extension Cakeagent_MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension Cakeagent_MountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".MountRequest"
+extension Cakeagent_CakeAgent.MountReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".MountReply"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "mounts"),
+    2: .same(proto: "error"),
+    3: .same(proto: "success"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1187,27 +1331,59 @@ extension Cakeagent_MountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.mounts) }()
+      case 2: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.response != nil {try decoder.handleConflictingOneOf()}
+          self.response = .error(v)
+        }
+      }()
+      case 3: try {
+        var v: Bool?
+        try decoder.decodeSingularBoolField(value: &v)
+        if let v = v {
+          if self.response != nil {try decoder.handleConflictingOneOf()}
+          self.response = .success(v)
+        }
+      }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.mounts.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.mounts, fieldNumber: 1)
+    }
+    switch self.response {
+    case .error?: try {
+      guard case .error(let v)? = self.response else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }()
+    case .success?: try {
+      guard case .success(let v)? = self.response else { preconditionFailure() }
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    }()
+    case nil: break
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_MountRequest, rhs: Cakeagent_MountRequest) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.MountReply, rhs: Cakeagent_CakeAgent.MountReply) -> Bool {
     if lhs.mounts != rhs.mounts {return false}
+    if lhs.response != rhs.response {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Cakeagent_MountVirtioFSReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".MountVirtioFSReply"
+extension Cakeagent_CakeAgent.MountReply.MountVirtioFSReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.MountReply.protoMessageName + ".MountVirtioFSReply"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "name"),
     2: .same(proto: "error"),
@@ -1264,74 +1440,8 @@ extension Cakeagent_MountVirtioFSReply: SwiftProtobuf.Message, SwiftProtobuf._Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Cakeagent_MountVirtioFSReply, rhs: Cakeagent_MountVirtioFSReply) -> Bool {
+  public static func ==(lhs: Cakeagent_CakeAgent.MountReply.MountVirtioFSReply, rhs: Cakeagent_CakeAgent.MountReply.MountVirtioFSReply) -> Bool {
     if lhs.name != rhs.name {return false}
-    if lhs.response != rhs.response {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Cakeagent_MountReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".MountReply"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "mounts"),
-    2: .same(proto: "error"),
-    3: .same(proto: "success"),
-  ]
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.mounts) }()
-      case 2: try {
-        var v: String?
-        try decoder.decodeSingularStringField(value: &v)
-        if let v = v {
-          if self.response != nil {try decoder.handleConflictingOneOf()}
-          self.response = .error(v)
-        }
-      }()
-      case 3: try {
-        var v: Bool?
-        try decoder.decodeSingularBoolField(value: &v)
-        if let v = v {
-          if self.response != nil {try decoder.handleConflictingOneOf()}
-          self.response = .success(v)
-        }
-      }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.mounts.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.mounts, fieldNumber: 1)
-    }
-    switch self.response {
-    case .error?: try {
-      guard case .error(let v)? = self.response else { preconditionFailure() }
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    }()
-    case .success?: try {
-      guard case .success(let v)? = self.response else { preconditionFailure() }
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
-    }()
-    case nil: break
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Cakeagent_MountReply, rhs: Cakeagent_MountReply) -> Bool {
-    if lhs.mounts != rhs.mounts {return false}
     if lhs.response != rhs.response {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

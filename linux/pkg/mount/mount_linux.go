@@ -44,8 +44,8 @@ func mountEndpoint(name, target string, uid, gid int32, readonly, early bool) (e
 	return
 }
 
-func mount(_ context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
-	mounts := make([]*cakeagent.MountVirtioFSReply, 0, len(request.Mounts))
+func mount(_ context.Context, request *cakeagent.CakeAgent_MountRequest) (*cakeagent.CakeAgent_MountReply, error) {
+	mounts := make([]*cakeagent.CakeAgent_MountReply_MountVirtioFSReply, 0, len(request.Mounts))
 
 	for _, m := range request.Mounts {
 		// mount virtiofs
@@ -53,38 +53,38 @@ func mount(_ context.Context, request *cakeagent.MountRequest) (*cakeagent.Mount
 			// if mount failed, remove target directory
 			utils.Shell("rm", "-rf", m.Target)
 
-			mounts = append(mounts, &cakeagent.MountVirtioFSReply{
+			mounts = append(mounts, &cakeagent.CakeAgent_MountReply_MountVirtioFSReply{
 				Name: m.Name,
-				Response: &cakeagent.MountVirtioFSReply_Error{
+				Response: &cakeagent.CakeAgent_MountReply_MountVirtioFSReply_Error{
 					Error: err.Error(),
 				},
 			})
 		} else {
 			// update mounts
-			mounts = append(mounts, &cakeagent.MountVirtioFSReply{
+			mounts = append(mounts, &cakeagent.CakeAgent_MountReply_MountVirtioFSReply{
 				Name: m.Name,
-				Response: &cakeagent.MountVirtioFSReply_Success{
+				Response: &cakeagent.CakeAgent_MountReply_MountVirtioFSReply_Success{
 					Success: true,
 				},
 			})
 		}
 	}
 
-	return &cakeagent.MountReply{
-		Response: &cakeagent.MountReply_Success{
+	return &cakeagent.CakeAgent_MountReply{
+		Response: &cakeagent.CakeAgent_MountReply_Success{
 			Success: true,
 		},
 	}, nil
 }
 
-func umount(_ context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
-	mounts := make([]*cakeagent.MountVirtioFSReply, 0, len(request.Mounts))
+func umount(_ context.Context, request *cakeagent.CakeAgent_MountRequest) (*cakeagent.CakeAgent_MountReply, error) {
+	mounts := make([]*cakeagent.CakeAgent_MountReply_MountVirtioFSReply, 0, len(request.Mounts))
 
 	for _, m := range request.Mounts {
 		if _, _, err := utils.Shell("umount", "-t", "virtiofs", m.Name); err != nil {
-			mounts = append(mounts, &cakeagent.MountVirtioFSReply{
+			mounts = append(mounts, &cakeagent.CakeAgent_MountReply_MountVirtioFSReply{
 				Name: m.Name,
-				Response: &cakeagent.MountVirtioFSReply_Error{
+				Response: &cakeagent.CakeAgent_MountReply_MountVirtioFSReply_Error{
 					Error: err.Error(),
 				},
 			})
@@ -94,18 +94,18 @@ func umount(_ context.Context, request *cakeagent.MountRequest) (*cakeagent.Moun
 
 			// remove from /etc/fstab
 			utils.Shell("sed", "-i", fmt.Sprintf("/%s/d", m.Name), "/etc/fstab")
-			mounts = append(mounts, &cakeagent.MountVirtioFSReply{
+			mounts = append(mounts, &cakeagent.CakeAgent_MountReply_MountVirtioFSReply{
 				Name: m.Name,
-				Response: &cakeagent.MountVirtioFSReply_Success{
+				Response: &cakeagent.CakeAgent_MountReply_MountVirtioFSReply_Success{
 					Success: true,
 				},
 			})
 		}
 	}
 
-	return &cakeagent.MountReply{
+	return &cakeagent.CakeAgent_MountReply{
 		Mounts: mounts,
-		Response: &cakeagent.MountReply_Success{
+		Response: &cakeagent.CakeAgent_MountReply_Success{
 			Success: true,
 		},
 	}, nil

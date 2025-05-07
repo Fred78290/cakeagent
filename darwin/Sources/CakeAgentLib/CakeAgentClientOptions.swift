@@ -5,8 +5,11 @@ import NIO
 import NIOPosix
 import NIOSSL
 
-public typealias CakeAgentClient = Cakeagent_AgentNIOClient
-public typealias CakeAgentInterceptor = Cakeagent_AgentClientInterceptorFactoryProtocol
+public typealias CakeAgent = Cakeagent_CakeAgent
+public typealias CakeAgentClient = Cakeagent_CakeAgentServiceNIOClient
+public typealias CakeAgentServiceClientInterceptorFactoryProtocol = Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol
+public typealias CakeAgentServiceClientMetadata = Cakeagent_CakeAgentServiceClientMetadata
+
 public struct CakeAgentClientOptions: ParsableArguments {
 
 	@Option(help: "Connection timeout in seconds")
@@ -84,7 +87,7 @@ public struct CakeAgentClientOptions: ParsableArguments {
 		}
 	}
 
-	public func createClient(on: EventLoopGroup, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentInterceptor? = nil) throws -> CakeAgentClient {
+	public func createClient(on: EventLoopGroup, retries: ConnectionBackoff.Retries = .unlimited, interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws -> CakeAgentClient {
 		return try CakeAgentHelper.createClient(on: on,
 		                                        listeningAddress: URL(string: self.address!)!,
 		                                        connectionTimeout: self.timeout,

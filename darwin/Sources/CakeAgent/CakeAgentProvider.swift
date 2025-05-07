@@ -11,6 +11,9 @@ import Synchronization
 
 let cakerSignature = "com.aldunelabs.cakeagent"
 
+public typealias CakeAgent = Cakeagent_CakeAgent
+public typealias CakeAgentServiceAsyncProvider = Cakeagent_CakeAgentServiceAsyncProvider
+
 class ServiceError : Error, CustomStringConvertible, @unchecked Sendable {
 	let description: String
 	let exitCode: Int32
@@ -54,7 +57,7 @@ extension String {
 		return self
 	}
 }
-extension Cakeagent_ExecuteRequest {
+extension CakeAgent.ExecuteRequest {
 	var isCommand: Bool {
 		guard case .command = self.request else {
 			return false
@@ -72,7 +75,7 @@ extension Cakeagent_ExecuteRequest {
 	}
 }
 
-final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
+final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 	let group: EventLoopGroup
 	let logger: Logger = Logger("CakeAgentProvider")
 
@@ -80,24 +83,24 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		self.group = group
 	}
 
-	func resizeDisk(request: Google_Protobuf_Empty, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_ResizeReply {
+	func resizeDisk(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.ResizeReply {
 		do {
 			try ResizeHandler.resizeDisk()
 
-			return Cakeagent_ResizeReply.with {
+			return CakeAgent.ResizeReply.with {
 				$0.success = true
 			}
 		} catch {
-			return Cakeagent_ResizeReply.with {
+			return CakeAgent.ResizeReply.with {
 				$0.failure = error.localizedDescription
 			}
 		}
 	}
 
-	func info(request: Google_Protobuf_Empty, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_InfoReply {
+	func info(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.InfoReply {
 		let processInfo = ProcessInfo.processInfo
-		var reply = Cakeagent_InfoReply()
-		var memory = Cakeagent_InfoReply.MemoryInfo()
+		var reply = CakeAgent.InfoReply()
+		var memory = CakeAgent.InfoReply.MemoryInfo()
 		var size: size_t = 0
 		var memSize: UInt64 = 0
 		var freeMemory: UInt64 = 0
@@ -116,7 +119,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 				let volumeName = resourceValues.volumeName {
 
 				if volumeIsBrowsable {
-					return Cakeagent_InfoReply.DiskInfo.with {
+					return CakeAgent.InfoReply.DiskInfo.with {
 						if volumeIsRootFileSystem {
 							$0.mount = "/"
 						} else {
@@ -193,7 +196,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		return reply
 	}
 
-	func shutdown(request: Google_Protobuf_Empty, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_RunReply {
+	func shutdown(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.RunReply {
 		let process = Process()
 		let arguments: [String] = ["shutdown", "-h", "+1s"]
 
@@ -213,7 +216,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		} catch {
 			logger.error("Failed to run shutdown command: \(error)")
 
-			return Cakeagent_RunReply.with { reply in
+			return CakeAgent.RunReply.with { reply in
 				reply.stderr = error.localizedDescription.data(using: .utf8) ?? Data()
 				reply.stdout = Data()
 				if process.isRunning == false {
@@ -224,7 +227,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 	}
 
 
-	func run(request: Cakeagent_RunCommand, context: GRPCAsyncServerCallContext) async throws -> Cakeagent_RunReply {
+	func run(request: CakeAgent.RunCommand, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.RunReply {
 		let process = Process()
 		let outputPipe = Pipe()
 		let errorPipe = Pipe()
@@ -282,7 +285,7 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 
 		process.waitUntilExit()
 
-		return Cakeagent_RunReply.with { reply in
+		return CakeAgent.RunReply.with { reply in
 			if outputData.isEmpty == false {
 				reply.stdout = outputData
 			}
@@ -295,16 +298,16 @@ final class CakeAgentProvider: Sendable, Cakeagent_AgentAsyncProvider {
 		}
 	}
 
-	func execute(requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream, context: GRPCAsyncServerCallContext) async throws {
+	func execute(requestStream: CakeAgentExecuteRequestStream, responseStream: CakeAgentExecuteResponseStream, context: GRPCAsyncServerCallContext) async throws {
 		try await ExecuteHandleStream(on: self.group.next(), requestStream: requestStream, responseStream: responseStream).stream()
 	}
 
-	func mount(request: Cakeagent_MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {
-		Cakeagent_MountReply.with { $0.error = "Not supported" }
+	func mount(request: CakeAgent.MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
+		CakeAgent.MountReply.with { $0.error = "Not supported" }
 	}
 
-	func umount(request: Cakeagent_MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> Cakeagent_MountReply {
-		Cakeagent_MountReply.with { $0.error = "Not supported" }
+	func umount(request: CakeAgent.MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
+		CakeAgent.MountReply.with { $0.error = "Not supported" }
 	}
 
 }	

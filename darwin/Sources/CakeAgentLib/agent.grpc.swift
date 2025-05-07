@@ -11,50 +11,50 @@ import NIOConcurrencyHelpers
 import SwiftProtobuf
 
 
-/// Usage: instantiate `Cakeagent_AgentClient`, then call methods of this protocol to make API calls.
-public protocol Cakeagent_AgentClientProtocol: GRPCClient {
+/// Usage: instantiate `Cakeagent_CakeAgentServiceClient`, then call methods of this protocol to make API calls.
+public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
   var serviceName: String { get }
-  var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { get }
+  var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? { get }
 
   func resizeDisk(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
-  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>
+  ) -> UnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply>
 
   func info(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
-  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
+  ) -> UnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.InfoReply>
 
   func shutdown(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
-  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>
+  ) -> UnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.RunReply>
 
   func run(
-    _ request: Cakeagent_RunCommand,
+    _ request: Cakeagent_CakeAgent.RunCommand,
     callOptions: CallOptions?
-  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply>
+  ) -> UnaryCall<Cakeagent_CakeAgent.RunCommand, Cakeagent_CakeAgent.RunReply>
 
   func execute(
     callOptions: CallOptions?,
-    handler: @escaping (Cakeagent_ExecuteResponse) -> Void
-  ) -> BidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>
+    handler: @escaping (Cakeagent_CakeAgent.ExecuteResponse) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_CakeAgent.ExecuteRequest, Cakeagent_CakeAgent.ExecuteResponse>
 
   func mount(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions?
-  ) -> UnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply>
+  ) -> UnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>
 
   func umount(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions?
-  ) -> UnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply>
+  ) -> UnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>
 }
 
-extension Cakeagent_AgentClientProtocol {
+extension Cakeagent_CakeAgentServiceClientProtocol {
   public var serviceName: String {
-    return "cakeagent.Agent"
+    return "cakeagent.CakeAgentService"
   }
 
   /// Unary call to ResizeDisk
@@ -64,11 +64,11 @@ extension Cakeagent_AgentClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func resizeDisk(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply> {
+  ) -> UnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply> {
     return self.makeUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.resizeDisk.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.resizeDisk.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? []
@@ -82,11 +82,11 @@ extension Cakeagent_AgentClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func info(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply> {
+  ) -> UnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.InfoReply> {
     return self.makeUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.info.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.info.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
@@ -100,11 +100,11 @@ extension Cakeagent_AgentClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func shutdown(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply> {
+  ) -> UnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.RunReply> {
     return self.makeUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.shutdown.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.shutdown.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeShutdownInterceptors() ?? []
@@ -118,11 +118,11 @@ extension Cakeagent_AgentClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func run(
-    _ request: Cakeagent_RunCommand,
+    _ request: Cakeagent_CakeAgent.RunCommand,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply> {
+  ) -> UnaryCall<Cakeagent_CakeAgent.RunCommand, Cakeagent_CakeAgent.RunReply> {
     return self.makeUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.run.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.run.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeRunInterceptors() ?? []
@@ -140,10 +140,10 @@ extension Cakeagent_AgentClientProtocol {
   /// - Returns: A `ClientStreamingCall` with futures for the metadata and status.
   public func execute(
     callOptions: CallOptions? = nil,
-    handler: @escaping (Cakeagent_ExecuteResponse) -> Void
-  ) -> BidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse> {
+    handler: @escaping (Cakeagent_CakeAgent.ExecuteResponse) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_CakeAgent.ExecuteRequest, Cakeagent_CakeAgent.ExecuteResponse> {
     return self.makeBidirectionalStreamingCall(
-      path: Cakeagent_AgentClientMetadata.Methods.execute.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.execute.path,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeExecuteInterceptors() ?? [],
       handler: handler
@@ -157,11 +157,11 @@ extension Cakeagent_AgentClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func mount(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply> {
+  ) -> UnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply> {
     return self.makeUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.mount.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.mount.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeMountInterceptors() ?? []
@@ -175,11 +175,11 @@ extension Cakeagent_AgentClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func umount(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply> {
+  ) -> UnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply> {
     return self.makeUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.umount.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.umount.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeUmountInterceptors() ?? []
@@ -188,24 +188,24 @@ extension Cakeagent_AgentClientProtocol {
 }
 
 @available(*, deprecated)
-extension Cakeagent_AgentClient: @unchecked Sendable {}
+extension Cakeagent_CakeAgentServiceClient: @unchecked Sendable {}
 
-@available(*, deprecated, renamed: "Cakeagent_AgentNIOClient")
-public final class Cakeagent_AgentClient: Cakeagent_AgentClientProtocol {
+@available(*, deprecated, renamed: "Cakeagent_CakeAgentServiceNIOClient")
+public final class Cakeagent_CakeAgentServiceClient: Cakeagent_CakeAgentServiceClientProtocol {
   private let lock = Lock()
   private var _defaultCallOptions: CallOptions
-  private var _interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol?
+  private var _interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol?
   public let channel: GRPCChannel
   public var defaultCallOptions: CallOptions {
     get { self.lock.withLock { return self._defaultCallOptions } }
     set { self.lock.withLockVoid { self._defaultCallOptions = newValue } }
   }
-  public var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
+  public var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? {
     get { self.lock.withLock { return self._interceptors } }
     set { self.lock.withLockVoid { self._interceptors = newValue } }
   }
 
-  /// Creates a client for the cakeagent.Agent service.
+  /// Creates a client for the cakeagent.CakeAgentService service.
   ///
   /// - Parameters:
   ///   - channel: `GRPCChannel` to the service host.
@@ -214,7 +214,7 @@ public final class Cakeagent_AgentClient: Cakeagent_AgentClientProtocol {
   public init(
     channel: GRPCChannel,
     defaultCallOptions: CallOptions = CallOptions(),
-    interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? = nil
+    interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? = nil
   ) {
     self.channel = channel
     self._defaultCallOptions = defaultCallOptions
@@ -222,12 +222,12 @@ public final class Cakeagent_AgentClient: Cakeagent_AgentClientProtocol {
   }
 }
 
-public struct Cakeagent_AgentNIOClient: Cakeagent_AgentClientProtocol {
+public struct Cakeagent_CakeAgentServiceNIOClient: Cakeagent_CakeAgentServiceClientProtocol {
   public var channel: GRPCChannel
   public var defaultCallOptions: CallOptions
-  public var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol?
+  public var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol?
 
-  /// Creates a client for the cakeagent.Agent service.
+  /// Creates a client for the cakeagent.CakeAgentService service.
   ///
   /// - Parameters:
   ///   - channel: `GRPCChannel` to the service host.
@@ -236,7 +236,7 @@ public struct Cakeagent_AgentNIOClient: Cakeagent_AgentClientProtocol {
   public init(
     channel: GRPCChannel,
     defaultCallOptions: CallOptions = CallOptions(),
-    interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? = nil
+    interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? = nil
   ) {
     self.channel = channel
     self.defaultCallOptions = defaultCallOptions
@@ -245,61 +245,61 @@ public struct Cakeagent_AgentNIOClient: Cakeagent_AgentClientProtocol {
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-public protocol Cakeagent_AgentAsyncClientProtocol: GRPCClient {
+public protocol Cakeagent_CakeAgentServiceAsyncClientProtocol: GRPCClient {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
-  var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { get }
+  var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? { get }
 
   func makeResizeDiskCall(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply>
 
   func makeInfoCall(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.InfoReply>
 
   func makeShutdownCall(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.RunReply>
 
   func makeRunCall(
-    _ request: Cakeagent_RunCommand,
+    _ request: Cakeagent_CakeAgent.RunCommand,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.RunCommand, Cakeagent_CakeAgent.RunReply>
 
   func makeExecuteCall(
     callOptions: CallOptions?
-  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_CakeAgent.ExecuteRequest, Cakeagent_CakeAgent.ExecuteResponse>
 
   func makeMountCall(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>
 
   func makeUmountCall(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply>
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-extension Cakeagent_AgentAsyncClientProtocol {
+extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
   public static var serviceDescriptor: GRPCServiceDescriptor {
-    return Cakeagent_AgentClientMetadata.serviceDescriptor
+    return Cakeagent_CakeAgentServiceClientMetadata.serviceDescriptor
   }
 
-  public var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
+  public var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? {
     return nil
   }
 
   public func makeResizeDiskCall(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply> {
     return self.makeAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.resizeDisk.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.resizeDisk.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? []
@@ -307,11 +307,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func makeInfoCall(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.InfoReply> {
     return self.makeAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.info.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.info.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
@@ -319,11 +319,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func makeShutdownCall(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.RunReply> {
     return self.makeAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.shutdown.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.shutdown.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeShutdownInterceptors() ?? []
@@ -331,11 +331,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func makeRunCall(
-    _ request: Cakeagent_RunCommand,
+    _ request: Cakeagent_CakeAgent.RunCommand,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Cakeagent_RunCommand, Cakeagent_RunReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.RunCommand, Cakeagent_CakeAgent.RunReply> {
     return self.makeAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.run.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.run.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeRunInterceptors() ?? []
@@ -344,20 +344,20 @@ extension Cakeagent_AgentAsyncClientProtocol {
 
   public func makeExecuteCall(
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse> {
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_CakeAgent.ExecuteRequest, Cakeagent_CakeAgent.ExecuteResponse> {
     return self.makeAsyncBidirectionalStreamingCall(
-      path: Cakeagent_AgentClientMetadata.Methods.execute.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.execute.path,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
     )
   }
 
   public func makeMountCall(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply> {
     return self.makeAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.mount.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.mount.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeMountInterceptors() ?? []
@@ -365,11 +365,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func makeUmountCall(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Cakeagent_MountRequest, Cakeagent_MountReply> {
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply> {
     return self.makeAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.umount.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.umount.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeUmountInterceptors() ?? []
@@ -378,13 +378,13 @@ extension Cakeagent_AgentAsyncClientProtocol {
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-extension Cakeagent_AgentAsyncClientProtocol {
+extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
   public func resizeDisk(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_ResizeReply {
+  ) async throws -> Cakeagent_CakeAgent.ResizeReply {
     return try await self.performAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.resizeDisk.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.resizeDisk.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? []
@@ -392,11 +392,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func info(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_InfoReply {
+  ) async throws -> Cakeagent_CakeAgent.InfoReply {
     return try await self.performAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.info.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.info.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeInfoInterceptors() ?? []
@@ -404,11 +404,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func shutdown(
-    _ request: SwiftProtobuf.Google_Protobuf_Empty,
+    _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_RunReply {
+  ) async throws -> Cakeagent_CakeAgent.RunReply {
     return try await self.performAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.shutdown.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.shutdown.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeShutdownInterceptors() ?? []
@@ -416,11 +416,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func run(
-    _ request: Cakeagent_RunCommand,
+    _ request: Cakeagent_CakeAgent.RunCommand,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_RunReply {
+  ) async throws -> Cakeagent_CakeAgent.RunReply {
     return try await self.performAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.run.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.run.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeRunInterceptors() ?? []
@@ -430,9 +430,9 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func execute<RequestStream>(
     _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Cakeagent_ExecuteResponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_ExecuteRequest {
+  ) -> GRPCAsyncResponseStream<Cakeagent_CakeAgent.ExecuteResponse> where RequestStream: Sequence, RequestStream.Element == Cakeagent_CakeAgent.ExecuteRequest {
     return self.performAsyncBidirectionalStreamingCall(
-      path: Cakeagent_AgentClientMetadata.Methods.execute.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.execute.path,
       requests: requests,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
@@ -442,9 +442,9 @@ extension Cakeagent_AgentAsyncClientProtocol {
   public func execute<RequestStream>(
     _ requests: RequestStream,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Cakeagent_ExecuteResponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_ExecuteRequest {
+  ) -> GRPCAsyncResponseStream<Cakeagent_CakeAgent.ExecuteResponse> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_CakeAgent.ExecuteRequest {
     return self.performAsyncBidirectionalStreamingCall(
-      path: Cakeagent_AgentClientMetadata.Methods.execute.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.execute.path,
       requests: requests,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeExecuteInterceptors() ?? []
@@ -452,11 +452,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func mount(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_MountReply {
+  ) async throws -> Cakeagent_CakeAgent.MountReply {
     return try await self.performAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.mount.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.mount.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeMountInterceptors() ?? []
@@ -464,11 +464,11 @@ extension Cakeagent_AgentAsyncClientProtocol {
   }
 
   public func umount(
-    _ request: Cakeagent_MountRequest,
+    _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions? = nil
-  ) async throws -> Cakeagent_MountReply {
+  ) async throws -> Cakeagent_CakeAgent.MountReply {
     return try await self.performAsyncUnaryCall(
-      path: Cakeagent_AgentClientMetadata.Methods.umount.path,
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.umount.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeUmountInterceptors() ?? []
@@ -477,15 +477,15 @@ extension Cakeagent_AgentAsyncClientProtocol {
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-public struct Cakeagent_AgentAsyncClient: Cakeagent_AgentAsyncClientProtocol {
+public struct Cakeagent_CakeAgentServiceAsyncClient: Cakeagent_CakeAgentServiceAsyncClientProtocol {
   public var channel: GRPCChannel
   public var defaultCallOptions: CallOptions
-  public var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol?
+  public var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol?
 
   public init(
     channel: GRPCChannel,
     defaultCallOptions: CallOptions = CallOptions(),
-    interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? = nil
+    interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? = nil
   ) {
     self.channel = channel
     self.defaultCallOptions = defaultCallOptions
@@ -493,112 +493,112 @@ public struct Cakeagent_AgentAsyncClient: Cakeagent_AgentAsyncClientProtocol {
   }
 }
 
-public protocol Cakeagent_AgentClientInterceptorFactoryProtocol: Sendable {
+public protocol Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when invoking 'resizeDisk'.
-  func makeResizeDiskInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>]
+  func makeResizeDiskInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply>]
 
   /// - Returns: Interceptors to use when invoking 'info'.
-  func makeInfoInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
+  func makeInfoInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.InfoReply>]
 
   /// - Returns: Interceptors to use when invoking 'shutdown'.
-  func makeShutdownInterceptors() -> [ClientInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>]
+  func makeShutdownInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.RunReply>]
 
   /// - Returns: Interceptors to use when invoking 'run'.
-  func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>]
+  func makeRunInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.RunCommand, Cakeagent_CakeAgent.RunReply>]
 
   /// - Returns: Interceptors to use when invoking 'execute'.
-  func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>]
+  func makeExecuteInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.ExecuteRequest, Cakeagent_CakeAgent.ExecuteResponse>]
 
   /// - Returns: Interceptors to use when invoking 'mount'.
-  func makeMountInterceptors() -> [ClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
+  func makeMountInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>]
 
   /// - Returns: Interceptors to use when invoking 'umount'.
-  func makeUmountInterceptors() -> [ClientInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
+  func makeUmountInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>]
 }
 
-public enum Cakeagent_AgentClientMetadata {
+public enum Cakeagent_CakeAgentServiceClientMetadata {
   public static let serviceDescriptor = GRPCServiceDescriptor(
-    name: "Agent",
-    fullName: "cakeagent.Agent",
+    name: "CakeAgentService",
+    fullName: "cakeagent.CakeAgentService",
     methods: [
-      Cakeagent_AgentClientMetadata.Methods.resizeDisk,
-      Cakeagent_AgentClientMetadata.Methods.info,
-      Cakeagent_AgentClientMetadata.Methods.shutdown,
-      Cakeagent_AgentClientMetadata.Methods.run,
-      Cakeagent_AgentClientMetadata.Methods.execute,
-      Cakeagent_AgentClientMetadata.Methods.mount,
-      Cakeagent_AgentClientMetadata.Methods.umount,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.resizeDisk,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.info,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.shutdown,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.run,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.execute,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.mount,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.umount,
     ]
   )
 
   public enum Methods {
     public static let resizeDisk = GRPCMethodDescriptor(
       name: "ResizeDisk",
-      path: "/cakeagent.Agent/ResizeDisk",
+      path: "/cakeagent.CakeAgentService/ResizeDisk",
       type: GRPCCallType.unary
     )
 
     public static let info = GRPCMethodDescriptor(
       name: "Info",
-      path: "/cakeagent.Agent/Info",
+      path: "/cakeagent.CakeAgentService/Info",
       type: GRPCCallType.unary
     )
 
     public static let shutdown = GRPCMethodDescriptor(
       name: "Shutdown",
-      path: "/cakeagent.Agent/Shutdown",
+      path: "/cakeagent.CakeAgentService/Shutdown",
       type: GRPCCallType.unary
     )
 
     public static let run = GRPCMethodDescriptor(
       name: "Run",
-      path: "/cakeagent.Agent/Run",
+      path: "/cakeagent.CakeAgentService/Run",
       type: GRPCCallType.unary
     )
 
     public static let execute = GRPCMethodDescriptor(
       name: "Execute",
-      path: "/cakeagent.Agent/Execute",
+      path: "/cakeagent.CakeAgentService/Execute",
       type: GRPCCallType.bidirectionalStreaming
     )
 
     public static let mount = GRPCMethodDescriptor(
       name: "Mount",
-      path: "/cakeagent.Agent/Mount",
+      path: "/cakeagent.CakeAgentService/Mount",
       type: GRPCCallType.unary
     )
 
     public static let umount = GRPCMethodDescriptor(
       name: "Umount",
-      path: "/cakeagent.Agent/Umount",
+      path: "/cakeagent.CakeAgentService/Umount",
       type: GRPCCallType.unary
     )
   }
 }
 
 /// To build a server, implement a class that conforms to this protocol.
-public protocol Cakeagent_AgentProvider: CallHandlerProvider {
-  var interceptors: Cakeagent_AgentServerInterceptorFactoryProtocol? { get }
+public protocol Cakeagent_CakeAgentServiceProvider: CallHandlerProvider {
+  var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? { get }
 
-  func resizeDisk(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_ResizeReply>
+  func resizeDisk(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.ResizeReply>
 
-  func info(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_InfoReply>
+  func info(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.InfoReply>
 
-  func shutdown(request: SwiftProtobuf.Google_Protobuf_Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_RunReply>
+  func shutdown(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.RunReply>
 
-  func run(request: Cakeagent_RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_RunReply>
+  func run(request: Cakeagent_CakeAgent.RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.RunReply>
 
-  func execute(context: StreamingResponseCallContext<Cakeagent_ExecuteResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_ExecuteRequest>) -> Void>
+  func execute(context: StreamingResponseCallContext<Cakeagent_CakeAgent.ExecuteResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_CakeAgent.ExecuteRequest>) -> Void>
 
-  func mount(request: Cakeagent_MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_MountReply>
+  func mount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
 
-  func umount(request: Cakeagent_MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_MountReply>
+  func umount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
 }
 
-extension Cakeagent_AgentProvider {
+extension Cakeagent_CakeAgentServiceProvider {
   public var serviceName: Substring {
-    return Cakeagent_AgentServerMetadata.serviceDescriptor.fullName[...]
+    return Cakeagent_CakeAgentServiceServerMetadata.serviceDescriptor.fullName[...]
   }
 
   /// Determines, calls and returns the appropriate request handler, depending on the request's method.
@@ -611,8 +611,8 @@ extension Cakeagent_AgentProvider {
     case "ResizeDisk":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ResizeReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.ResizeReply>(),
         interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? [],
         userFunction: self.resizeDisk(request:context:)
       )
@@ -620,8 +620,8 @@ extension Cakeagent_AgentProvider {
     case "Info":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_InfoReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.InfoReply>(),
         interceptors: self.interceptors?.makeInfoInterceptors() ?? [],
         userFunction: self.info(request:context:)
       )
@@ -629,8 +629,8 @@ extension Cakeagent_AgentProvider {
     case "Shutdown":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.RunReply>(),
         interceptors: self.interceptors?.makeShutdownInterceptors() ?? [],
         userFunction: self.shutdown(request:context:)
       )
@@ -638,8 +638,8 @@ extension Cakeagent_AgentProvider {
     case "Run":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_RunCommand>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.RunCommand>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.RunReply>(),
         interceptors: self.interceptors?.makeRunInterceptors() ?? [],
         userFunction: self.run(request:context:)
       )
@@ -647,8 +647,8 @@ extension Cakeagent_AgentProvider {
     case "Execute":
       return BidirectionalStreamingServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_ExecuteRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteResponse>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.ExecuteRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.ExecuteResponse>(),
         interceptors: self.interceptors?.makeExecuteInterceptors() ?? [],
         observerFactory: self.execute(context:)
       )
@@ -656,8 +656,8 @@ extension Cakeagent_AgentProvider {
     case "Mount":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_MountRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.MountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.MountReply>(),
         interceptors: self.interceptors?.makeMountInterceptors() ?? [],
         userFunction: self.mount(request:context:)
       )
@@ -665,8 +665,8 @@ extension Cakeagent_AgentProvider {
     case "Umount":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_MountRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.MountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.MountReply>(),
         interceptors: self.interceptors?.makeUmountInterceptors() ?? [],
         userFunction: self.umount(request:context:)
       )
@@ -679,58 +679,58 @@ extension Cakeagent_AgentProvider {
 
 /// To implement a server, implement an object which conforms to this protocol.
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-public protocol Cakeagent_AgentAsyncProvider: CallHandlerProvider, Sendable {
+public protocol Cakeagent_CakeAgentServiceAsyncProvider: CallHandlerProvider, Sendable {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
-  var interceptors: Cakeagent_AgentServerInterceptorFactoryProtocol? { get }
+  var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? { get }
 
   func resizeDisk(
-    request: SwiftProtobuf.Google_Protobuf_Empty,
+    request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_ResizeReply
+  ) async throws -> Cakeagent_CakeAgent.ResizeReply
 
   func info(
-    request: SwiftProtobuf.Google_Protobuf_Empty,
+    request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_InfoReply
+  ) async throws -> Cakeagent_CakeAgent.InfoReply
 
   func shutdown(
-    request: SwiftProtobuf.Google_Protobuf_Empty,
+    request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_RunReply
+  ) async throws -> Cakeagent_CakeAgent.RunReply
 
   func run(
-    request: Cakeagent_RunCommand,
+    request: Cakeagent_CakeAgent.RunCommand,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_RunReply
+  ) async throws -> Cakeagent_CakeAgent.RunReply
 
   func execute(
-    requestStream: GRPCAsyncRequestStream<Cakeagent_ExecuteRequest>,
-    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_ExecuteResponse>,
+    requestStream: GRPCAsyncRequestStream<Cakeagent_CakeAgent.ExecuteRequest>,
+    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.ExecuteResponse>,
     context: GRPCAsyncServerCallContext
   ) async throws
 
   func mount(
-    request: Cakeagent_MountRequest,
+    request: Cakeagent_CakeAgent.MountRequest,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_MountReply
+  ) async throws -> Cakeagent_CakeAgent.MountReply
 
   func umount(
-    request: Cakeagent_MountRequest,
+    request: Cakeagent_CakeAgent.MountRequest,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Cakeagent_MountReply
+  ) async throws -> Cakeagent_CakeAgent.MountReply
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-extension Cakeagent_AgentAsyncProvider {
+extension Cakeagent_CakeAgentServiceAsyncProvider {
   public static var serviceDescriptor: GRPCServiceDescriptor {
-    return Cakeagent_AgentServerMetadata.serviceDescriptor
+    return Cakeagent_CakeAgentServiceServerMetadata.serviceDescriptor
   }
 
   public var serviceName: Substring {
-    return Cakeagent_AgentServerMetadata.serviceDescriptor.fullName[...]
+    return Cakeagent_CakeAgentServiceServerMetadata.serviceDescriptor.fullName[...]
   }
 
-  public var interceptors: Cakeagent_AgentServerInterceptorFactoryProtocol? {
+  public var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? {
     return nil
   }
 
@@ -742,8 +742,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "ResizeDisk":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ResizeReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.ResizeReply>(),
         interceptors: self.interceptors?.makeResizeDiskInterceptors() ?? [],
         wrapping: { try await self.resizeDisk(request: $0, context: $1) }
       )
@@ -751,8 +751,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "Info":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_InfoReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.InfoReply>(),
         interceptors: self.interceptors?.makeInfoInterceptors() ?? [],
         wrapping: { try await self.info(request: $0, context: $1) }
       )
@@ -760,8 +760,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "Shutdown":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.RunReply>(),
         interceptors: self.interceptors?.makeShutdownInterceptors() ?? [],
         wrapping: { try await self.shutdown(request: $0, context: $1) }
       )
@@ -769,8 +769,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "Run":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_RunCommand>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_RunReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.RunCommand>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.RunReply>(),
         interceptors: self.interceptors?.makeRunInterceptors() ?? [],
         wrapping: { try await self.run(request: $0, context: $1) }
       )
@@ -778,8 +778,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "Execute":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_ExecuteRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_ExecuteResponse>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.ExecuteRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.ExecuteResponse>(),
         interceptors: self.interceptors?.makeExecuteInterceptors() ?? [],
         wrapping: { try await self.execute(requestStream: $0, responseStream: $1, context: $2) }
       )
@@ -787,8 +787,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "Mount":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_MountRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.MountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.MountReply>(),
         interceptors: self.interceptors?.makeMountInterceptors() ?? [],
         wrapping: { try await self.mount(request: $0, context: $1) }
       )
@@ -796,8 +796,8 @@ extension Cakeagent_AgentAsyncProvider {
     case "Umount":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Cakeagent_MountRequest>(),
-        responseSerializer: ProtobufSerializer<Cakeagent_MountReply>(),
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.MountRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.MountReply>(),
         interceptors: self.interceptors?.makeUmountInterceptors() ?? [],
         wrapping: { try await self.umount(request: $0, context: $1) }
       )
@@ -808,92 +808,92 @@ extension Cakeagent_AgentAsyncProvider {
   }
 }
 
-public protocol Cakeagent_AgentServerInterceptorFactoryProtocol: Sendable {
+public protocol Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when handling 'resizeDisk'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeResizeDiskInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_ResizeReply>]
+  func makeResizeDiskInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply>]
 
   /// - Returns: Interceptors to use when handling 'info'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeInfoInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_InfoReply>]
+  func makeInfoInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.InfoReply>]
 
   /// - Returns: Interceptors to use when handling 'shutdown'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeShutdownInterceptors() -> [ServerInterceptor<SwiftProtobuf.Google_Protobuf_Empty, Cakeagent_RunReply>]
+  func makeShutdownInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.RunReply>]
 
   /// - Returns: Interceptors to use when handling 'run'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeRunInterceptors() -> [ServerInterceptor<Cakeagent_RunCommand, Cakeagent_RunReply>]
+  func makeRunInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.RunCommand, Cakeagent_CakeAgent.RunReply>]
 
   /// - Returns: Interceptors to use when handling 'execute'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeExecuteInterceptors() -> [ServerInterceptor<Cakeagent_ExecuteRequest, Cakeagent_ExecuteResponse>]
+  func makeExecuteInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.ExecuteRequest, Cakeagent_CakeAgent.ExecuteResponse>]
 
   /// - Returns: Interceptors to use when handling 'mount'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeMountInterceptors() -> [ServerInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
+  func makeMountInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>]
 
   /// - Returns: Interceptors to use when handling 'umount'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makeUmountInterceptors() -> [ServerInterceptor<Cakeagent_MountRequest, Cakeagent_MountReply>]
+  func makeUmountInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>]
 }
 
-public enum Cakeagent_AgentServerMetadata {
+public enum Cakeagent_CakeAgentServiceServerMetadata {
   public static let serviceDescriptor = GRPCServiceDescriptor(
-    name: "Agent",
-    fullName: "cakeagent.Agent",
+    name: "CakeAgentService",
+    fullName: "cakeagent.CakeAgentService",
     methods: [
-      Cakeagent_AgentServerMetadata.Methods.resizeDisk,
-      Cakeagent_AgentServerMetadata.Methods.info,
-      Cakeagent_AgentServerMetadata.Methods.shutdown,
-      Cakeagent_AgentServerMetadata.Methods.run,
-      Cakeagent_AgentServerMetadata.Methods.execute,
-      Cakeagent_AgentServerMetadata.Methods.mount,
-      Cakeagent_AgentServerMetadata.Methods.umount,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.resizeDisk,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.info,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.shutdown,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.run,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.execute,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.mount,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.umount,
     ]
   )
 
   public enum Methods {
     public static let resizeDisk = GRPCMethodDescriptor(
       name: "ResizeDisk",
-      path: "/cakeagent.Agent/ResizeDisk",
+      path: "/cakeagent.CakeAgentService/ResizeDisk",
       type: GRPCCallType.unary
     )
 
     public static let info = GRPCMethodDescriptor(
       name: "Info",
-      path: "/cakeagent.Agent/Info",
+      path: "/cakeagent.CakeAgentService/Info",
       type: GRPCCallType.unary
     )
 
     public static let shutdown = GRPCMethodDescriptor(
       name: "Shutdown",
-      path: "/cakeagent.Agent/Shutdown",
+      path: "/cakeagent.CakeAgentService/Shutdown",
       type: GRPCCallType.unary
     )
 
     public static let run = GRPCMethodDescriptor(
       name: "Run",
-      path: "/cakeagent.Agent/Run",
+      path: "/cakeagent.CakeAgentService/Run",
       type: GRPCCallType.unary
     )
 
     public static let execute = GRPCMethodDescriptor(
       name: "Execute",
-      path: "/cakeagent.Agent/Execute",
+      path: "/cakeagent.CakeAgentService/Execute",
       type: GRPCCallType.bidirectionalStreaming
     )
 
     public static let mount = GRPCMethodDescriptor(
       name: "Mount",
-      path: "/cakeagent.Agent/Mount",
+      path: "/cakeagent.CakeAgentService/Mount",
       type: GRPCCallType.unary
     )
 
     public static let umount = GRPCMethodDescriptor(
       name: "Umount",
-      path: "/cakeagent.Agent/Umount",
+      path: "/cakeagent.CakeAgentService/Umount",
       type: GRPCCallType.unary
     )
   }

@@ -16,12 +16,12 @@ import Semaphore
 import Synchronization
 
 public typealias CakeAgentExecuteStream = NIOAsyncChannel<ByteBuffer, ByteBuffer>
-public typealias Cakeagent_ExecuteRequestStream = GRPCAsyncRequestStream<Cakeagent_ExecuteRequest>
-public typealias Cakeagent_ExecuteResponseStream = GRPCAsyncResponseStreamWriter<Cakeagent_ExecuteResponse>
+public typealias CakeAgentExecuteRequestStream = GRPCAsyncRequestStream<CakeAgent.ExecuteRequest>
+public typealias CakeAgentExecuteResponseStream = GRPCAsyncResponseStreamWriter<CakeAgent.ExecuteResponse>
 
 final class OutputAsyncStream: Sendable {
 	let name: String
-	let (stream, continuation) = AsyncStream.makeStream(of: Cakeagent_ExecuteResponse.self)
+	let (stream, continuation) = AsyncStream.makeStream(of: CakeAgent.ExecuteResponse.self)
 
 	init(name: String) {
 		self.name = name
@@ -30,8 +30,8 @@ final class OutputAsyncStream: Sendable {
 
 
 public class ExecuteHandleStream {
-	let requestStream: Cakeagent_ExecuteRequestStream
-	let responseStream: Cakeagent_ExecuteResponseStream
+	let requestStream: CakeAgentExecuteRequestStream
+	let responseStream: CakeAgentExecuteResponseStream
 	let eventLoop: EventLoop
 
 	private struct OuputStream {
@@ -49,13 +49,13 @@ public class ExecuteHandleStream {
 		}
 	}
 
-	init(on: EventLoop, requestStream: Cakeagent_ExecuteRequestStream, responseStream: Cakeagent_ExecuteResponseStream) {
+	init(on: EventLoop, requestStream: CakeAgentExecuteRequestStream, responseStream: CakeAgentExecuteResponseStream) {
 		self.eventLoop = on
 		self.requestStream = requestStream
 		self.responseStream = responseStream
 	}
 
-	private func createTTY(size: Cakeagent_TerminalSize) throws -> TTY {
+	private func createTTY(size: CakeAgent.ExecuteRequest.TerminalSize) throws -> TTY {
 		let tty = try TTY(tty: size.rows + size.cols > 0)
 
 		try tty.setTermSize(rows: size.rows, cols: size.cols)
@@ -63,7 +63,7 @@ public class ExecuteHandleStream {
 		return tty
 	}
 
-	private func createProcess(command: Cakeagent_ExecuteCommand, tty: TTY) async throws -> Process {
+	private func createProcess(command: CakeAgent.ExecuteRequest.ExecuteCommand, tty: TTY) async throws -> Process {
 		let process: Process = Process()
 		let cmd: String
 		let args: [String]
@@ -154,7 +154,7 @@ public class ExecuteHandleStream {
 							logger.debug("\(output.name): bytesRead: \(bytesRead), outBytes: \(output.outBytes)")
 						}
 
-						_ = try await self.responseStream.send(Cakeagent_ExecuteResponse.with {
+						_ = try await self.responseStream.send(CakeAgent.ExecuteResponse.with {
 							if output.channel == STDOUT_FILENO {
 								$0.stdout = data
 							} else {
@@ -224,7 +224,7 @@ public class ExecuteHandleStream {
 			tty.close()
 		}
 
-		_ = try await self.responseStream.send(Cakeagent_ExecuteResponse.with {
+		_ = try await self.responseStream.send(CakeAgent.ExecuteResponse.with {
 			$0.established = true
 		})
 
@@ -283,7 +283,7 @@ public class ExecuteHandleStream {
 
 		logger.debug("exitCode: \(exitCode)")
 
-		try await responseStream.send(Cakeagent_ExecuteResponse.with { $0.exitCode = exitCode })
+		try await responseStream.send(CakeAgent.ExecuteResponse.with { $0.exitCode = exitCode })
 	}
 }
 

@@ -12,7 +12,7 @@ final class Exec: GrpcParsableCommand {
 	@Argument(help: "Command to execute")
 	var arguments: [String]
 
-	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? {
+	var interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? {
 		try? CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)
 	}
 
@@ -24,7 +24,7 @@ final class Exec: GrpcParsableCommand {
 		}
 	}
 
-	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws {
+	func run(on: EventLoopGroup, client: CakeAgentClient, callOptions: CallOptions?) async throws {
 		let command = self.arguments.remove(at: 0)
 		//#if TRACE
 		//FileHandle.standardError.write("Executing command: \(command) with arguments: \(self.arguments), enter to continue\n".data(using: .utf8)!)

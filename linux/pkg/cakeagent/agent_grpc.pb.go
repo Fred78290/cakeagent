@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -20,323 +19,323 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agent_ResizeDisk_FullMethodName = "/cakeagent.Agent/ResizeDisk"
-	Agent_Info_FullMethodName       = "/cakeagent.Agent/Info"
-	Agent_Shutdown_FullMethodName   = "/cakeagent.Agent/Shutdown"
-	Agent_Run_FullMethodName        = "/cakeagent.Agent/Run"
-	Agent_Execute_FullMethodName    = "/cakeagent.Agent/Execute"
-	Agent_Mount_FullMethodName      = "/cakeagent.Agent/Mount"
-	Agent_Umount_FullMethodName     = "/cakeagent.Agent/Umount"
+	CakeAgentService_ResizeDisk_FullMethodName = "/cakeagent.CakeAgentService/ResizeDisk"
+	CakeAgentService_Info_FullMethodName       = "/cakeagent.CakeAgentService/Info"
+	CakeAgentService_Shutdown_FullMethodName   = "/cakeagent.CakeAgentService/Shutdown"
+	CakeAgentService_Run_FullMethodName        = "/cakeagent.CakeAgentService/Run"
+	CakeAgentService_Execute_FullMethodName    = "/cakeagent.CakeAgentService/Execute"
+	CakeAgentService_Mount_FullMethodName      = "/cakeagent.CakeAgentService/Mount"
+	CakeAgentService_Umount_FullMethodName     = "/cakeagent.CakeAgentService/Umount"
 )
 
-// AgentClient is the client API for Agent service.
+// CakeAgentServiceClient is the client API for CakeAgentService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AgentClient interface {
-	ResizeDisk(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ResizeReply, error)
-	Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error)
-	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RunReply, error)
-	Run(ctx context.Context, in *RunCommand, opts ...grpc.CallOption) (*RunReply, error)
-	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecuteRequest, ExecuteResponse], error)
-	Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
-	Umount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error)
+type CakeAgentServiceClient interface {
+	ResizeDisk(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_ResizeReply, error)
+	Info(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_InfoReply, error)
+	Shutdown(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_RunReply, error)
+	Run(ctx context.Context, in *CakeAgent_RunCommand, opts ...grpc.CallOption) (*CakeAgent_RunReply, error)
+	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse], error)
+	Mount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
+	Umount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
 }
 
-type agentClient struct {
+type cakeAgentServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAgentClient(cc grpc.ClientConnInterface) AgentClient {
-	return &agentClient{cc}
+func NewCakeAgentServiceClient(cc grpc.ClientConnInterface) CakeAgentServiceClient {
+	return &cakeAgentServiceClient{cc}
 }
 
-func (c *agentClient) ResizeDisk(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ResizeReply, error) {
+func (c *cakeAgentServiceClient) ResizeDisk(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_ResizeReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ResizeReply)
-	err := c.cc.Invoke(ctx, Agent_ResizeDisk_FullMethodName, in, out, cOpts...)
+	out := new(CakeAgent_ResizeReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_ResizeDisk_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *agentClient) Info(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*InfoReply, error) {
+func (c *cakeAgentServiceClient) Info(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_InfoReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(InfoReply)
-	err := c.cc.Invoke(ctx, Agent_Info_FullMethodName, in, out, cOpts...)
+	out := new(CakeAgent_InfoReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_Info_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *agentClient) Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RunReply, error) {
+func (c *cakeAgentServiceClient) Shutdown(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_RunReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RunReply)
-	err := c.cc.Invoke(ctx, Agent_Shutdown_FullMethodName, in, out, cOpts...)
+	out := new(CakeAgent_RunReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_Shutdown_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *agentClient) Run(ctx context.Context, in *RunCommand, opts ...grpc.CallOption) (*RunReply, error) {
+func (c *cakeAgentServiceClient) Run(ctx context.Context, in *CakeAgent_RunCommand, opts ...grpc.CallOption) (*CakeAgent_RunReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RunReply)
-	err := c.cc.Invoke(ctx, Agent_Run_FullMethodName, in, out, cOpts...)
+	out := new(CakeAgent_RunReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_Run_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *agentClient) Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecuteRequest, ExecuteResponse], error) {
+func (c *cakeAgentServiceClient) Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Agent_ServiceDesc.Streams[0], Agent_Execute_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &CakeAgentService_ServiceDesc.Streams[0], CakeAgentService_Execute_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ExecuteRequest, ExecuteResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Agent_ExecuteClient = grpc.BidiStreamingClient[ExecuteRequest, ExecuteResponse]
+type CakeAgentService_ExecuteClient = grpc.BidiStreamingClient[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]
 
-func (c *agentClient) Mount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error) {
+func (c *cakeAgentServiceClient) Mount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MountReply)
-	err := c.cc.Invoke(ctx, Agent_Mount_FullMethodName, in, out, cOpts...)
+	out := new(CakeAgent_MountReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_Mount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *agentClient) Umount(ctx context.Context, in *MountRequest, opts ...grpc.CallOption) (*MountReply, error) {
+func (c *cakeAgentServiceClient) Umount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MountReply)
-	err := c.cc.Invoke(ctx, Agent_Umount_FullMethodName, in, out, cOpts...)
+	out := new(CakeAgent_MountReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_Umount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// AgentServer is the server API for Agent service.
-// All implementations must embed UnimplementedAgentServer
+// CakeAgentServiceServer is the server API for CakeAgentService service.
+// All implementations must embed UnimplementedCakeAgentServiceServer
 // for forward compatibility.
-type AgentServer interface {
-	ResizeDisk(context.Context, *emptypb.Empty) (*ResizeReply, error)
-	Info(context.Context, *emptypb.Empty) (*InfoReply, error)
-	Shutdown(context.Context, *emptypb.Empty) (*RunReply, error)
-	Run(context.Context, *RunCommand) (*RunReply, error)
-	Execute(grpc.BidiStreamingServer[ExecuteRequest, ExecuteResponse]) error
-	Mount(context.Context, *MountRequest) (*MountReply, error)
-	Umount(context.Context, *MountRequest) (*MountReply, error)
-	mustEmbedUnimplementedAgentServer()
+type CakeAgentServiceServer interface {
+	ResizeDisk(context.Context, *CakeAgent_Empty) (*CakeAgent_ResizeReply, error)
+	Info(context.Context, *CakeAgent_Empty) (*CakeAgent_InfoReply, error)
+	Shutdown(context.Context, *CakeAgent_Empty) (*CakeAgent_RunReply, error)
+	Run(context.Context, *CakeAgent_RunCommand) (*CakeAgent_RunReply, error)
+	Execute(grpc.BidiStreamingServer[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]) error
+	Mount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
+	Umount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
+	mustEmbedUnimplementedCakeAgentServiceServer()
 }
 
-// UnimplementedAgentServer must be embedded to have
+// UnimplementedCakeAgentServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedAgentServer struct{}
+type UnimplementedCakeAgentServiceServer struct{}
 
-func (UnimplementedAgentServer) ResizeDisk(context.Context, *emptypb.Empty) (*ResizeReply, error) {
+func (UnimplementedCakeAgentServiceServer) ResizeDisk(context.Context, *CakeAgent_Empty) (*CakeAgent_ResizeReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResizeDisk not implemented")
 }
-func (UnimplementedAgentServer) Info(context.Context, *emptypb.Empty) (*InfoReply, error) {
+func (UnimplementedCakeAgentServiceServer) Info(context.Context, *CakeAgent_Empty) (*CakeAgent_InfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
 }
-func (UnimplementedAgentServer) Shutdown(context.Context, *emptypb.Empty) (*RunReply, error) {
+func (UnimplementedCakeAgentServiceServer) Shutdown(context.Context, *CakeAgent_Empty) (*CakeAgent_RunReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
-func (UnimplementedAgentServer) Run(context.Context, *RunCommand) (*RunReply, error) {
+func (UnimplementedCakeAgentServiceServer) Run(context.Context, *CakeAgent_RunCommand) (*CakeAgent_RunReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Run not implemented")
 }
-func (UnimplementedAgentServer) Execute(grpc.BidiStreamingServer[ExecuteRequest, ExecuteResponse]) error {
+func (UnimplementedCakeAgentServiceServer) Execute(grpc.BidiStreamingServer[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Execute not implemented")
 }
-func (UnimplementedAgentServer) Mount(context.Context, *MountRequest) (*MountReply, error) {
+func (UnimplementedCakeAgentServiceServer) Mount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Mount not implemented")
 }
-func (UnimplementedAgentServer) Umount(context.Context, *MountRequest) (*MountReply, error) {
+func (UnimplementedCakeAgentServiceServer) Umount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Umount not implemented")
 }
-func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
-func (UnimplementedAgentServer) testEmbeddedByValue()               {}
+func (UnimplementedCakeAgentServiceServer) mustEmbedUnimplementedCakeAgentServiceServer() {}
+func (UnimplementedCakeAgentServiceServer) testEmbeddedByValue()                          {}
 
-// UnsafeAgentServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AgentServer will
+// UnsafeCakeAgentServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CakeAgentServiceServer will
 // result in compilation errors.
-type UnsafeAgentServer interface {
-	mustEmbedUnimplementedAgentServer()
+type UnsafeCakeAgentServiceServer interface {
+	mustEmbedUnimplementedCakeAgentServiceServer()
 }
 
-func RegisterAgentServer(s grpc.ServiceRegistrar, srv AgentServer) {
-	// If the following call pancis, it indicates UnimplementedAgentServer was
+func RegisterCakeAgentServiceServer(s grpc.ServiceRegistrar, srv CakeAgentServiceServer) {
+	// If the following call pancis, it indicates UnimplementedCakeAgentServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&Agent_ServiceDesc, srv)
+	s.RegisterService(&CakeAgentService_ServiceDesc, srv)
 }
 
-func _Agent_ResizeDisk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _CakeAgentService_ResizeDisk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServer).ResizeDisk(ctx, in)
+		return srv.(CakeAgentServiceServer).ResizeDisk(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agent_ResizeDisk_FullMethodName,
+		FullMethod: CakeAgentService_ResizeDisk_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).ResizeDisk(ctx, req.(*emptypb.Empty))
+		return srv.(CakeAgentServiceServer).ResizeDisk(ctx, req.(*CakeAgent_Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _CakeAgentService_Info_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServer).Info(ctx, in)
+		return srv.(CakeAgentServiceServer).Info(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agent_Info_FullMethodName,
+		FullMethod: CakeAgentService_Info_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Info(ctx, req.(*emptypb.Empty))
+		return srv.(CakeAgentServiceServer).Info(ctx, req.(*CakeAgent_Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _CakeAgentService_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServer).Shutdown(ctx, in)
+		return srv.(CakeAgentServiceServer).Shutdown(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agent_Shutdown_FullMethodName,
+		FullMethod: CakeAgentService_Shutdown_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Shutdown(ctx, req.(*emptypb.Empty))
+		return srv.(CakeAgentServiceServer).Shutdown(ctx, req.(*CakeAgent_Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_Run_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RunCommand)
+func _CakeAgentService_Run_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_RunCommand)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServer).Run(ctx, in)
+		return srv.(CakeAgentServiceServer).Run(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agent_Run_FullMethodName,
+		FullMethod: CakeAgentService_Run_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Run(ctx, req.(*RunCommand))
+		return srv.(CakeAgentServiceServer).Run(ctx, req.(*CakeAgent_RunCommand))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_Execute_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AgentServer).Execute(&grpc.GenericServerStream[ExecuteRequest, ExecuteResponse]{ServerStream: stream})
+func _CakeAgentService_Execute_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(CakeAgentServiceServer).Execute(&grpc.GenericServerStream[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Agent_ExecuteServer = grpc.BidiStreamingServer[ExecuteRequest, ExecuteResponse]
+type CakeAgentService_ExecuteServer = grpc.BidiStreamingServer[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]
 
-func _Agent_Mount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MountRequest)
+func _CakeAgentService_Mount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_MountRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServer).Mount(ctx, in)
+		return srv.(CakeAgentServiceServer).Mount(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agent_Mount_FullMethodName,
+		FullMethod: CakeAgentService_Mount_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Mount(ctx, req.(*MountRequest))
+		return srv.(CakeAgentServiceServer).Mount(ctx, req.(*CakeAgent_MountRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_Umount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MountRequest)
+func _CakeAgentService_Umount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_MountRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServer).Umount(ctx, in)
+		return srv.(CakeAgentServiceServer).Umount(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agent_Umount_FullMethodName,
+		FullMethod: CakeAgentService_Umount_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).Umount(ctx, req.(*MountRequest))
+		return srv.(CakeAgentServiceServer).Umount(ctx, req.(*CakeAgent_MountRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
+// CakeAgentService_ServiceDesc is the grpc.ServiceDesc for CakeAgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Agent_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "cakeagent.Agent",
-	HandlerType: (*AgentServer)(nil),
+var CakeAgentService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "cakeagent.CakeAgentService",
+	HandlerType: (*CakeAgentServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "ResizeDisk",
-			Handler:    _Agent_ResizeDisk_Handler,
+			Handler:    _CakeAgentService_ResizeDisk_Handler,
 		},
 		{
 			MethodName: "Info",
-			Handler:    _Agent_Info_Handler,
+			Handler:    _CakeAgentService_Info_Handler,
 		},
 		{
 			MethodName: "Shutdown",
-			Handler:    _Agent_Shutdown_Handler,
+			Handler:    _CakeAgentService_Shutdown_Handler,
 		},
 		{
 			MethodName: "Run",
-			Handler:    _Agent_Run_Handler,
+			Handler:    _CakeAgentService_Run_Handler,
 		},
 		{
 			MethodName: "Mount",
-			Handler:    _Agent_Mount_Handler,
+			Handler:    _CakeAgentService_Mount_Handler,
 		},
 		{
 			MethodName: "Umount",
-			Handler:    _Agent_Umount_Handler,
+			Handler:    _CakeAgentService_Umount_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Execute",
-			Handler:       _Agent_Execute_Handler,
+			Handler:       _CakeAgentService_Execute_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

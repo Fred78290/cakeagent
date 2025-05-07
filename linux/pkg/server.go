@@ -35,7 +35,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -45,7 +44,7 @@ const (
 )
 
 type server struct {
-	cakeagent.UnimplementedAgentServer
+	cakeagent.UnimplementedCakeAgentServiceServer
 }
 
 type pipe struct {
@@ -100,7 +99,7 @@ func newPipe(name string, nonblocking bool) (p *pipe, err error) {
 	return
 }
 
-func newTTY(termSize *cakeagent.TerminalSize) (tty *pseudoTTY, err error) {
+func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pseudoTTY, err error) {
 	tty = &pseudoTTY{}
 
 	if tty.stderr, err = newPipe("stderr", true); err != nil {
@@ -348,7 +347,7 @@ func (s *server) isEAGAIN(err error) bool {
 	return false
 }
 
-func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.InfoReply, err error) {
+func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_InfoReply, err error) {
 	var partitions []disk.PartitionStat
 
 	memoryTotal := memory.TotalMemory()
@@ -358,13 +357,13 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 		return nil, err
 	}
 
-	var diskInfos []*cakeagent.InfoReply_DiskInfo = make([]*cakeagent.InfoReply_DiskInfo, 0, len(partitions))
+	var diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo = make([]*cakeagent.CakeAgent_InfoReply_DiskInfo, 0, len(partitions))
 
 	for _, partition := range partitions {
 		if !slices.Contains(partition.Opts, "nobrowse") && !slices.Contains(partition.Opts, "nodev") {
 			if diskInfo, err := disk.Usage(partition.Mountpoint); err == nil {
 				if diskInfo != nil {
-					diskInfos = append(diskInfos, &cakeagent.InfoReply_DiskInfo{
+					diskInfos = append(diskInfos, &cakeagent.CakeAgent_InfoReply_DiskInfo{
 						Device: partition.Device,
 						Mount:  partition.Mountpoint,
 						FsType: partition.Fstype,
@@ -377,11 +376,11 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 		}
 	}
 
-	reply = &cakeagent.InfoReply{
+	reply = &cakeagent.CakeAgent_InfoReply{
 		Ipaddresses: []string{},
 		CpuCount:    int32(runtime.NumCPU()),
 		DiskInfos:   diskInfos,
-		Memory: &cakeagent.InfoReply_MemoryInfo{
+		Memory: &cakeagent.CakeAgent_InfoReply_MemoryInfo{
 			Total: memoryTotal,
 			Free:  memoryFree,
 			Used:  memoryTotal - memoryFree,
@@ -428,9 +427,9 @@ func (s *server) Info(ctx context.Context, req *emptypb.Empty) (reply *cakeagent
 	return reply, nil
 }
 
-func (s *server) Shutdown(ctx context.Context, req *emptypb.Empty) (reply *cakeagent.RunReply, err error) {
+func (s *server) Shutdown(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_RunReply, err error) {
 	home, _ := os.UserHomeDir()
-	reply = &cakeagent.RunReply{}
+	reply = &cakeagent.CakeAgent_RunReply{}
 
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("shutdown", "-h", "+1s")
@@ -489,12 +488,12 @@ func (s *server) Shutdown(ctx context.Context, req *emptypb.Empty) (reply *cakea
 	return
 }
 
-func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cakeagent.RunReply, err error) {
+func (s *server) Run(ctx context.Context, req *cakeagent.CakeAgent_RunCommand) (reply *cakeagent.CakeAgent_RunReply, err error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	home, _ := os.UserHomeDir()
-	reply = &cakeagent.RunReply{}
+	reply = &cakeagent.CakeAgent_RunReply{}
 
 	arguments := append([]string{req.Command.GetCommand()}, req.Command.Args...)
 
@@ -533,14 +532,14 @@ func (s *server) Run(ctx context.Context, req *cakeagent.RunCommand) (reply *cak
 	return
 }
 
-func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.TerminalSize, stream cakeagent.Agent_ExecuteServer) (err error) {
+func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteCommand, termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize, stream cakeagent.CakeAgentService_ExecuteServer) (err error) {
 	if tty, e := newTTY(termSize); e != nil {
 		err = fmt.Errorf("failed to open pty: %v", e)
 	} else {
 		ctx, cancel := context.WithCancel(context.Background())
 		home, _ := os.UserHomeDir()
 		var wg sync.WaitGroup
-		var message cakeagent.ExecuteResponse
+		var message cakeagent.CakeAgent_ExecuteResponse
 		var cmd *exec.Cmd
 
 		doCancel := func(reason string) {
@@ -624,17 +623,17 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 
 							totalSent += uint64(len(buffer[:available]))
 
-							var message *cakeagent.ExecuteResponse
+							var message *cakeagent.CakeAgent_ExecuteResponse
 
 							if channel == 0 {
-								message = &cakeagent.ExecuteResponse{
-									Response: &cakeagent.ExecuteResponse_Stdout{
+								message = &cakeagent.CakeAgent_ExecuteResponse{
+									Response: &cakeagent.CakeAgent_ExecuteResponse_Stdout{
 										Stdout: buffer[:available],
 									},
 								}
 							} else {
-								message = &cakeagent.ExecuteResponse{
-									Response: &cakeagent.ExecuteResponse_Stderr{
+								message = &cakeagent.CakeAgent_ExecuteResponse{
+									Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 										Stderr: buffer[:available],
 									},
 								}
@@ -717,14 +716,14 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 			tty.Close()
 
 			if cmd != nil {
-				message = cakeagent.ExecuteResponse{
-					Response: &cakeagent.ExecuteResponse_ExitCode{
+				message = cakeagent.CakeAgent_ExecuteResponse{
+					Response: &cakeagent.CakeAgent_ExecuteResponse_ExitCode{
 						ExitCode: int32(cmd.ProcessState.ExitCode()),
 					},
 				}
 			} else {
-				message = cakeagent.ExecuteResponse{
-					Response: &cakeagent.ExecuteResponse_ExitCode{
+				message = cakeagent.CakeAgent_ExecuteResponse{
+					Response: &cakeagent.CakeAgent_ExecuteResponse_ExitCode{
 						ExitCode: 1,
 					},
 				}
@@ -778,8 +777,8 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 				go fowardOutput(ctx, 1, tty.StderrReader())
 				go fowardStdin()
 
-				message = cakeagent.ExecuteResponse{
-					Response: &cakeagent.ExecuteResponse_Established{
+				message = cakeagent.CakeAgent_ExecuteResponse{
+					Response: &cakeagent.CakeAgent_ExecuteResponse_Established{
 						Established: true,
 					},
 				}
@@ -801,8 +800,8 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 			}
 
 			if command.GetShell() {
-				message = cakeagent.ExecuteResponse{
-					Response: &cakeagent.ExecuteResponse_Stderr{
+				message = cakeagent.CakeAgent_ExecuteResponse{
+					Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 						Stderr: []byte("\r"),
 					},
 				}
@@ -812,8 +811,8 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 		}
 
 		if s.isUnexpectedError(err) {
-			message = cakeagent.ExecuteResponse{
-				Response: &cakeagent.ExecuteResponse_Stderr{
+			message = cakeagent.CakeAgent_ExecuteResponse{
+				Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 					Stderr: []byte(err.Error() + "\r\n"),
 				},
 			}
@@ -827,10 +826,10 @@ func (s *server) execute(command *cakeagent.ExecuteCommand, termSize *cakeagent.
 	return
 }
 
-func (s *server) Execute(stream cakeagent.Agent_ExecuteServer) (err error) {
-	var request *cakeagent.ExecuteRequest
-	var command *cakeagent.ExecuteCommand
-	var termSize *cakeagent.TerminalSize
+func (s *server) Execute(stream cakeagent.CakeAgentService_ExecuteServer) (err error) {
+	var request *cakeagent.CakeAgent_ExecuteRequest
+	var command *cakeagent.CakeAgent_ExecuteRequest_ExecuteCommand
+	var termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize
 
 	if request, err = stream.Recv(); err != nil {
 		glog.Errorf("Failed to receive command message: %v", err)
@@ -853,24 +852,24 @@ func (s *server) Execute(stream cakeagent.Agent_ExecuteServer) (err error) {
 	return s.execute(command, termSize, stream)
 }
 
-func (s *server) Mount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
+func (s *server) Mount(ctx context.Context, request *cakeagent.CakeAgent_MountRequest) (*cakeagent.CakeAgent_MountReply, error) {
 	return mount.Mount(ctx, request)
 }
 
-func (s *server) Umount(ctx context.Context, request *cakeagent.MountRequest) (*cakeagent.MountReply, error) {
+func (s *server) Umount(ctx context.Context, request *cakeagent.CakeAgent_MountRequest) (*cakeagent.CakeAgent_MountReply, error) {
 	return mount.Umount(ctx, request)
 }
 
-func (s *server) ResizeDisk(context.Context, *emptypb.Empty) (*cakeagent.ResizeReply, error) {
+func (s *server) ResizeDisk(context.Context, *cakeagent.CakeAgent_Empty) (*cakeagent.CakeAgent_ResizeReply, error) {
 	if err := resize.ResizeDisk(); err == nil {
-		return &cakeagent.ResizeReply{
-			Response: &cakeagent.ResizeReply_Success{
+		return &cakeagent.CakeAgent_ResizeReply{
+			Response: &cakeagent.CakeAgent_ResizeReply_Success{
 				Success: true,
 			},
 		}, nil
 	} else {
-		return &cakeagent.ResizeReply{
-			Response: &cakeagent.ResizeReply_Failure{
+		return &cakeagent.CakeAgent_ResizeReply{
+			Response: &cakeagent.CakeAgent_ResizeReply_Failure{
 				Failure: err.Error(),
 			},
 		}, nil
@@ -972,7 +971,7 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 		if err == nil {
 			glog.Infof("Starting gRPC server on %s", cfg.Address)
 
-			cakeagent.RegisterAgentServer(grpcServer, &server{})
+			cakeagent.RegisterCakeAgentServiceServer(grpcServer, &server{})
 
 			if err = grpcServer.Serve(listener); err != nil {
 				err = fmt.Errorf("failed to serve: %s", err)

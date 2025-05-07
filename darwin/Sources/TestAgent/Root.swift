@@ -20,14 +20,14 @@ class GrpcError: Error {
 
 protocol GrpcParsableCommand: AsyncParsableCommand {
 	var options: CakeAgentClientOptions { get }
-	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { get }
+	var interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? { get }
 	var retries: ConnectionBackoff.Retries { get }
 
-	func run(on: EventLoopGroup, client: Cakeagent_AgentNIOClient, callOptions: CallOptions?) async throws
+	func run(on: EventLoopGroup, client: CakeAgentClient, callOptions: CallOptions?) async throws
 }
 
 extension GrpcParsableCommand {
-	var interceptors: Cakeagent_AgentClientInterceptorFactoryProtocol? { nil }
+	var interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? { nil }
 	var retries: ConnectionBackoff.Retries { .unlimited }
 
 	func execute(command: GrpcParsableCommand) async throws {
