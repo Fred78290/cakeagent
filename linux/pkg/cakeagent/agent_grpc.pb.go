@@ -26,6 +26,7 @@ const (
 	CakeAgentService_Execute_FullMethodName    = "/cakeagent.CakeAgentService/Execute"
 	CakeAgentService_Mount_FullMethodName      = "/cakeagent.CakeAgentService/Mount"
 	CakeAgentService_Umount_FullMethodName     = "/cakeagent.CakeAgentService/Umount"
+	CakeAgentService_Tunnel_FullMethodName     = "/cakeagent.CakeAgentService/Tunnel"
 )
 
 // CakeAgentServiceClient is the client API for CakeAgentService service.
@@ -39,6 +40,7 @@ type CakeAgentServiceClient interface {
 	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse], error)
 	Mount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
 	Umount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
+	Tunnel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage], error)
 }
 
 type cakeAgentServiceClient struct {
@@ -122,6 +124,19 @@ func (c *cakeAgentServiceClient) Umount(ctx context.Context, in *CakeAgent_Mount
 	return out, nil
 }
 
+func (c *cakeAgentServiceClient) Tunnel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &CakeAgentService_ServiceDesc.Streams[1], CakeAgentService_Tunnel_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CakeAgentService_TunnelClient = grpc.BidiStreamingClient[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]
+
 // CakeAgentServiceServer is the server API for CakeAgentService service.
 // All implementations must embed UnimplementedCakeAgentServiceServer
 // for forward compatibility.
@@ -133,6 +148,7 @@ type CakeAgentServiceServer interface {
 	Execute(grpc.BidiStreamingServer[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]) error
 	Mount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
 	Umount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
+	Tunnel(grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]) error
 	mustEmbedUnimplementedCakeAgentServiceServer()
 }
 
@@ -163,6 +179,9 @@ func (UnimplementedCakeAgentServiceServer) Mount(context.Context, *CakeAgent_Mou
 }
 func (UnimplementedCakeAgentServiceServer) Umount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Umount not implemented")
+}
+func (UnimplementedCakeAgentServiceServer) Tunnel(grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method Tunnel not implemented")
 }
 func (UnimplementedCakeAgentServiceServer) mustEmbedUnimplementedCakeAgentServiceServer() {}
 func (UnimplementedCakeAgentServiceServer) testEmbeddedByValue()                          {}
@@ -300,6 +319,13 @@ func _CakeAgentService_Umount_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CakeAgentService_Tunnel_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(CakeAgentServiceServer).Tunnel(&grpc.GenericServerStream[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CakeAgentService_TunnelServer = grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]
+
 // CakeAgentService_ServiceDesc is the grpc.ServiceDesc for CakeAgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -336,6 +362,12 @@ var CakeAgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Execute",
 			Handler:       _CakeAgentService_Execute_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "Tunnel",
+			Handler:       _CakeAgentService_Tunnel_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

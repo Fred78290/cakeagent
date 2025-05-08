@@ -23,6 +23,7 @@ import (
 	"github.com/Fred78290/cakeagent/pkg/mount"
 	"github.com/Fred78290/cakeagent/pkg/resize"
 	"github.com/Fred78290/cakeagent/pkg/serialport"
+	"github.com/Fred78290/cakeagent/pkg/tunnel"
 	"github.com/creack/pty"
 	"github.com/elastic/go-sysinfo"
 	"github.com/mdlayher/vsock"
@@ -850,6 +851,20 @@ func (s *server) Execute(stream cakeagent.CakeAgentService_ExecuteServer) (err e
 	}
 
 	return s.execute(command, termSize, stream)
+}
+
+func (s *server) Tunnel(stream cakeagent.CakeAgentService_TunnelServer) error {
+	if tunnelServer, err := tunnel.NewTunnelServer(stream); err == nil {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace("Tunnel server created")
+		}
+
+		return tunnelServer.Stream(nil)
+	} else {
+		glog.Errorf("Failed to create tunnel server: %v", err)
+
+		return err
+	}
 }
 
 func (s *server) Mount(ctx context.Context, request *cakeagent.CakeAgent_MountRequest) (*cakeagent.CakeAgent_MountReply, error) {
