@@ -85,21 +85,12 @@ struct TunnelHandlerStream {
 	func stream() async throws {
 		var iterator = requestStream.makeAsyncIterator()
 		let client: Connectable
-		let socketAddress: SocketAddress
 				
 		guard let firstRequest = try await iterator.next(), case let .connect(connect) = firstRequest.message else {
 			throw ServiceError("protocol error, expected TunnelMessageConnect")
 		}
 		
-		guard let u = URL(string: connect.guestAddress) else {
-			throw ServiceError("protocol error, expected TunnelMessageConnect.guestAddress to be a valid URL")
-		}
-
-		if u.scheme == "unix" || u.isFileURL {
-			socketAddress = try .init(unixDomainSocketPath: u.path)
-		} else {
-			socketAddress = try .init(ipAddress: u.host ?? "127.0.0.1", port: Int(u.port ?? 0))
-		}
+		let socketAddress = connect.guestAddress.toSocketAddress()
 
 		if connect.protocol == .tcp {
 			client = TCPTunnelHandlerStream(on: self.eventLoop)
