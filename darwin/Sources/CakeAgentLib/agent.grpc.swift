@@ -50,6 +50,11 @@ public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
     _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions?
   ) -> UnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>
+
+  func tunnel(
+    callOptions: CallOptions?,
+    handler: @escaping (Cakeagent_CakeAgent.TunnelMessage) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>
 }
 
 extension Cakeagent_CakeAgentServiceClientProtocol {
@@ -185,6 +190,27 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
       interceptors: self.interceptors?.makeUmountInterceptors() ?? []
     )
   }
+
+  /// Bidirectional streaming call to Tunnel
+  ///
+  /// Callers should use the `send` method on the returned object to send messages
+  /// to the server. The caller should send an `.end` after the final message has been sent.
+  ///
+  /// - Parameters:
+  ///   - callOptions: Call options.
+  ///   - handler: A closure called when each response is received from the server.
+  /// - Returns: A `ClientStreamingCall` with futures for the metadata and status.
+  public func tunnel(
+    callOptions: CallOptions? = nil,
+    handler: @escaping (Cakeagent_CakeAgent.TunnelMessage) -> Void
+  ) -> BidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage> {
+    return self.makeBidirectionalStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel.path,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeTunnelInterceptors() ?? [],
+      handler: handler
+    )
+  }
 }
 
 @available(*, deprecated)
@@ -282,6 +308,10 @@ public protocol Cakeagent_CakeAgentServiceAsyncClientProtocol: GRPCClient {
     _ request: Cakeagent_CakeAgent.MountRequest,
     callOptions: CallOptions?
   ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>
+
+  func makeTunnelCall(
+    callOptions: CallOptions?
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -373,6 +403,16 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeUmountInterceptors() ?? []
+    )
+  }
+
+  public func makeTunnelCall(
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage> {
+    return self.makeAsyncBidirectionalStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel.path,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeTunnelInterceptors() ?? []
     )
   }
 }
@@ -474,6 +514,30 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
       interceptors: self.interceptors?.makeUmountInterceptors() ?? []
     )
   }
+
+  public func tunnel<RequestStream>(
+    _ requests: RequestStream,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncResponseStream<Cakeagent_CakeAgent.TunnelMessage> where RequestStream: Sequence, RequestStream.Element == Cakeagent_CakeAgent.TunnelMessage {
+    return self.performAsyncBidirectionalStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel.path,
+      requests: requests,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeTunnelInterceptors() ?? []
+    )
+  }
+
+  public func tunnel<RequestStream>(
+    _ requests: RequestStream,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncResponseStream<Cakeagent_CakeAgent.TunnelMessage> where RequestStream: AsyncSequence & Sendable, RequestStream.Element == Cakeagent_CakeAgent.TunnelMessage {
+    return self.performAsyncBidirectionalStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel.path,
+      requests: requests,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeTunnelInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -515,6 +579,9 @@ public protocol Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol: Send
 
   /// - Returns: Interceptors to use when invoking 'umount'.
   func makeUmountInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>]
+
+  /// - Returns: Interceptors to use when invoking 'tunnel'.
+  func makeTunnelInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>]
 }
 
 public enum Cakeagent_CakeAgentServiceClientMetadata {
@@ -529,6 +596,7 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
       Cakeagent_CakeAgentServiceClientMetadata.Methods.execute,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.mount,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.umount,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel,
     ]
   )
 
@@ -574,6 +642,12 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
       path: "/cakeagent.CakeAgentService/Umount",
       type: GRPCCallType.unary
     )
+
+    public static let tunnel = GRPCMethodDescriptor(
+      name: "Tunnel",
+      path: "/cakeagent.CakeAgentService/Tunnel",
+      type: GRPCCallType.bidirectionalStreaming
+    )
   }
 }
 
@@ -594,6 +668,8 @@ public protocol Cakeagent_CakeAgentServiceProvider: CallHandlerProvider {
   func mount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
 
   func umount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
+
+  func tunnel(context: StreamingResponseCallContext<Cakeagent_CakeAgent.TunnelMessage>) -> EventLoopFuture<(StreamEvent<Cakeagent_CakeAgent.TunnelMessage>) -> Void>
 }
 
 extension Cakeagent_CakeAgentServiceProvider {
@@ -671,6 +747,15 @@ extension Cakeagent_CakeAgentServiceProvider {
         userFunction: self.umount(request:context:)
       )
 
+    case "Tunnel":
+      return BidirectionalStreamingServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.TunnelMessage>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.TunnelMessage>(),
+        interceptors: self.interceptors?.makeTunnelInterceptors() ?? [],
+        observerFactory: self.tunnel(context:)
+      )
+
     default:
       return nil
     }
@@ -718,6 +803,12 @@ public protocol Cakeagent_CakeAgentServiceAsyncProvider: CallHandlerProvider, Se
     request: Cakeagent_CakeAgent.MountRequest,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.MountReply
+
+  func tunnel(
+    requestStream: GRPCAsyncRequestStream<Cakeagent_CakeAgent.TunnelMessage>,
+    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.TunnelMessage>,
+    context: GRPCAsyncServerCallContext
+  ) async throws
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -802,6 +893,15 @@ extension Cakeagent_CakeAgentServiceAsyncProvider {
         wrapping: { try await self.umount(request: $0, context: $1) }
       )
 
+    case "Tunnel":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.TunnelMessage>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.TunnelMessage>(),
+        interceptors: self.interceptors?.makeTunnelInterceptors() ?? [],
+        wrapping: { try await self.tunnel(requestStream: $0, responseStream: $1, context: $2) }
+      )
+
     default:
       return nil
     }
@@ -837,6 +937,10 @@ public protocol Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol: Send
   /// - Returns: Interceptors to use when handling 'umount'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeUmountInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.MountRequest, Cakeagent_CakeAgent.MountReply>]
+
+  /// - Returns: Interceptors to use when handling 'tunnel'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeTunnelInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>]
 }
 
 public enum Cakeagent_CakeAgentServiceServerMetadata {
@@ -851,6 +955,7 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
       Cakeagent_CakeAgentServiceServerMetadata.Methods.execute,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.mount,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.umount,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.tunnel,
     ]
   )
 
@@ -895,6 +1000,12 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
       name: "Umount",
       path: "/cakeagent.CakeAgentService/Umount",
       type: GRPCCallType.unary
+    )
+
+    public static let tunnel = GRPCMethodDescriptor(
+      name: "Tunnel",
+      path: "/cakeagent.CakeAgentService/Tunnel",
+      type: GRPCCallType.bidirectionalStreaming
     )
   }
 }

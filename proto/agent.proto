@@ -16,9 +16,29 @@ service CakeAgentService {
 	rpc Execute (stream CakeAgent.ExecuteRequest) returns (stream CakeAgent.ExecuteResponse);
 	rpc Mount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
 	rpc Umount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
+	rpc Tunnel(stream CakeAgent.TunnelMessage) returns (stream CakeAgent.TunnelMessage);
 }
 
 message CakeAgent {
+	message TunnelMessage {
+		enum TunnelProtocol {
+			TCP = 0;
+			UDP = 1;
+		}
+
+		message TunnelMessageConnect {
+			string id = 1;
+			TunnelProtocol protocol = 2; //tcp, udp
+			string guestAddress = 3; //ip address of the guest
+		}
+
+		oneof message {
+			TunnelMessageConnect connect = 1;
+			bytes datas = 2;
+			bool eof = 3; //end of file
+		}
+	}
+	
 	message Empty {
 	}
 

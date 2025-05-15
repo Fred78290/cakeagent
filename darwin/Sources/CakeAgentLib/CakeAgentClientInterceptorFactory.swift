@@ -142,4 +142,13 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		return [CakeAgentClientInterceptor<CakeAgent.MountRequest, CakeAgent.MountReply>(inputHandle: inputHandle, state: state)]
 	}
 
+	public func makeTunnelInterceptors() -> [ClientInterceptor<CakeAgent.TunnelMessage, CakeAgent.TunnelMessage>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.tunnel) == false {
+			return []
+		}
+
+		return [CakeAgentClientInterceptor<CakeAgent.TunnelMessage, CakeAgent.TunnelMessage>(inputHandle: inputHandle, state: state)]
+	}
+	
+
 }
