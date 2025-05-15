@@ -90,7 +90,7 @@ struct TunnelHandlerStream {
 			throw ServiceError("protocol error, expected TunnelMessageConnect")
 		}
 		
-		let socketAddress = connect.guestAddress.toSocketAddress()
+		let socketAddress = try connect.guestAddress.toSocketAddress()
 
 		if connect.protocol == .tcp {
 			client = TCPTunnelHandlerStream(on: self.eventLoop)
