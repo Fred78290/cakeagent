@@ -21,12 +21,14 @@ let package = Package(
 		.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.29.0"),
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
 		.package(url: "https://github.com/groue/Semaphore", from: "0.0.8"),
+		.package(url: "https://github.com/Fred78290/swift-nio-portforwarding.git",  revision: "b4af57ead7328319f6ea482b87f3c0d0c9909b40"),
 	],
 	targets: [
 		.target(name: "CakeAgentLib",
 			dependencies: [
 				.product(name: "GRPC", package: "grpc-swift"),
 				.product(name: "Semaphore", package: "Semaphore"),
+				.product(name: "NIOPortForwarding", package: "swift-nio-portforwarding")
 			],
 			path: "darwin/Sources/CakeAgentLib",
 			swiftSettings: [

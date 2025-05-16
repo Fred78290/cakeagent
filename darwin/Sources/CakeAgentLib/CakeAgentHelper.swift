@@ -5,6 +5,8 @@ import NIO
 import NIOPosix
 import NIOSSL
 import Semaphore
+import NIOPortForwarding
+
 
 typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
 
@@ -665,4 +667,14 @@ public struct CakeAgentHelper: Sendable {
 
 		return try response.response.wait()
 	}
+
+	public func tunnel(bindAddress: SocketAddress, remoteAddress: SocketAddress, proto: MappedPort.Proto, callOptions: CallOptions? = nil) throws -> Int32 {
+		let listener = try CakeAgentTunnelListener(group: self.eventLoopGroup, cakeAgentClient: client)
+
+		_ = try listener.addPortForwardingServer(bindAddress: bindAddress, remoteAddress: remoteAddress, proto: proto, ttl: 5)
+
+		try listener.bind().wait()
+		return 0
+	}
+
 }
