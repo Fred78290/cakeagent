@@ -36,6 +36,7 @@ message CakeAgent {
 			TunnelMessageConnect connect = 1;
 			bytes datas = 2;
 			bool eof = 3; //end of file
+			string error = 4; //error message
 		}
 	}
 	

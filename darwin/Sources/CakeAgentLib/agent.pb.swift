@@ -60,6 +60,15 @@ public struct Cakeagent_CakeAgent: Sendable {
       set {message = .eof(newValue)}
     }
 
+    ///error message
+    public var error: String {
+      get {
+        if case .error(let v)? = message {return v}
+        return String()
+      }
+      set {message = .error(newValue)}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public enum OneOf_Message: Equatable, @unchecked Sendable {
@@ -67,6 +76,8 @@ public struct Cakeagent_CakeAgent: Sendable {
       case datas(Data)
       ///end of file
       case eof(Bool)
+      ///error message
+      case error(String)
 
     }
 
@@ -609,6 +620,7 @@ extension Cakeagent_CakeAgent.TunnelMessage: SwiftProtobuf.Message, SwiftProtobu
     1: .same(proto: "connect"),
     2: .same(proto: "datas"),
     3: .same(proto: "eof"),
+    4: .same(proto: "error"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -646,6 +658,14 @@ extension Cakeagent_CakeAgent.TunnelMessage: SwiftProtobuf.Message, SwiftProtobu
           self.message = .eof(v)
         }
       }()
+      case 4: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.message != nil {try decoder.handleConflictingOneOf()}
+          self.message = .error(v)
+        }
+      }()
       default: break
       }
     }
@@ -668,6 +688,10 @@ extension Cakeagent_CakeAgent.TunnelMessage: SwiftProtobuf.Message, SwiftProtobu
     case .eof?: try {
       guard case .eof(let v)? = self.message else { preconditionFailure() }
       try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    }()
+    case .error?: try {
+      guard case .error(let v)? = self.message else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     }()
     case nil: break
     }

@@ -109,6 +109,16 @@ func (s *TunnelServer) Read(p []byte) (n int, err error) {
 		copy(p, data)
 
 		return len(data), nil
+	} else if eof := in.GetEof(); eof {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace("Received EOF")
+		}
+		return 0, io.EOF
+	} else if err := in.GetError(); err != "" {
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Tracef("Received error: %s", err)
+		}
+		return 0, errors.New(err)
 	} else {
 		return 0, errors.New("invalid message")
 	}
