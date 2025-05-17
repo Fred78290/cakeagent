@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/Fred78290/cakeagent/pkg/cakeagent"
@@ -19,17 +20,23 @@ type TunnelServer struct {
 func NewTunnelServer(stream cakeagent.CakeAgentService_TunnelServer) (tunnel *TunnelServer, err error) {
 	var input *cakeagent.CakeAgent_TunnelMessage
 	var conn net.Conn
-	protocols := []string{"tcp", "udp"}
+	protocols := []string{"unix", "unixgram"}
 
 	if input, err = stream.Recv(); err == nil {
 		if connect := input.GetConnect(); connect == nil {
 			err = errors.New("invalid message")
 		} else if conn, err = net.Dial(protocols[connect.Protocol], connect.GuestAddress); err == nil {
+			if glog.GetLevel() >= glog.TraceLevel {
+				glog.Tracef("Tunnel %s: %s", connect.Id, connect.GuestAddress)
+			}
+
 			tunnel = &TunnelServer{
 				id:     connect.Id,
 				stream: stream,
 				conn:   conn,
 			}
+		} else {
+			glog.WithError(err).Debugf("failed to connect to guest %s: %s", connect.Id, connect.GuestAddress)
 		}
 	} else if errors.Is(err, io.EOF) {
 		err = nil
@@ -41,11 +48,20 @@ func NewTunnelServer(stream cakeagent.CakeAgentService_TunnelServer) (tunnel *Tu
 func (s *TunnelServer) Stream(quit <-chan struct{}) (err error) {
 	var wg sync.WaitGroup
 
-	broker := func(to, from io.ReadWriter) {
+	finish := make(chan struct{})
 
+	broker := func(to, from io.ReadWriter) {
 		if _, err := io.Copy(to, from); err != nil {
-			glog.WithError(err).Debug("failed to call io.Copy")
+			if !strings.Contains(err.Error(), "use of closed network connection") {
+				glog.WithError(err).Debug("failed to call io.Copy")
+			}
 		}
+
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Trace("leave copy")
+		}
+
+		finish <- struct{}{}
 
 		wg.Done()
 	}
@@ -54,8 +70,6 @@ func (s *TunnelServer) Stream(quit <-chan struct{}) (err error) {
 
 	go broker(s, s.conn)
 	go broker(s.conn, s)
-
-	finish := make(chan struct{})
 
 	go func() {
 		wg.Wait()
@@ -77,10 +91,18 @@ func (s *TunnelServer) Stream(quit <-chan struct{}) (err error) {
 
 	<-finish
 
+	if glog.GetLevel() >= glog.TraceLevel {
+		glog.Tracef("Leave stream: %v", err)
+	}
+
 	return
 }
 
 func (s *TunnelServer) Close() error {
+	if glog.GetLevel() >= glog.TraceLevel {
+		glog.Trace("Close tunnel")
+	}
+
 	message := &cakeagent.CakeAgent_TunnelMessage{
 		Message: &cakeagent.CakeAgent_TunnelMessage_Eof{
 			Eof: true,
