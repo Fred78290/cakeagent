@@ -7,6 +7,7 @@ import Semaphore
 import Synchronization
 import Logging
 import NIOPortForwarding
+import CryptoKit
 
 open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 	internal let cakeAgentClient: CakeAgentClient
@@ -30,8 +31,14 @@ open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 		}
 
 		public func channelRegistered(context: ChannelHandlerContext) {
+			#if TRACE
+				redbold("Create tunnel from \(self.bindAddress) to \(self.remoteAddress)")
+			#endif
 			self.tunnel = cakeAgentClient.tunnel(callOptions: nil) { message in
 				// Handle incoming messages from the tunnel
+				#if TRACE
+					redbold("Receive message \(message)")
+				#endif
 				switch message.message {
 				case .datas(let data):
 					// Send data to the channel
@@ -40,8 +47,31 @@ open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 				case .eof:
 					// Handle tunnel close
 					context.channel.close(promise: nil)
+				case .error(let err):
+					// Handle error
+					#if TRACE
+						redbold("Tunnel error: \(err)")
+					#endif
+					self.errorCaught(context: context, error: IOError(errnoCode: EIO, reason: err))
 				default:
 					break
+				}
+			}
+
+			self.tunnel?.status.whenComplete { result in
+				switch result {
+				case .failure(let err):
+#if TRACE
+					redbold("Tunnel error: \(err)")
+#endif
+					self.errorCaught(context: context, error: err)
+				case .success(let status):
+#if TRACE
+					redbold("Tunnel status: \(status)")
+#endif
+					if status.code != .ok {
+						self.errorCaught(context: context, error: status)
+					}
 				}
 			}
 
@@ -52,11 +82,15 @@ open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 			if let tunnel = self.tunnel {
 				let connect = CakeAgent.TunnelMessage.with {
 					$0.connect = CakeAgent.TunnelMessage.TunnelMessageConnect.with { message in
-						message.id = "\(self.bindAddress.description):\(self.remoteAddress.description)@\(context.channel)"
+						message.id = SHA256.hash(data: Data("\(self.bindAddress.description):\(self.remoteAddress.description)@\(context.channel)".utf8)).description
 						message.protocol = self.proto
 						message.guestAddress = self.remoteAddress.pathname!
 					}
 				}
+
+				#if TRACE
+					redbold("Connect tunnel \(connect)")
+				#endif
 
 				_ = tunnel.sendMessage(connect)
 			}
@@ -66,6 +100,9 @@ open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 
 		public func channelInactive(context: ChannelHandlerContext) {
 			if let tunnel = self.tunnel {
+				#if TRACE
+					redbold("Disconnect tunnel from \(self.bindAddress) to \(self.remoteAddress)")
+				#endif
 				tunnel.sendMessage(CakeAgent.TunnelMessage.with { $0.eof = true}).whenComplete { _ in
 					_ = tunnel.sendEnd()
 				}
@@ -82,6 +119,9 @@ open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 					$0.datas = Data(buffer: data)
 				}
 
+				#if TRACE
+					redbold("Send message \(message)")
+				#endif
 				_ = tunnel.sendMessage(message)
 			} else {
 				context.fireChannelRead(data)
@@ -89,6 +129,9 @@ open class CakeAgentTunnelListener: PortForwarder, @unchecked Sendable {
 		}
 
 		public func errorCaught(context: ChannelHandlerContext, error: Error) {
+			#if TRACE
+				redbold("errorCaught \(error)")
+			#endif
 			context.close(promise: nil)
 
 			context.fireErrorCaught(error)

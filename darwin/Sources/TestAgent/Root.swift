@@ -82,6 +82,7 @@ struct Root: AsyncParsableCommand {
 	                                                	Run.self,
 	                                                	Shutdown.self,
 	                                                	Infos.self,
+	                                                	Tunnel.self,
 	                                                ])
 	public static func getHome(asSystem: Bool = false) throws -> URL {
 		let cakeHomeDir: URL
