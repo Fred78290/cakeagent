@@ -161,16 +161,16 @@ public struct DiskInfo: Sendable, Codable {
 
 public struct AttachedNetwork: Sendable, Codable {
 	public var network: String
-	public var mode: String
-	public var macAddress: String
+	public var mode: String?
+	public var macAddress: String?
 
 	public init() {
 		self.network = ""
-		self.mode = ""
-		self.macAddress = ""
+		self.mode = nil
+		self.macAddress = nil
 	}
 
-	public init(network: String, mode: String, macAddress: String) {
+	public init(network: String, mode: String?, macAddress: String?) {
 		self.network = network
 		self.mode = mode
 		self.macAddress = macAddress
@@ -190,6 +190,14 @@ public struct TunnelInfo: Sendable, Codable {
 	}
 
 	public var oneOf: OneOf
+
+	public init(from: ForwardedPort) {
+		self.oneOf = .forward(from)
+	}
+
+	public init(from: UnixDomainSocket) {
+		self.oneOf = .unixDomain(from)
+	}
 }
 
 public struct SocketInfo: Sendable, Codable {
