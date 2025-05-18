@@ -182,6 +182,18 @@ public struct TunnelInfo: Sendable, Codable {
 		public var proto: MappedPort.Proto
 		public var host: String
 		public var guest: String
+
+		public init() {
+			self.proto = .tcp
+			self.host = ""
+			self.guest = ""
+		}
+
+		public init(proto: MappedPort.Proto, host: String, guest: String) {
+			self.proto = proto
+			self.host = host
+			self.guest = guest
+		}
 	}
 
 	public enum OneOf: Sendable, Codable {
@@ -206,11 +218,51 @@ public struct SocketInfo: Sendable, Codable {
 		case connect // = 1
 		case tcp // = 2
 		case udp // = 3
+
+		var rawValue: Int {
+			switch self {
+			case .bind:
+				return 0
+			case .connect:
+				return 1
+			case .tcp:
+				return 2
+			case .udp:
+				return 3
+			}
+		}
+
+		public init?(rawValue: Int) {
+			switch rawValue {
+			case 0:
+				self = .bind
+			case 1:
+				self = .connect
+			case 2:
+				self = .tcp
+			case 3:
+				self = .udp
+			default:
+				return nil
+			}
+		}
 	}
 
 	public var mode: Mode
 	public var host: String
 	public var port: Int32
+
+	public init() {
+		self.mode = .bind
+		self.host = ""
+		self.port = 0
+	}
+
+	public init(mode: Mode, host: String, port: Int32) {
+		self.mode = mode
+		self.host = host
+		self.port = port
+	}
 }
 
 public struct InfoReply: Sendable, Codable {
