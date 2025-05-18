@@ -854,6 +854,10 @@ func (s *server) Execute(stream cakeagent.CakeAgentService_ExecuteServer) (err e
 }
 
 func (s *server) Tunnel(stream cakeagent.CakeAgentService_TunnelServer) error {
+	if glog.GetLevel() >= glog.TraceLevel {
+		glog.Trace("Tunnel requested")
+	}
+
 	if tunnelServer, err := tunnel.NewTunnelServer(stream); err == nil {
 		if glog.GetLevel() >= glog.TraceLevel {
 			glog.Trace("Tunnel server created")
@@ -862,6 +866,15 @@ func (s *server) Tunnel(stream cakeagent.CakeAgentService_TunnelServer) error {
 		return tunnelServer.Stream(nil)
 	} else {
 		glog.Errorf("Failed to create tunnel server: %v", err)
+
+		// If we have an error, we need to send it back to the client
+		message := &cakeagent.CakeAgent_TunnelMessage{
+			Message: &cakeagent.CakeAgent_TunnelMessage_Error{
+				Error: err.Error(),
+			},
+		}
+
+		stream.Send(message)
 
 		return err
 	}

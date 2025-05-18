@@ -5,6 +5,8 @@ import NIO
 import NIOPosix
 import NIOSSL
 import Semaphore
+import NIOPortForwarding
+
 
 typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
 
@@ -382,7 +384,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 			}
 		}
 
-		self.pipeChannel = try await stream.subchannel.flatMapThrowing { streamChannel in
+		let channel = try await stream.subchannel.flatMapThrowing { streamChannel in
 			return Task {
 				return try await NIOPipeBootstrap(group: self.eventLoop)
 					.channelOption(.autoRead, value: true)
@@ -404,7 +406,26 @@ final class CakeChannelStreamer: @unchecked Sendable {
 			}
 		}.get().value
 
+		self.pipeChannel = channel
+
 		try await pipeChannel!.executeThenClose { inbound, outbound in
+			stream.status.whenComplete { result in
+				switch result {
+				case .failure(let err):
+					#if TRACE
+						redbold("Tunnel error: \(err)")
+					#endif
+					channel.channel.close(promise: nil)
+				case .success(let status):
+					#if TRACE
+						redbold("Tunnel status: \(status)")
+					#endif
+					if status.code != .ok {
+						channel.channel.close(promise: nil)
+					}
+				}
+			}
+
 			if case let .execute(cmd, arguments) = command {
 				stream.sendCommand(command: cmd, arguments: arguments)
 			} else if case .shell = command {
@@ -665,4 +686,14 @@ public struct CakeAgentHelper: Sendable {
 
 		return try response.response.wait()
 	}
+
+	public func tunnel(bindAddress: SocketAddress, remoteAddress: SocketAddress, proto: MappedPort.Proto, callOptions: CallOptions? = nil) throws -> Int32 {
+		let listener = try CakeAgentTunnelListener(group: self.eventLoopGroup, cakeAgentClient: client)
+
+		_ = try listener.addPortForwardingServer(bindAddress: bindAddress, remoteAddress: remoteAddress, proto: proto, ttl: 5)
+
+		try listener.bind().wait()
+		return 0
+	}
+
 }

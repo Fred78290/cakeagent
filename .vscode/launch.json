@@ -13,7 +13,7 @@
 			"mode": "auto",
 			"program": "${workspaceFolder}/linux",
 			"args": [
-				"--listen=tcp://127.0.0.1:5000",
+				"--listen=tcp://127.0.0.1:5010",
 				"--log-level=trace",
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
 				"--tls-cert=${env:HOME}/.cake/agent/server.pem",
@@ -27,15 +27,15 @@
 			"mode": "auto",
 			"program": "${workspaceFolder}/linux",
 			"args": [
-				"--listen=tcp://127.0.0.1:5000"
+				"--listen=tcp://127.0.0.1:5010"
 			]
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [
 				"run",
-				"--listen=tcp://127.0.0.1:5000",
+				"--listen=tcp://127.0.0.1:5010",
 				"--log-level=trace",
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
 				"--tls-cert=${env:HOME}/.cake/agent/server.pem",
@@ -47,7 +47,7 @@
 			"preLaunchTask": "swift: Build Debug cakeagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [
 				"--help"
@@ -58,11 +58,11 @@
 			"preLaunchTask": "swift: Build Debug testagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [
 				"--insecure",
-				"--connect=tcp://127.0.0.1:500",
+				"--connect=tcp://127.0.0.1:5010",
 				"infos"
 			],
 			"cwd": "${workspaceFolder:cakeagent}",
@@ -71,11 +71,28 @@
 			"preLaunchTask": "swift: Build Debug testagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
+			"request": "launch",
+			"args": [
+				"--connect=tcp://127.0.0.1:5010",
+				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
+				"--tls-cert=${env:HOME}/.cake/agent/client.pem",
+				"--tls-key=${env:HOME}/.cake/agent/client.key",
+				"tunnel",
+				"--remote=/tmp/server.sock",
+				"--local=/tmp/tunnel.sock"
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "testagent tunnel",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "swift",
 			"request": "launch",
 			"args": [
 				"--insecure",
-				"--connect=tcp://127.0.0.1:500",
+				"--connect=tcp://127.0.0.1:5010",
 				"exec",
 				"ls"
 			],
@@ -85,11 +102,11 @@
 			"preLaunchTask": "swift: Build Debug testagent"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [
 				"--insecure",
-				"--connect=tcp://127.0.0.1:500",
+				"--connect=tcp://127.0.0.1:5010",
 				"shell"
 			],
 			"cwd": "${workspaceFolder:cakeagent}",
@@ -116,15 +133,6 @@
 			"preLaunchTask": "swift: Build Debug cakeagent"
 		},
 		{
-			"type": "lldb",
-			"request": "launch",
-			"args": [],
-			"cwd": "${workspaceFolder:cakeagent}",
-			"name": "Debug cakeagent",
-			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
-			"preLaunchTask": "swift: Build Debug cakeagent"
-		},
-		{
 			"type": "swift",
 			"request": "launch",
 			"args": [],
@@ -141,15 +149,6 @@
 			"name": "Debug testagent",
 			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
 			"preLaunchTask": "swift: Build Debug testagent"
-		},
-		{
-			"type": "lldb",
-			"request": "launch",
-			"args": [],
-			"cwd": "${workspaceFolder:cakeagent}",
-			"name": "Release testagent",
-			"program": "${workspaceFolder:cakeagent}/.build/release/testagent",
-			"preLaunchTask": "swift: Build Release testagent"
 		}
 	]
 }

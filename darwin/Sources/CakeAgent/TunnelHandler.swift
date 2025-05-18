@@ -133,6 +133,8 @@ struct TunnelHandlerStream {
 								try await output.write(ByteBuffer(data: data))
 							} else if case .eof = request.message {
 								return
+							} else if case .error(let err) = request.message {
+								throw ServiceError(err)
 							} else {
 								throw ServiceError("protocol error, unexpected TunnelMessage: \(String(describing: request.message))")
 							}
