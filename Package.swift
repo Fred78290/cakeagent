@@ -21,7 +21,7 @@ let package = Package(
 		.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.29.0"),
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
 		.package(url: "https://github.com/groue/Semaphore", from: "0.0.8"),
-		.package(url: "https://github.com/Fred78290/swift-nio-portforwarding.git",  revision: "b4af57ead7328319f6ea482b87f3c0d0c9909b40"),
+		.package(url: "https://github.com/Fred78290/swift-nio-portforwarding.git", .upToNextMajor(from: "0.2.2")),
 	],
 	targets: [
 		.target(name: "CakeAgentLib",
