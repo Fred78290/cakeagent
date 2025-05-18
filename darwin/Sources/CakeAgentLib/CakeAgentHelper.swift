@@ -159,6 +159,52 @@ public struct DiskInfo: Sendable, Codable {
 	}
 }
 
+public struct AttachedNetwork: Sendable, Codable {
+	public var network: String
+	public var mode: String
+	public var macAddress: String
+
+	public init() {
+		self.network = ""
+		self.mode = ""
+		self.macAddress = ""
+	}
+
+	public init(network: String, mode: String, macAddress: String) {
+		self.network = network
+		self.mode = mode
+		self.macAddress = macAddress
+	}
+}
+
+public struct TunnelInfo: Sendable, Codable {
+	public struct UnixDomainSocket: Sendable, Codable {
+		public var proto: MappedPort.Proto
+		public var host: String
+		public var guest: String
+	}
+
+	public enum OneOf: Sendable, Codable {
+		case forward(ForwardedPort)
+		case unixDomain(UnixDomainSocket)
+	}
+
+	public var oneOf: OneOf
+}
+
+public struct SocketInfo: Sendable, Codable {
+	public enum Mode: Sendable, Codable {
+		case bind // = 0
+		case connect // = 1
+		case tcp // = 2
+		case udp // = 3
+	}
+
+	public var mode: Mode
+	public var host: String
+	public var port: Int32
+}
+
 public struct InfoReply: Sendable, Codable {
 	public var name: String
 	public var version: String?
@@ -172,6 +218,9 @@ public struct InfoReply: Sendable, Codable {
 	public var release: String?
 	public var mounts: [String]?
 	public var status: Status
+	public var attachedNetworks: [AttachedNetwork]?
+	public var tunnelInfos: [TunnelInfo]?
+	public var socketInfos: [SocketInfo]?
 
 	init() {
 		self.name = ""
@@ -184,8 +233,11 @@ public struct InfoReply: Sendable, Codable {
 		self.osname = ""
 		self.hostname = nil
 		self.release = nil
-		self.mounts = nil
 		self.status = .stopped
+		self.mounts = nil
+		self.attachedNetworks = nil
+		self.tunnelInfos = nil
+		self.socketInfos = nil
 	}
 
 	public init(info: CakeAgent.InfoReply) {
