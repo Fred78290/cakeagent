@@ -306,12 +306,15 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		try await TunnelHandlerStream(on: self.group.next(), requestStream: requestStream, responseStream: responseStream).stream()
 	}
 
-	func mount(request: CakeAgent.MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
+	func mount(request: CakeAgent.MountRequest, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
 		CakeAgent.MountReply.with { $0.error = "Not supported" }
 	}
 
-	func umount(request: CakeAgent.MountRequest, context: GRPC.GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
+	func umount(request: CakeAgent.MountRequest, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
 		CakeAgent.MountReply.with { $0.error = "Not supported" }
 	}
 
+    func events(request: CakeAgent.Empty, responseStream: GRPCAsyncResponseStreamWriter<CakeAgent.TunnelPortForwardEvent>, context: GRPC.GRPCAsyncServerCallContext) async throws {
+        try await responseStream.send(CakeAgent.TunnelPortForwardEvent.with { $0.error = "Not supported" })
+    }
 }	

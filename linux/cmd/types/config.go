@@ -11,6 +11,7 @@ import (
 
 const (
 	DefaultMaxRequestTimeout time.Duration = 120 * time.Second
+	DefaulktTickEvent        time.Duration = 1 * time.Second
 )
 
 type Config struct {
@@ -24,6 +25,7 @@ type Config struct {
 	LogLevel       string
 	DisplayVersion bool
 	Timeout        time.Duration
+	TickEvent      time.Duration
 }
 
 func NewConfig() *Config {
@@ -33,6 +35,7 @@ func NewConfig() *Config {
 		LogFormat:      "text",
 		LogLevel:       glog.InfoLevel.String(),
 		Timeout:        DefaultMaxRequestTimeout,
+		TickEvent:      DefaulktTickEvent,
 	}
 }
 
@@ -69,6 +72,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
 
 	app.Flag("timeout", "Request timeout for operation. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.Timeout)
+	app.Flag("tick", "Tick event idling").Default(DefaulktTickEvent.String()).DurationVar(&cfg.TickEvent)
 
 	app.Flag("version", "Display version and exit").BoolVar(&cfg.DisplayVersion)
 

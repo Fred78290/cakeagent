@@ -20,6 +20,7 @@ import (
 
 	"github.com/Fred78290/cakeagent/cmd/types"
 	"github.com/Fred78290/cakeagent/pkg/cakeagent"
+	"github.com/Fred78290/cakeagent/pkg/event"
 	"github.com/Fred78290/cakeagent/pkg/mount"
 	"github.com/Fred78290/cakeagent/pkg/resize"
 	"github.com/Fred78290/cakeagent/pkg/serialport"
@@ -36,6 +37,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
+
+	"github.com/lima-vm/lima/pkg/guestagent"
+	"github.com/lima-vm/lima/pkg/guestagent/api"
 )
 
 const (
@@ -46,6 +50,7 @@ const (
 
 type server struct {
 	cakeagent.UnimplementedCakeAgentServiceServer
+	agent guestagent.Agent
 }
 
 type pipe struct {
@@ -904,6 +909,57 @@ func (s *server) ResizeDisk(context.Context, *cakeagent.CakeAgent_Empty) (*cakea
 	}
 }
 
+func (s *server) Events(_ *cakeagent.CakeAgent_Empty, stream cakeagent.CakeAgentService_EventsServer) error {
+	if s.agent == nil {
+		response := &cakeagent.CakeAgent_TunnelPortForwardEvent{
+			Event: &cakeagent.CakeAgent_TunnelPortForwardEvent_Error{
+				Error: "agent not initialized",
+			},
+		}
+
+		if err := stream.Send(response); err != nil {
+			return fmt.Errorf("agent not initialized")
+		}
+	} else {
+		responses := make(chan *api.Event)
+
+		go s.agent.Events(stream.Context(), responses)
+
+		for response := range responses {
+			forwardEvent := &cakeagent.CakeAgent_TunnelPortForwardEvent_ForwardEvent{
+				AddedPorts:   make([]*cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward, 0, len(response.LocalPortsAdded)),
+				RemovedPorts: make([]*cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward, 0, len(response.LocalPortsRemoved)),
+			}
+
+			for _, port := range response.LocalPortsAdded {
+				forwardEvent.AddedPorts = append(forwardEvent.AddedPorts, &cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward{
+					Ip:   port.Ip,
+					Port: port.Port,
+				})
+			}
+
+			for _, port := range response.LocalPortsRemoved {
+				forwardEvent.RemovedPorts = append(forwardEvent.RemovedPorts, &cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward{
+					Ip:   port.Ip,
+					Port: port.Port,
+				})
+			}
+
+			message := &cakeagent.CakeAgent_TunnelPortForwardEvent{
+				Event: &cakeagent.CakeAgent_TunnelPortForwardEvent_ForwardEvent_{
+					ForwardEvent: forwardEvent,
+				},
+			}
+
+			if err := stream.Send(message); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func createListener(listen string) (listener net.Listener, err error) {
 	var u *url.URL
 
@@ -967,9 +1023,12 @@ func createListener(listen string) (listener net.Listener, err error) {
 
 func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 	var listener net.Listener
+	var agent guestagent.Agent
 
 	if listener, err = createListener(cfg.Address); err != nil {
 		err = fmt.Errorf("failed to parse address: %s", err)
+	} else if agent, err = event.NewAgent(cfg.TickEvent); err != nil {
+		err = fmt.Errorf("failed to create agent: %s", err)
 	} else {
 		if cfg.TlsCert != "" && cfg.TlsKey != "" && cfg.CaCert != "" {
 
@@ -999,7 +1058,9 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 		if err == nil {
 			glog.Infof("Starting gRPC server on %s", cfg.Address)
 
-			cakeagent.RegisterCakeAgentServiceServer(grpcServer, &server{})
+			cakeagent.RegisterCakeAgentServiceServer(grpcServer, &server{
+				agent: agent,
+			})
 
 			if err = grpcServer.Serve(listener); err != nil {
 				err = fmt.Errorf("failed to serve: %s", err)

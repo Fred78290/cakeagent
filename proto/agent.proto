@@ -17,6 +17,7 @@ service CakeAgentService {
 	rpc Mount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
 	rpc Umount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
 	rpc Tunnel(stream CakeAgent.TunnelMessage) returns (stream CakeAgent.TunnelMessage);
+	rpc Events(CakeAgent.Empty) returns (stream CakeAgent.TunnelPortForwardEvent);
 }
 
 message CakeAgent {
@@ -39,7 +40,25 @@ message CakeAgent {
 			string error = 4; //error message
 		}
 	}
-	
+
+	message TunnelPortForwardEvent {
+		message TunnelPortForward {
+			TunnelMessage.TunnelProtocol protocol = 1; //tcp, udp
+			string ip = 2; //ip address of the guest
+			int32 port = 3; //port of the guest
+		}
+
+		message ForwardEvent {
+			repeated TunnelPortForward addedPorts = 1; //list of ports
+			repeated TunnelPortForward removedPorts = 12; //list of ports
+		}
+
+		oneof event {
+			ForwardEvent forwardEvent = 1;
+			string error = 2; //error message
+		}
+	}
+
 	message Empty {
 	}
 
