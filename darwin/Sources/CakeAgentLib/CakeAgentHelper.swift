@@ -210,6 +210,34 @@ public struct TunnelInfo: Sendable, Codable {
 	public init(from: UnixDomainSocket) {
 		self.oneOf = .unixDomain(from)
 	}
+
+	public init(from decoder: Decoder) throws {
+		let container: KeyedDecodingContainer<Self.CodingKeys> = try decoder.container(keyedBy: CodingKeys.self)
+
+		if let forward = try container.decodeIfPresent(ForwardedPort.self, forKey: .forward) {
+			self.oneOf = .forward(forward)
+		} else if let unixDomainSocket = try container.decodeIfPresent(UnixDomainSocket.self, forKey: .unixDomain) {
+			self.oneOf = .unixDomain(unixDomainSocket)
+		} else {
+			throw NSError(domain: "CakeAgent", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid TunnelInfo"])
+		}
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container: KeyedEncodingContainer<CodingKeys> = encoder.container(keyedBy: CodingKeys.self)
+
+		switch oneOf {
+		case .forward(let value):
+			try container.encode(value, forKey: .forward)
+		case .unixDomain(let value):
+			try container.encode(value, forKey: .unixDomain)
+		}
+	}
+
+	enum CodingKeys: String, CodingKey {
+		case forward
+		case unixDomain
+	}
 }
 
 public struct SocketInfo: Sendable, Codable {
