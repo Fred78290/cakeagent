@@ -149,6 +149,13 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 
 		return [CakeAgentClientInterceptor<CakeAgent.TunnelMessage, CakeAgent.TunnelMessage>(inputHandle: inputHandle, state: state)]
 	}
-	
+
+	public func makeEventsInterceptors() -> [GRPC.ClientInterceptor<CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.events) == false {
+			return []
+		}
+
+		return [CakeAgentClientInterceptor<CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>(inputHandle: inputHandle, state: state)]
+	}
 
 }

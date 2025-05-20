@@ -136,6 +136,77 @@ public struct Cakeagent_CakeAgent: Sendable {
     public init() {}
   }
 
+  public struct TunnelPortForwardEvent: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var event: Cakeagent_CakeAgent.TunnelPortForwardEvent.OneOf_Event? = nil
+
+    public var forwardEvent: Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent {
+      get {
+        if case .forwardEvent(let v)? = event {return v}
+        return Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent()
+      }
+      set {event = .forwardEvent(newValue)}
+    }
+
+    ///error message
+    public var error: String {
+      get {
+        if case .error(let v)? = event {return v}
+        return String()
+      }
+      set {event = .error(newValue)}
+    }
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public enum OneOf_Event: Equatable, Sendable {
+      case forwardEvent(Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent)
+      ///error message
+      case error(String)
+
+    }
+
+    public struct TunnelPortForward: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      ///tcp, udp
+      public var `protocol`: Cakeagent_CakeAgent.TunnelMessage.TunnelProtocol = .tcp
+
+      ///ip address of the guest
+      public var ip: String = String()
+
+      ///port of the guest
+      public var port: Int32 = 0
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public struct ForwardEvent: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      ///list of ports
+      public var addedPorts: [Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward] = []
+
+      ///list of ports
+      public var removedPorts: [Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward] = []
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public init() {}
+  }
+
   public struct Empty: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -751,6 +822,153 @@ extension Cakeagent_CakeAgent.TunnelMessage.TunnelMessageConnect: SwiftProtobuf.
     if lhs.id != rhs.id {return false}
     if lhs.`protocol` != rhs.`protocol` {return false}
     if lhs.guestAddress != rhs.guestAddress {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.TunnelPortForwardEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".TunnelPortForwardEvent"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "forwardEvent"),
+    2: .same(proto: "error"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent?
+        var hadOneofValue = false
+        if let current = self.event {
+          hadOneofValue = true
+          if case .forwardEvent(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.event = .forwardEvent(v)
+        }
+      }()
+      case 2: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.event != nil {try decoder.handleConflictingOneOf()}
+          self.event = .error(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.event {
+    case .forwardEvent?: try {
+      guard case .forwardEvent(let v)? = self.event else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }()
+    case .error?: try {
+      guard case .error(let v)? = self.event else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.TunnelPortForwardEvent, rhs: Cakeagent_CakeAgent.TunnelPortForwardEvent) -> Bool {
+    if lhs.event != rhs.event {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.TunnelPortForwardEvent.protoMessageName + ".TunnelPortForward"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "protocol"),
+    2: .same(proto: "ip"),
+    3: .same(proto: "port"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.`protocol`) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.ip) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.port) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.`protocol` != .tcp {
+      try visitor.visitSingularEnumField(value: self.`protocol`, fieldNumber: 1)
+    }
+    if !self.ip.isEmpty {
+      try visitor.visitSingularStringField(value: self.ip, fieldNumber: 2)
+    }
+    if self.port != 0 {
+      try visitor.visitSingularInt32Field(value: self.port, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward, rhs: Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward) -> Bool {
+    if lhs.`protocol` != rhs.`protocol` {return false}
+    if lhs.ip != rhs.ip {return false}
+    if lhs.port != rhs.port {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.TunnelPortForwardEvent.protoMessageName + ".ForwardEvent"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "addedPorts"),
+    12: .same(proto: "removedPorts"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.addedPorts) }()
+      case 12: try { try decoder.decodeRepeatedMessageField(value: &self.removedPorts) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.addedPorts.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.addedPorts, fieldNumber: 1)
+    }
+    if !self.removedPorts.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.removedPorts, fieldNumber: 12)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent, rhs: Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent) -> Bool {
+    if lhs.addedPorts != rhs.addedPorts {return false}
+    if lhs.removedPorts != rhs.removedPorts {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

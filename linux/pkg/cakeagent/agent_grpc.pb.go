@@ -27,6 +27,7 @@ const (
 	CakeAgentService_Mount_FullMethodName      = "/cakeagent.CakeAgentService/Mount"
 	CakeAgentService_Umount_FullMethodName     = "/cakeagent.CakeAgentService/Umount"
 	CakeAgentService_Tunnel_FullMethodName     = "/cakeagent.CakeAgentService/Tunnel"
+	CakeAgentService_Events_FullMethodName     = "/cakeagent.CakeAgentService/Events"
 )
 
 // CakeAgentServiceClient is the client API for CakeAgentService service.
@@ -41,6 +42,7 @@ type CakeAgentServiceClient interface {
 	Mount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
 	Umount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
 	Tunnel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage], error)
+	Events(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CakeAgent_TunnelPortForwardEvent], error)
 }
 
 type cakeAgentServiceClient struct {
@@ -137,6 +139,25 @@ func (c *cakeAgentServiceClient) Tunnel(ctx context.Context, opts ...grpc.CallOp
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CakeAgentService_TunnelClient = grpc.BidiStreamingClient[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]
 
+func (c *cakeAgentServiceClient) Events(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CakeAgent_TunnelPortForwardEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &CakeAgentService_ServiceDesc.Streams[2], CakeAgentService_Events_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[CakeAgent_Empty, CakeAgent_TunnelPortForwardEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CakeAgentService_EventsClient = grpc.ServerStreamingClient[CakeAgent_TunnelPortForwardEvent]
+
 // CakeAgentServiceServer is the server API for CakeAgentService service.
 // All implementations must embed UnimplementedCakeAgentServiceServer
 // for forward compatibility.
@@ -149,6 +170,7 @@ type CakeAgentServiceServer interface {
 	Mount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
 	Umount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
 	Tunnel(grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]) error
+	Events(*CakeAgent_Empty, grpc.ServerStreamingServer[CakeAgent_TunnelPortForwardEvent]) error
 	mustEmbedUnimplementedCakeAgentServiceServer()
 }
 
@@ -182,6 +204,9 @@ func (UnimplementedCakeAgentServiceServer) Umount(context.Context, *CakeAgent_Mo
 }
 func (UnimplementedCakeAgentServiceServer) Tunnel(grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]) error {
 	return status.Errorf(codes.Unimplemented, "method Tunnel not implemented")
+}
+func (UnimplementedCakeAgentServiceServer) Events(*CakeAgent_Empty, grpc.ServerStreamingServer[CakeAgent_TunnelPortForwardEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method Events not implemented")
 }
 func (UnimplementedCakeAgentServiceServer) mustEmbedUnimplementedCakeAgentServiceServer() {}
 func (UnimplementedCakeAgentServiceServer) testEmbeddedByValue()                          {}
@@ -326,6 +351,17 @@ func _CakeAgentService_Tunnel_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CakeAgentService_TunnelServer = grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]
 
+func _CakeAgentService_Events_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(CakeAgent_Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CakeAgentServiceServer).Events(m, &grpc.GenericServerStream[CakeAgent_Empty, CakeAgent_TunnelPortForwardEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CakeAgentService_EventsServer = grpc.ServerStreamingServer[CakeAgent_TunnelPortForwardEvent]
+
 // CakeAgentService_ServiceDesc is the grpc.ServiceDesc for CakeAgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -370,6 +406,11 @@ var CakeAgentService_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _CakeAgentService_Tunnel_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "Events",
+			Handler:       _CakeAgentService_Events_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "agent.proto",

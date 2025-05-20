@@ -55,6 +55,12 @@ public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
     callOptions: CallOptions?,
     handler: @escaping (Cakeagent_CakeAgent.TunnelMessage) -> Void
   ) -> BidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>
+
+  func events(
+    _ request: Cakeagent_CakeAgent.Empty,
+    callOptions: CallOptions?,
+    handler: @escaping (Cakeagent_CakeAgent.TunnelPortForwardEvent) -> Void
+  ) -> ServerStreamingCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>
 }
 
 extension Cakeagent_CakeAgentServiceClientProtocol {
@@ -211,6 +217,27 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
       handler: handler
     )
   }
+
+  /// Server streaming call to Events
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Events.
+  ///   - callOptions: Call options.
+  ///   - handler: A closure called when each response is received from the server.
+  /// - Returns: A `ServerStreamingCall` with futures for the metadata and status.
+  public func events(
+    _ request: Cakeagent_CakeAgent.Empty,
+    callOptions: CallOptions? = nil,
+    handler: @escaping (Cakeagent_CakeAgent.TunnelPortForwardEvent) -> Void
+  ) -> ServerStreamingCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent> {
+    return self.makeServerStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.events.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeEventsInterceptors() ?? [],
+      handler: handler
+    )
+  }
 }
 
 @available(*, deprecated)
@@ -312,6 +339,11 @@ public protocol Cakeagent_CakeAgentServiceAsyncClientProtocol: GRPCClient {
   func makeTunnelCall(
     callOptions: CallOptions?
   ) -> GRPCAsyncBidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>
+
+  func makeEventsCall(
+    _ request: Cakeagent_CakeAgent.Empty,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncServerStreamingCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -413,6 +445,18 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
       path: Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel.path,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeTunnelInterceptors() ?? []
+    )
+  }
+
+  public func makeEventsCall(
+    _ request: Cakeagent_CakeAgent.Empty,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncServerStreamingCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent> {
+    return self.makeAsyncServerStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.events.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeEventsInterceptors() ?? []
     )
   }
 }
@@ -538,6 +582,18 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
       interceptors: self.interceptors?.makeTunnelInterceptors() ?? []
     )
   }
+
+  public func events(
+    _ request: Cakeagent_CakeAgent.Empty,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncResponseStream<Cakeagent_CakeAgent.TunnelPortForwardEvent> {
+    return self.performAsyncServerStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.events.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeEventsInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -582,6 +638,9 @@ public protocol Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol: Send
 
   /// - Returns: Interceptors to use when invoking 'tunnel'.
   func makeTunnelInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>]
+
+  /// - Returns: Interceptors to use when invoking 'events'.
+  func makeEventsInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>]
 }
 
 public enum Cakeagent_CakeAgentServiceClientMetadata {
@@ -597,6 +656,7 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
       Cakeagent_CakeAgentServiceClientMetadata.Methods.mount,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.umount,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.events,
     ]
   )
 
@@ -648,6 +708,12 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
       path: "/cakeagent.CakeAgentService/Tunnel",
       type: GRPCCallType.bidirectionalStreaming
     )
+
+    public static let events = GRPCMethodDescriptor(
+      name: "Events",
+      path: "/cakeagent.CakeAgentService/Events",
+      type: GRPCCallType.serverStreaming
+    )
   }
 }
 
@@ -670,6 +736,8 @@ public protocol Cakeagent_CakeAgentServiceProvider: CallHandlerProvider {
   func umount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
 
   func tunnel(context: StreamingResponseCallContext<Cakeagent_CakeAgent.TunnelMessage>) -> EventLoopFuture<(StreamEvent<Cakeagent_CakeAgent.TunnelMessage>) -> Void>
+
+  func events(request: Cakeagent_CakeAgent.Empty, context: StreamingResponseCallContext<Cakeagent_CakeAgent.TunnelPortForwardEvent>) -> EventLoopFuture<GRPCStatus>
 }
 
 extension Cakeagent_CakeAgentServiceProvider {
@@ -756,6 +824,15 @@ extension Cakeagent_CakeAgentServiceProvider {
         observerFactory: self.tunnel(context:)
       )
 
+    case "Events":
+      return ServerStreamingServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.TunnelPortForwardEvent>(),
+        interceptors: self.interceptors?.makeEventsInterceptors() ?? [],
+        userFunction: self.events(request:context:)
+      )
+
     default:
       return nil
     }
@@ -807,6 +884,12 @@ public protocol Cakeagent_CakeAgentServiceAsyncProvider: CallHandlerProvider, Se
   func tunnel(
     requestStream: GRPCAsyncRequestStream<Cakeagent_CakeAgent.TunnelMessage>,
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.TunnelMessage>,
+    context: GRPCAsyncServerCallContext
+  ) async throws
+
+  func events(
+    request: Cakeagent_CakeAgent.Empty,
+    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.TunnelPortForwardEvent>,
     context: GRPCAsyncServerCallContext
   ) async throws
 }
@@ -902,6 +985,15 @@ extension Cakeagent_CakeAgentServiceAsyncProvider {
         wrapping: { try await self.tunnel(requestStream: $0, responseStream: $1, context: $2) }
       )
 
+    case "Events":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.Empty>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.TunnelPortForwardEvent>(),
+        interceptors: self.interceptors?.makeEventsInterceptors() ?? [],
+        wrapping: { try await self.events(request: $0, responseStream: $1, context: $2) }
+      )
+
     default:
       return nil
     }
@@ -941,6 +1033,10 @@ public protocol Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol: Send
   /// - Returns: Interceptors to use when handling 'tunnel'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeTunnelInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>]
+
+  /// - Returns: Interceptors to use when handling 'events'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeEventsInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>]
 }
 
 public enum Cakeagent_CakeAgentServiceServerMetadata {
@@ -956,6 +1052,7 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
       Cakeagent_CakeAgentServiceServerMetadata.Methods.mount,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.umount,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.tunnel,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.events,
     ]
   )
 
@@ -1006,6 +1103,12 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
       name: "Tunnel",
       path: "/cakeagent.CakeAgentService/Tunnel",
       type: GRPCCallType.bidirectionalStreaming
+    )
+
+    public static let events = GRPCMethodDescriptor(
+      name: "Events",
+      path: "/cakeagent.CakeAgentService/Events",
+      type: GRPCCallType.serverStreaming
     )
   }
 }
