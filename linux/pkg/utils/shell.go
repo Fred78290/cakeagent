@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -28,4 +29,15 @@ func Shell(args ...string) (stdOut string, stdErr string, err error) {
 	}
 
 	return
+}
+
+// ToJSON serialize interface to json
+func ToJSON(v any) string {
+	if v == nil {
+		return ""
+	}
+
+	b, _ := json.Marshal(v)
+
+	return string(b)
 }

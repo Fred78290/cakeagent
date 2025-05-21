@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ import (
 	"github.com/Fred78290/cakeagent/pkg/resize"
 	"github.com/Fred78290/cakeagent/pkg/serialport"
 	"github.com/Fred78290/cakeagent/pkg/tunnel"
+	"github.com/Fred78290/cakeagent/pkg/utils"
 	"github.com/creack/pty"
 	"github.com/elastic/go-sysinfo"
 	"github.com/mdlayher/vsock"
@@ -57,6 +59,12 @@ type pipe struct {
 	name   string
 	input  *os.File
 	output *os.File
+}
+
+type networkInterface struct {
+	Name      string
+	Index     int
+	Addresses []string
 }
 
 func (p *pipe) Close() {
@@ -353,6 +361,50 @@ func (s *server) isEAGAIN(err error) bool {
 	return false
 }
 
+func (s *server) IpAddresses() ([]networkInterface, error) {
+	var result []networkInterface
+
+	if interfaces, err := net.Interfaces(); err != nil {
+		return nil, err
+	} else {
+		// We need to find interface with an address
+		// that is not a loopback address
+		// and that is not a link local address
+		// and that is not a multicast address
+		// and that is not a broadcast address
+		// and that is not a point to point address
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagLoopback == 0 {
+				inf := networkInterface{
+					Name:      iface.Name,
+					Index:     iface.Index,
+					Addresses: []string{},
+				}
+
+				if addrs, err := iface.Addrs(); err == nil {
+					for _, addr := range addrs {
+						var ip net.IP
+						switch v := addr.(type) {
+						case *net.IPNet:
+							ip = v.IP
+						case *net.IPAddr:
+							ip = v.IP
+						}
+
+						if ip != nil && !ip.IsLoopback() && ip.IsGlobalUnicast() {
+							inf.Addresses = append(inf.Addresses, ip.String())
+						}
+					}
+
+					result = append(result, inf)
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
 func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_InfoReply, err error) {
 	var partitions []disk.PartitionStat
 
@@ -409,24 +461,11 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 	}
 
 	// Get IP addresses
-	if interfaces, err := net.Interfaces(); err != nil {
+	if addresses, err := s.IpAddresses(); err != nil {
 		return nil, err
 	} else {
-		for _, iface := range interfaces {
-			if addrs, err := iface.Addrs(); err == nil {
-				for _, addr := range addrs {
-					var ip net.IP
-					switch v := addr.(type) {
-					case *net.IPNet:
-						ip = v.IP
-					case *net.IPAddr:
-						ip = v.IP
-					}
-					if ip != nil && !ip.IsLoopback() && ip.To4() != nil {
-						reply.Ipaddresses = append(reply.Ipaddresses, ip.String())
-					}
-				}
-			}
+		for _, address := range addresses {
+			reply.Ipaddresses = append(reply.Ipaddresses, address.Addresses...)
 		}
 	}
 
@@ -910,17 +949,70 @@ func (s *server) ResizeDisk(context.Context, *cakeagent.CakeAgent_Empty) (*cakea
 }
 
 func (s *server) Events(_ *cakeagent.CakeAgent_Empty, stream cakeagent.CakeAgentService_EventsServer) error {
-	if s.agent == nil {
+	var ipv6 string
+	var ipv4 string
+
+	sendError := func(err string) {
 		response := &cakeagent.CakeAgent_TunnelPortForwardEvent{
 			Event: &cakeagent.CakeAgent_TunnelPortForwardEvent_Error{
-				Error: "agent not initialized",
+				Error: err,
 			},
 		}
 
 		if err := stream.Send(response); err != nil {
-			return fmt.Errorf("agent not initialized")
+			glog.Errorf("Failed to send error message: %v", err)
 		}
+	}
+
+	hostAddres := func(ip string) string {
+		if ip == "0.0.0.0" {
+			return ipv4
+		} else if ip == "::" {
+			if ipv6 == "" {
+				return ipv4
+			}
+
+			return ipv6
+		}
+
+		return ip
+	}
+
+	if interfaces, err := s.IpAddresses(); err != nil {
+		sendError("failed to get network interfaces")
+		glog.Errorf("Failed to get network interfaces: %v", err)
+	} else if s.agent == nil {
+		sendError("agent not initialized")
+		glog.Error("agent not initialized")
 	} else {
+		for _, str := range interfaces[0].Addresses {
+			if addr, err := netip.ParseAddr(str); err == nil {
+				if glog.GetLevel() >= glog.TraceLevel {
+					glog.Tracef("Found IP address: %s, len:%d", str, addr.BitLen())
+				}
+
+				if addr.Is4() {
+					if ipv4 == "" {
+						ipv4 = str
+						if glog.GetLevel() >= glog.TraceLevel {
+							glog.Tracef("Found IPv4: %s", ipv4)
+						}
+					}
+				} else if addr.Is6() {
+					if ipv6 == "" {
+						ipv6 = str
+						if glog.GetLevel() >= glog.TraceLevel {
+							glog.Tracef("Found IPv6: %s", ipv6)
+						}
+					}
+				}
+			}
+		}
+
+		if glog.GetLevel() >= glog.TraceLevel {
+			glog.Tracef("Found %d network interfaces: %s", len(interfaces), utils.ToJSON(interfaces))
+		}
+
 		responses := make(chan *api.Event)
 
 		go s.agent.Events(stream.Context(), responses)
@@ -932,19 +1024,26 @@ func (s *server) Events(_ *cakeagent.CakeAgent_Empty, stream cakeagent.CakeAgent
 			}
 
 			for _, port := range response.LocalPortsAdded {
-				forwardEvent.AddedPorts = append(forwardEvent.AddedPorts, &cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward{
-					Ip:   port.Ip,
-					Port: port.Port,
-				})
+				if ip := net.ParseIP(port.Ip); ip != nil {
+					if !ip.IsMulticast() && !ip.IsLinkLocalUnicast() && !ip.IsLoopback() {
+						forwardEvent.AddedPorts = append(forwardEvent.AddedPorts, &cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward{
+							Ip:   hostAddres(port.Ip),
+							Port: port.Port,
+						})
+					}
+				}
 			}
 
 			for _, port := range response.LocalPortsRemoved {
-				forwardEvent.RemovedPorts = append(forwardEvent.RemovedPorts, &cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward{
-					Ip:   port.Ip,
-					Port: port.Port,
-				})
+				if ip := net.ParseIP(port.Ip); ip != nil {
+					if !ip.IsMulticast() && !ip.IsLinkLocalUnicast() && !ip.IsLoopback() {
+						forwardEvent.RemovedPorts = append(forwardEvent.RemovedPorts, &cakeagent.CakeAgent_TunnelPortForwardEvent_TunnelPortForward{
+							Ip:   hostAddres(port.Ip),
+							Port: port.Port,
+						})
+					}
+				}
 			}
-
 			message := &cakeagent.CakeAgent_TunnelPortForwardEvent{
 				Event: &cakeagent.CakeAgent_TunnelPortForwardEvent_ForwardEvent_{
 					ForwardEvent: forwardEvent,
