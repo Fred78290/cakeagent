@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -395,6 +396,10 @@ func (s *server) IpAddresses() ([]networkInterface, error) {
 							inf.Addresses = append(inf.Addresses, ip.String())
 						}
 					}
+
+					sort.Slice(inf.Addresses, func(i, j int) bool {
+						return len(inf.Addresses[i]) < len(inf.Addresses[j])
+					})
 
 					result = append(result, inf)
 				}
