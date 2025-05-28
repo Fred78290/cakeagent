@@ -15,17 +15,18 @@ const (
 )
 
 type Config struct {
-	InstallService bool
-	Mounts         []string
-	Address        string
-	CaCert         string
-	TlsCert        string
-	TlsKey         string
-	LogFormat      string
-	LogLevel       string
-	DisplayVersion bool
-	Timeout        time.Duration
-	TickEvent      time.Duration
+	InstallService  bool
+	Mounts          []string
+	Address         string
+	CaCert          string
+	TlsCert         string
+	TlsKey          string
+	LogFormat       string
+	LogLevel        string
+	DisplayVersion  bool
+	ConsoleEndpoint string
+	Timeout         time.Duration
+	TickEvent       time.Duration
 }
 
 func NewConfig() *Config {
@@ -63,6 +64,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("install", "Install as service").Default("false").BoolVar(&cfg.InstallService)
 	app.Flag("mount", "Mount endpoint").StringsVar(&cfg.Mounts)
 	app.Flag("listen", "Listen on address").Default(cfg.Address).StringVar(&cfg.Address)
+	app.Flag("console", "Console endpoint").Default(cfg.ConsoleEndpoint).StringVar(&cfg.ConsoleEndpoint)
 
 	app.Flag("ca-cert", "CA TLS certificate").Default(cfg.CaCert).StringVar(&cfg.CaCert)
 	app.Flag("tls-cert", "Server TLS certificate").Default(cfg.TlsCert).StringVar(&cfg.TlsCert)
