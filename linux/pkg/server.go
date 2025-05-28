@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Fred78290/cakeagent/cmd/types"
+	"github.com/Fred78290/cakeagent/console"
 	"github.com/Fred78290/cakeagent/pkg/cakeagent"
 	"github.com/Fred78290/cakeagent/pkg/event"
 	"github.com/Fred78290/cakeagent/pkg/mount"
@@ -37,9 +38,7 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
 
 	"github.com/lima-vm/lima/pkg/guestagent"
 	"github.com/lima-vm/lima/pkg/guestagent/api"
@@ -255,111 +254,6 @@ func (t *pseudoTTY) WriteToStdin(data []byte) (n int, err error) {
 		n, err = t.stdin.output.Write(data)
 	}
 	return
-}
-
-func (s *server) isGRPCCancel(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if status, ok := status.FromError(err); ok {
-		return status.Code() == codes.Canceled
-	}
-
-	return false
-}
-
-func (s *server) isEINTR(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if opErr, ok := err.(*os.PathError); ok {
-		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
-			if syscallErr == syscall.EINTR {
-				return true
-			}
-		}
-	}
-
-	if syscallErr, ok := err.(syscall.Errno); ok {
-		if syscallErr == syscall.EINTR {
-			return true
-		}
-	}
-
-	if opErr, ok := err.(*os.SyscallError); ok {
-		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
-			if syscallErr == syscall.EINTR {
-				return true
-			}
-		}
-	}
-
-	if opErr, ok := err.(*os.LinkError); ok {
-		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
-			if syscallErr == syscall.EINTR {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (s *server) isUnexpectedError(err error) bool {
-
-	if err == nil {
-		return false
-	}
-
-	if _, ok := err.(*exec.ExitError); ok {
-		return false
-	}
-
-	if err == io.EOF || err == io.ErrClosedPipe || err == context.Canceled {
-		return false
-	}
-
-	return true
-}
-
-func (s *server) isEAGAIN(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if opErr, ok := err.(*os.PathError); ok {
-		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
-			if syscallErr == syscall.EAGAIN {
-				return true
-			}
-		}
-	}
-
-	if syscallErr, ok := err.(syscall.Errno); ok {
-		if syscallErr == syscall.EAGAIN {
-			return true
-		}
-	}
-
-	if opErr, ok := err.(*os.SyscallError); ok {
-		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
-			if syscallErr == syscall.EAGAIN {
-				return true
-			}
-		}
-	}
-
-	if opErr, ok := err.(*os.LinkError); ok {
-		if syscallErr, ok := opErr.Err.(syscall.Errno); ok {
-			if syscallErr == syscall.EAGAIN {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func (s *server) IpAddresses() ([]networkInterface, error) {
@@ -639,7 +533,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 					readfd.Set(int(input.Fd()))
 
 					if _, err := unix.Select(int(input.Fd())+1, &readfd, nil, nil, &timeout); err != nil {
-						if s.isEINTR(err) {
+						if utils.IsEINTR(err) {
 							continue
 						} else {
 							glog.Errorf("Error selecting %s: %v", name, err)
@@ -649,7 +543,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 
 					if readfd.IsSet(int(input.Fd())) {
 						if available, err := input.Read(buffer); err != nil {
-							if s.isEAGAIN(err) {
+							if utils.IsEAGAIN(err) {
 								if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
 									glog.Tracef("EOF %s, totalSent=%d, process exited", name, totalSent)
 									return
@@ -727,7 +621,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 					return
 				default:
 					if request, err := stream.Recv(); err != nil {
-						if !s.isGRPCCancel(err) {
+						if !utils.IsGRPCCancel(err) {
 							if err != io.EOF && err != context.Canceled {
 								doCancel(fmt.Sprintf("Failed to receive message: %v", err))
 							}
@@ -837,7 +731,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 					glog.Errorf("Failed to send established message: %v", err)
 					cmd.Process.Signal(syscall.SIGKILL)
 				} else if err = cmd.Wait(); err != nil {
-					if s.isUnexpectedError(err) {
+					if utils.IsUnexpectedError(err) {
 						glog.Errorf("Failed to wait for command: %v", err)
 					}
 				}
@@ -860,7 +754,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 		}
 
-		if s.isUnexpectedError(err) {
+		if utils.IsUnexpectedError(err) {
 			message = cakeagent.CakeAgent_ExecuteResponse{
 				Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 					Stderr: []byte(err.Error() + "\r\n"),
@@ -1166,8 +1060,21 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 				agent: agent,
 			})
 
+			var ctx context.Context
+			var cancel context.CancelFunc
+
+			if console := console.NewConsole(); console != nil {
+				ctx, cancel = context.WithCancel(context.Background())
+
+				go console.Forward(ctx)
+			}
+
 			if err = grpcServer.Serve(listener); err != nil {
 				err = fmt.Errorf("failed to serve: %s", err)
+			}
+
+			if cancel != nil {
+				cancel()
 			}
 		}
 	}
