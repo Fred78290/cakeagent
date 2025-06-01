@@ -3,21 +3,27 @@ package service
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
+
+	glog "github.com/sirupsen/logrus"
 
 	"github.com/Fred78290/cakeagent/cmd/types"
+	svc "github.com/kardianos/service"
 )
 
-func InstallService(cfg *types.Config) (err error) {
-	servicePath := "/etc/systemd/system/cakeagent.service"
+type program struct{}
 
-	if _, err := os.Stat(servicePath); err == nil {
-		return fmt.Errorf("service is already installed")
-	}
+func (p *program) Start(s svc.Service) error {
+	return nil
+}
+
+func (p *program) Stop(s svc.Service) error {
+	return nil
+}
+
+func InstallService(cfg *types.Config) (err error) {
+	var service svc.Service
 
 	args := []string{
-		os.Args[0],
 		fmt.Sprintf("--listen=%s", cfg.Address),
 	}
 
@@ -33,42 +39,33 @@ func InstallService(cfg *types.Config) (err error) {
 		args = append(args, fmt.Sprintf("--tls-key=%s", cfg.TlsKey))
 	}
 
-	defaultEnv := ""
+	svcConfig := &svc.Config{
+		Name:        "cakeagent",
+		DisplayName: "CakeAgent",
+		Description: "CakeAgent Service.",
+		UserName:    "root",
+		Executable:  os.Args[0],
+		Arguments:   args,
+		Dependencies: []string{
+			"After=network.target",
+		},
+		EnvVars: map[string]string{
+			"PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin/:/sbin",
+		},
+	}
 
-	service := `
-[Unit]
-Description=CakeAgent Service
-After=network.target
+	prg := &program{}
 
-[Service]
-Type=simple
-Restart=on-failure
-EnvironmentFile=-/etc/default/cakeagent
-Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin/:/sbin
-User=root
-ExecStart=` + strings.Join(args, " ") + `
+	if service, err = svc.New(prg, svcConfig); err == nil {
+		if err = service.Install(); err != nil {
+			glog.Errorf("Failed to install service: %v", err)
+		} else {
+			glog.Info("Service installed successfully")
 
-[Install]
-WantedBy=multi-user.target
-`
-
-	if err := os.WriteFile("/etc/default/cakeagent", []byte(defaultEnv), 0644); err != nil {
-		err = fmt.Errorf("Failed to write env file: %v", err)
-	} else if err = os.WriteFile(servicePath, []byte(service), 0644); err != nil {
-		err = fmt.Errorf("Failed to write service file: %v", err)
-	} else {
-		cmds := [][]string{
-			{"systemctl", "daemon-reload"},
-			{"systemctl", "enable", "cakeagent"},
-			{"systemctl", "start", "cakeagent"},
-		}
-
-		for _, cmdArgs := range cmds {
-			cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-
-			if output, err := cmd.CombinedOutput(); err != nil {
-				err = fmt.Errorf("Command %v failed: %v, Output: %s", cmdArgs, err, output)
-				break
+			if err = service.Start(); err != nil {
+				glog.Errorf("Failed to start service: %v", err)
+			} else {
+				glog.Infof("Service started successfully")
 			}
 		}
 	}

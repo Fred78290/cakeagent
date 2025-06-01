@@ -8,6 +8,7 @@ require (
 	github.com/alecthomas/kingpin v2.2.6+incompatible
 	github.com/creack/pty v1.1.24
 	github.com/elastic/go-sysinfo v1.15.0
+	github.com/kardianos/service v1.2.2
 	github.com/lima-vm/lima v1.0.7
 	github.com/mdlayher/vsock v1.2.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
