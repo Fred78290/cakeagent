@@ -687,6 +687,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 
 			if shell, err = exec.LookPath(shell); err != nil {
 				shell = "/bin/sh"
+				err = nil
 			}
 			cmd = exec.CommandContext(ctx, shell, "-i", "-l")
 		} else if exc := command.GetCommand(); exc != nil {
