@@ -203,12 +203,12 @@ public struct TunnelInfo: Sendable, Codable {
 
 	public var oneOf: OneOf
 
-	public init(from: ForwardedPort) {
-		self.oneOf = .forward(from)
+	public init(forward: ForwardedPort) {
+		self.oneOf = .forward(forward)
 	}
 
-	public init(from: UnixDomainSocket) {
-		self.oneOf = .unixDomain(from)
+	public init(unixDomain: UnixDomainSocket) {
+		self.oneOf = .unixDomain(unixDomain)
 	}
 
 	public init(from decoder: Decoder) throws {
