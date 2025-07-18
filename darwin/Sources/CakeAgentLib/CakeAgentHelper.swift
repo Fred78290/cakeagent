@@ -8,7 +8,7 @@ import Semaphore
 import NIOPortForwarding
 
 
-typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
+public typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
 
 public protocol CakeAgentClientInterceptorState {
 	func restoreState()
@@ -22,7 +22,7 @@ public protocol CakeAgentClientInterceptorState {
 
 extension CakeAgentExecuteStream {
 	@discardableResult
-	func sendTerminalSize(rows: Int32, cols: Int32) -> EventLoopFuture<Void> {
+	public func sendTerminalSize(rows: Int32, cols: Int32) -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.size = CakeAgent.ExecuteRequest.TerminalSize.with {
 				$0.rows = rows
@@ -34,7 +34,7 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	func sendCommand(command: String, arguments: [String]) -> EventLoopFuture<Void> {
+	public func sendCommand(command: String, arguments: [String]) -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.with {
 				$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.Command.with {
@@ -48,7 +48,7 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	func sendShell() -> EventLoopFuture<Void> {
+	public func sendShell() -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.with {
 				$0.shell = true
@@ -59,7 +59,7 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	func sendBuffer(_ buffer: ByteBuffer) -> EventLoopFuture<Void> {
+	public func sendBuffer(_ buffer: ByteBuffer) -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.input = Data(buffer: buffer)
 		}
@@ -68,7 +68,7 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	func sendEof() -> EventLoopFuture<Void> {
+	public func sendEof() -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.eof = true
 		}
@@ -77,7 +77,7 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	func end() -> EventLoopFuture<Void> {
+	public func end() -> EventLoopFuture<Void> {
 		#if TRACE
 			redbold("Send end")
 		#endif
