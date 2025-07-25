@@ -353,7 +353,7 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 	if host, err := sysinfo.Host(); err == nil {
 		info := host.Info()
 
-		reply.Osname = info.OS.Name
+		reply.Osname = info.OS.Family
 		reply.Release = info.OS.Codename
 		reply.Version = info.OS.Version
 		reply.Uptime = uint64(time.Now().Nanosecond() - info.BootTime.Nanosecond())
