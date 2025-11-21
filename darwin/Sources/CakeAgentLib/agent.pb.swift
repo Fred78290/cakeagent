@@ -28,7 +28,7 @@ public struct Cakeagent_CakeAgent: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public struct TunnelMessage: @unchecked Sendable {
+  public struct TunnelMessage: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -71,7 +71,7 @@ public struct Cakeagent_CakeAgent: Sendable {
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-    public enum OneOf_Message: Equatable, @unchecked Sendable {
+    public enum OneOf_Message: Equatable, Sendable {
       case connect(Cakeagent_CakeAgent.TunnelMessage.TunnelMessageConnect)
       case datas(Data)
       ///end of file
@@ -251,35 +251,68 @@ public struct Cakeagent_CakeAgent: Sendable {
     public init() {}
   }
 
-  public struct InfoReply: Sendable {
+  public struct InfoReply: @unchecked Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    public var version: String = String()
+    public var version: String {
+      get {return _storage._version}
+      set {_uniqueStorage()._version = newValue}
+    }
 
-    public var uptime: UInt64 = 0
+    public var uptime: UInt64 {
+      get {return _storage._uptime}
+      set {_uniqueStorage()._uptime = newValue}
+    }
 
     public var memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo {
-      get {return _memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
-      set {_memory = newValue}
+      get {return _storage._memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
+      set {_uniqueStorage()._memory = newValue}
     }
     /// Returns true if `memory` has been explicitly set.
-    public var hasMemory: Bool {return self._memory != nil}
+    public var hasMemory: Bool {return _storage._memory != nil}
     /// Clears the value of `memory`. Subsequent reads from it will return its default value.
-    public mutating func clearMemory() {self._memory = nil}
+    public mutating func clearMemory() {_uniqueStorage()._memory = nil}
 
-    public var cpuCount: Int32 = 0
+    public var cpuCount: Int32 {
+      get {return _storage._cpuCount}
+      set {_uniqueStorage()._cpuCount = newValue}
+    }
 
-    public var diskInfos: [Cakeagent_CakeAgent.InfoReply.DiskInfo] = []
+    public var diskInfos: [Cakeagent_CakeAgent.InfoReply.DiskInfo] {
+      get {return _storage._diskInfos}
+      set {_uniqueStorage()._diskInfos = newValue}
+    }
 
-    public var ipaddresses: [String] = []
+    public var ipaddresses: [String] {
+      get {return _storage._ipaddresses}
+      set {_uniqueStorage()._ipaddresses = newValue}
+    }
 
-    public var osname: String = String()
+    public var osname: String {
+      get {return _storage._osname}
+      set {_uniqueStorage()._osname = newValue}
+    }
 
-    public var hostname: String = String()
+    public var hostname: String {
+      get {return _storage._hostname}
+      set {_uniqueStorage()._hostname = newValue}
+    }
 
-    public var release: String = String()
+    public var release: String {
+      get {return _storage._release}
+      set {_uniqueStorage()._release = newValue}
+    }
+
+    public var cpu: Cakeagent_CakeAgent.InfoReply.CpuInfo {
+      get {return _storage._cpu ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
+      set {_uniqueStorage()._cpu = newValue}
+    }
+    /// Returns true if `cpu` has been explicitly set.
+    public var hasCpu: Bool {return _storage._cpu != nil}
+    /// Clears the value of `cpu`. Subsequent reads from it will return its default value.
+    public mutating func clearCpu() {_uniqueStorage()._cpu = nil}
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -321,12 +354,76 @@ public struct Cakeagent_CakeAgent: Sendable {
       public init() {}
     }
 
+    public struct CpuCoreInfo: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var coreID: Int32 = 0
+
+      public var usagePercent: Double = 0
+
+      public var user: Double = 0
+
+      public var system: Double = 0
+
+      public var idle: Double = 0
+
+      public var iowait: Double = 0
+
+      public var irq: Double = 0
+
+      public var softirq: Double = 0
+
+      public var steal: Double = 0
+
+      public var guest: Double = 0
+
+      public var guestNice: Double = 0
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
+    public struct CpuInfo: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var totalUsagePercent: Double = 0
+
+      public var user: Double = 0
+
+      public var system: Double = 0
+
+      public var idle: Double = 0
+
+      public var iowait: Double = 0
+
+      public var irq: Double = 0
+
+      public var softirq: Double = 0
+
+      public var steal: Double = 0
+
+      public var guest: Double = 0
+
+      public var guestNice: Double = 0
+
+      public var cores: [Cakeagent_CakeAgent.InfoReply.CpuCoreInfo] = []
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
     public init() {}
 
-    fileprivate var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
+    fileprivate var _storage = _StorageClass.defaultInstance
   }
 
-  public struct RunCommand: @unchecked Sendable {
+  public struct RunCommand: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -371,7 +468,7 @@ public struct Cakeagent_CakeAgent: Sendable {
     fileprivate var _input: Data? = nil
   }
 
-  public struct ExecuteRequest: @unchecked Sendable {
+  public struct ExecuteRequest: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -412,7 +509,7 @@ public struct Cakeagent_CakeAgent: Sendable {
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-    public enum OneOf_Request: Equatable, @unchecked Sendable {
+    public enum OneOf_Request: Equatable, Sendable {
       case command(Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand)
       case input(Data)
       case size(Cakeagent_CakeAgent.ExecuteRequest.TerminalSize)
@@ -485,7 +582,7 @@ public struct Cakeagent_CakeAgent: Sendable {
     public init() {}
   }
 
-  public struct RunReply: @unchecked Sendable {
+  public struct RunReply: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -501,7 +598,7 @@ public struct Cakeagent_CakeAgent: Sendable {
     public init() {}
   }
 
-  public struct ExecuteResponse: @unchecked Sendable {
+  public struct ExecuteResponse: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -542,7 +639,7 @@ public struct Cakeagent_CakeAgent: Sendable {
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-    public enum OneOf_Response: Equatable, @unchecked Sendable {
+    public enum OneOf_Response: Equatable, Sendable {
       case exitCode(Int32)
       case stdout(Data)
       case stderr(Data)
@@ -687,12 +784,7 @@ extension Cakeagent_CakeAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension Cakeagent_CakeAgent.TunnelMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".TunnelMessage"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "connect"),
-    2: .same(proto: "datas"),
-    3: .same(proto: "eof"),
-    4: .same(proto: "error"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connect\0\u{1}datas\0\u{1}eof\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -777,19 +869,12 @@ extension Cakeagent_CakeAgent.TunnelMessage: SwiftProtobuf.Message, SwiftProtobu
 }
 
 extension Cakeagent_CakeAgent.TunnelMessage.TunnelProtocol: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "TCP"),
-    1: .same(proto: "UDP"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TCP\0\u{1}UDP\0")
 }
 
 extension Cakeagent_CakeAgent.TunnelMessage.TunnelMessageConnect: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.TunnelMessage.protoMessageName + ".TunnelMessageConnect"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "id"),
-    2: .same(proto: "protocol"),
-    3: .same(proto: "guestAddress"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}protocol\0\u{1}guestAddress\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -829,10 +914,7 @@ extension Cakeagent_CakeAgent.TunnelMessage.TunnelMessageConnect: SwiftProtobuf.
 
 extension Cakeagent_CakeAgent.TunnelPortForwardEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".TunnelPortForwardEvent"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "forwardEvent"),
-    2: .same(proto: "error"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}forwardEvent\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -894,11 +976,7 @@ extension Cakeagent_CakeAgent.TunnelPortForwardEvent: SwiftProtobuf.Message, Swi
 
 extension Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.TunnelPortForwardEvent.protoMessageName + ".TunnelPortForward"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "protocol"),
-    2: .same(proto: "ip"),
-    3: .same(proto: "port"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}protocol\0\u{1}ip\0\u{1}port\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -938,10 +1016,7 @@ extension Cakeagent_CakeAgent.TunnelPortForwardEvent.TunnelPortForward: SwiftPro
 
 extension Cakeagent_CakeAgent.TunnelPortForwardEvent.ForwardEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.TunnelPortForwardEvent.protoMessageName + ".ForwardEvent"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "addedPorts"),
-    12: .same(proto: "removedPorts"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}addedPorts\0\u{2}\u{b}removedPorts\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -995,10 +1070,7 @@ extension Cakeagent_CakeAgent.Empty: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 extension Cakeagent_CakeAgent.ResizeReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".ResizeReply"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "success"),
-    2: .same(proto: "failure"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}failure\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1055,83 +1127,132 @@ extension Cakeagent_CakeAgent.ResizeReply: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".InfoReply"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "version"),
-    2: .same(proto: "uptime"),
-    3: .same(proto: "memory"),
-    4: .same(proto: "cpuCount"),
-    5: .same(proto: "diskInfos"),
-    6: .same(proto: "ipaddresses"),
-    7: .same(proto: "osname"),
-    8: .same(proto: "hostname"),
-    9: .same(proto: "release"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}ipaddresses\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0")
+
+  fileprivate class _StorageClass {
+    var _version: String = String()
+    var _uptime: UInt64 = 0
+    var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
+    var _cpuCount: Int32 = 0
+    var _diskInfos: [Cakeagent_CakeAgent.InfoReply.DiskInfo] = []
+    var _ipaddresses: [String] = []
+    var _osname: String = String()
+    var _hostname: String = String()
+    var _release: String = String()
+    var _cpu: Cakeagent_CakeAgent.InfoReply.CpuInfo? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _version = source._version
+      _uptime = source._uptime
+      _memory = source._memory
+      _cpuCount = source._cpuCount
+      _diskInfos = source._diskInfos
+      _ipaddresses = source._ipaddresses
+      _osname = source._osname
+      _hostname = source._hostname
+      _release = source._release
+      _cpu = source._cpu
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.version) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.uptime) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._memory) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.cpuCount) }()
-      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.diskInfos) }()
-      case 6: try { try decoder.decodeRepeatedStringField(value: &self.ipaddresses) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.osname) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.hostname) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.release) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._version) }()
+        case 2: try { try decoder.decodeSingularUInt64Field(value: &_storage._uptime) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._memory) }()
+        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._cpuCount) }()
+        case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._diskInfos) }()
+        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._ipaddresses) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._osname) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._hostname) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._release) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._cpu) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.version.isEmpty {
-      try visitor.visitSingularStringField(value: self.version, fieldNumber: 1)
-    }
-    if self.uptime != 0 {
-      try visitor.visitSingularUInt64Field(value: self.uptime, fieldNumber: 2)
-    }
-    try { if let v = self._memory {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    if self.cpuCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.cpuCount, fieldNumber: 4)
-    }
-    if !self.diskInfos.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.diskInfos, fieldNumber: 5)
-    }
-    if !self.ipaddresses.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.ipaddresses, fieldNumber: 6)
-    }
-    if !self.osname.isEmpty {
-      try visitor.visitSingularStringField(value: self.osname, fieldNumber: 7)
-    }
-    if !self.hostname.isEmpty {
-      try visitor.visitSingularStringField(value: self.hostname, fieldNumber: 8)
-    }
-    if !self.release.isEmpty {
-      try visitor.visitSingularStringField(value: self.release, fieldNumber: 9)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._version.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._version, fieldNumber: 1)
+      }
+      if _storage._uptime != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._uptime, fieldNumber: 2)
+      }
+      try { if let v = _storage._memory {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      if _storage._cpuCount != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._cpuCount, fieldNumber: 4)
+      }
+      if !_storage._diskInfos.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._diskInfos, fieldNumber: 5)
+      }
+      if !_storage._ipaddresses.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._ipaddresses, fieldNumber: 6)
+      }
+      if !_storage._osname.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._osname, fieldNumber: 7)
+      }
+      if !_storage._hostname.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._hostname, fieldNumber: 8)
+      }
+      if !_storage._release.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._release, fieldNumber: 9)
+      }
+      try { if let v = _storage._cpu {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Cakeagent_CakeAgent.InfoReply, rhs: Cakeagent_CakeAgent.InfoReply) -> Bool {
-    if lhs.version != rhs.version {return false}
-    if lhs.uptime != rhs.uptime {return false}
-    if lhs._memory != rhs._memory {return false}
-    if lhs.cpuCount != rhs.cpuCount {return false}
-    if lhs.diskInfos != rhs.diskInfos {return false}
-    if lhs.ipaddresses != rhs.ipaddresses {return false}
-    if lhs.osname != rhs.osname {return false}
-    if lhs.hostname != rhs.hostname {return false}
-    if lhs.release != rhs.release {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._version != rhs_storage._version {return false}
+        if _storage._uptime != rhs_storage._uptime {return false}
+        if _storage._memory != rhs_storage._memory {return false}
+        if _storage._cpuCount != rhs_storage._cpuCount {return false}
+        if _storage._diskInfos != rhs_storage._diskInfos {return false}
+        if _storage._ipaddresses != rhs_storage._ipaddresses {return false}
+        if _storage._osname != rhs_storage._osname {return false}
+        if _storage._hostname != rhs_storage._hostname {return false}
+        if _storage._release != rhs_storage._release {return false}
+        if _storage._cpu != rhs_storage._cpu {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1139,11 +1260,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
 
 extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".MemoryInfo"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "total"),
-    2: .same(proto: "free"),
-    3: .same(proto: "used"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}total\0\u{1}free\0\u{1}used\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1183,14 +1300,7 @@ extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, Swift
 
 extension Cakeagent_CakeAgent.InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".DiskInfo"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "device"),
-    2: .same(proto: "mount"),
-    3: .same(proto: "fsType"),
-    4: .same(proto: "size"),
-    5: .same(proto: "used"),
-    6: .same(proto: "free"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}device\0\u{1}mount\0\u{1}fsType\0\u{1}size\0\u{1}used\0\u{1}free\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1243,12 +1353,169 @@ extension Cakeagent_CakeAgent.InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftPr
   }
 }
 
+extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".CpuCoreInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}core_id\0\u{3}usage_percent\0\u{1}user\0\u{1}system\0\u{1}idle\0\u{1}iowait\0\u{1}irq\0\u{1}softirq\0\u{1}steal\0\u{1}guest\0\u{1}guestNice\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.coreID) }()
+      case 2: try { try decoder.decodeSingularDoubleField(value: &self.usagePercent) }()
+      case 3: try { try decoder.decodeSingularDoubleField(value: &self.user) }()
+      case 4: try { try decoder.decodeSingularDoubleField(value: &self.system) }()
+      case 5: try { try decoder.decodeSingularDoubleField(value: &self.idle) }()
+      case 6: try { try decoder.decodeSingularDoubleField(value: &self.iowait) }()
+      case 7: try { try decoder.decodeSingularDoubleField(value: &self.irq) }()
+      case 8: try { try decoder.decodeSingularDoubleField(value: &self.softirq) }()
+      case 9: try { try decoder.decodeSingularDoubleField(value: &self.steal) }()
+      case 10: try { try decoder.decodeSingularDoubleField(value: &self.guest) }()
+      case 11: try { try decoder.decodeSingularDoubleField(value: &self.guestNice) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.coreID != 0 {
+      try visitor.visitSingularInt32Field(value: self.coreID, fieldNumber: 1)
+    }
+    if self.usagePercent.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.usagePercent, fieldNumber: 2)
+    }
+    if self.user.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.user, fieldNumber: 3)
+    }
+    if self.system.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.system, fieldNumber: 4)
+    }
+    if self.idle.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.idle, fieldNumber: 5)
+    }
+    if self.iowait.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.iowait, fieldNumber: 6)
+    }
+    if self.irq.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.irq, fieldNumber: 7)
+    }
+    if self.softirq.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.softirq, fieldNumber: 8)
+    }
+    if self.steal.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.steal, fieldNumber: 9)
+    }
+    if self.guest.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.guest, fieldNumber: 10)
+    }
+    if self.guestNice.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.guestNice, fieldNumber: 11)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.InfoReply.CpuCoreInfo, rhs: Cakeagent_CakeAgent.InfoReply.CpuCoreInfo) -> Bool {
+    if lhs.coreID != rhs.coreID {return false}
+    if lhs.usagePercent != rhs.usagePercent {return false}
+    if lhs.user != rhs.user {return false}
+    if lhs.system != rhs.system {return false}
+    if lhs.idle != rhs.idle {return false}
+    if lhs.iowait != rhs.iowait {return false}
+    if lhs.irq != rhs.irq {return false}
+    if lhs.softirq != rhs.softirq {return false}
+    if lhs.steal != rhs.steal {return false}
+    if lhs.guest != rhs.guest {return false}
+    if lhs.guestNice != rhs.guestNice {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".CpuInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_usage_percent\0\u{1}user\0\u{1}system\0\u{1}idle\0\u{1}iowait\0\u{1}irq\0\u{1}softirq\0\u{1}steal\0\u{1}guest\0\u{1}guestNice\0\u{1}cores\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularDoubleField(value: &self.totalUsagePercent) }()
+      case 2: try { try decoder.decodeSingularDoubleField(value: &self.user) }()
+      case 3: try { try decoder.decodeSingularDoubleField(value: &self.system) }()
+      case 4: try { try decoder.decodeSingularDoubleField(value: &self.idle) }()
+      case 5: try { try decoder.decodeSingularDoubleField(value: &self.iowait) }()
+      case 6: try { try decoder.decodeSingularDoubleField(value: &self.irq) }()
+      case 7: try { try decoder.decodeSingularDoubleField(value: &self.softirq) }()
+      case 8: try { try decoder.decodeSingularDoubleField(value: &self.steal) }()
+      case 9: try { try decoder.decodeSingularDoubleField(value: &self.guest) }()
+      case 10: try { try decoder.decodeSingularDoubleField(value: &self.guestNice) }()
+      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.cores) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.totalUsagePercent.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.totalUsagePercent, fieldNumber: 1)
+    }
+    if self.user.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.user, fieldNumber: 2)
+    }
+    if self.system.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.system, fieldNumber: 3)
+    }
+    if self.idle.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.idle, fieldNumber: 4)
+    }
+    if self.iowait.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.iowait, fieldNumber: 5)
+    }
+    if self.irq.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.irq, fieldNumber: 6)
+    }
+    if self.softirq.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.softirq, fieldNumber: 7)
+    }
+    if self.steal.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.steal, fieldNumber: 8)
+    }
+    if self.guest.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.guest, fieldNumber: 9)
+    }
+    if self.guestNice.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.guestNice, fieldNumber: 10)
+    }
+    if !self.cores.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.cores, fieldNumber: 11)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.InfoReply.CpuInfo, rhs: Cakeagent_CakeAgent.InfoReply.CpuInfo) -> Bool {
+    if lhs.totalUsagePercent != rhs.totalUsagePercent {return false}
+    if lhs.user != rhs.user {return false}
+    if lhs.system != rhs.system {return false}
+    if lhs.idle != rhs.idle {return false}
+    if lhs.iowait != rhs.iowait {return false}
+    if lhs.irq != rhs.irq {return false}
+    if lhs.softirq != rhs.softirq {return false}
+    if lhs.steal != rhs.steal {return false}
+    if lhs.guest != rhs.guest {return false}
+    if lhs.guestNice != rhs.guestNice {return false}
+    if lhs.cores != rhs.cores {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Cakeagent_CakeAgent.RunCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".RunCommand"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "command"),
-    2: .same(proto: "input"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}input\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1287,10 +1554,7 @@ extension Cakeagent_CakeAgent.RunCommand: SwiftProtobuf.Message, SwiftProtobuf._
 
 extension Cakeagent_CakeAgent.RunCommand.Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.RunCommand.protoMessageName + ".Command"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "command"),
-    2: .same(proto: "args"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}args\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1325,12 +1589,7 @@ extension Cakeagent_CakeAgent.RunCommand.Command: SwiftProtobuf.Message, SwiftPr
 
 extension Cakeagent_CakeAgent.ExecuteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".ExecuteRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "command"),
-    2: .same(proto: "input"),
-    3: .same(proto: "size"),
-    4: .same(proto: "eof"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}input\0\u{1}size\0\u{1}eof\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1421,10 +1680,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest: SwiftProtobuf.Message, SwiftProtob
 
 extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.protoMessageName + ".ExecuteCommand"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "command"),
-    2: .same(proto: "shell"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}shell\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1486,10 +1742,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand: SwiftProtobuf.Messa
 
 extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.protoMessageName + ".Command"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "command"),
-    2: .same(proto: "args"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}args\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1524,10 +1777,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command: SwiftProtob
 
 extension Cakeagent_CakeAgent.ExecuteRequest.TerminalSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.protoMessageName + ".TerminalSize"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "rows"),
-    2: .same(proto: "cols"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rows\0\u{1}cols\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1562,11 +1812,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest.TerminalSize: SwiftProtobuf.Message
 
 extension Cakeagent_CakeAgent.RunReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".RunReply"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "exitCode"),
-    2: .same(proto: "stdout"),
-    3: .same(proto: "stderr"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}exitCode\0\u{1}stdout\0\u{1}stderr\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1606,12 +1852,7 @@ extension Cakeagent_CakeAgent.RunReply: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension Cakeagent_CakeAgent.ExecuteResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".ExecuteResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "exitCode"),
-    2: .same(proto: "stdout"),
-    3: .same(proto: "stderr"),
-    4: .same(proto: "established"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}exitCode\0\u{1}stdout\0\u{1}stderr\0\u{1}established\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1692,9 +1933,7 @@ extension Cakeagent_CakeAgent.ExecuteResponse: SwiftProtobuf.Message, SwiftProto
 
 extension Cakeagent_CakeAgent.MountRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".MountRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "mounts"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}mounts\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1724,14 +1963,7 @@ extension Cakeagent_CakeAgent.MountRequest: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Cakeagent_CakeAgent.MountRequest.MountVirtioFS: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.MountRequest.protoMessageName + ".MountVirtioFS"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "name"),
-    2: .same(proto: "target"),
-    3: .same(proto: "uid"),
-    4: .same(proto: "gid"),
-    5: .same(proto: "readonly"),
-    6: .same(proto: "early"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}target\0\u{1}uid\0\u{1}gid\0\u{1}readonly\0\u{1}early\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1786,11 +2018,7 @@ extension Cakeagent_CakeAgent.MountRequest.MountVirtioFS: SwiftProtobuf.Message,
 
 extension Cakeagent_CakeAgent.MountReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".MountReply"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "mounts"),
-    2: .same(proto: "error"),
-    3: .same(proto: "success"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}mounts\0\u{1}error\0\u{1}success\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1852,11 +2080,7 @@ extension Cakeagent_CakeAgent.MountReply: SwiftProtobuf.Message, SwiftProtobuf._
 
 extension Cakeagent_CakeAgent.MountReply.MountVirtioFSReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.MountReply.protoMessageName + ".MountVirtioFSReply"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "name"),
-    2: .same(proto: "error"),
-    3: .same(proto: "success"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}error\0\u{1}success\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

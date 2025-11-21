@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/netip"
 	"net/url"
@@ -33,6 +34,7 @@ import (
 	"github.com/elastic/go-sysinfo"
 	"github.com/mdlayher/vsock"
 	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	glog "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
@@ -310,6 +312,12 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 	memoryTotal := memory.TotalMemory()
 	memoryFree := memory.FreeMemory()
 
+	// Get detailed CPU times
+	cpuTimes, err := cpu.Times(false)
+	if err != nil {
+		glog.Warnf("Failed to get CPU times: %v", err)
+	}
+
 	if partitions, err = disk.Partitions(true); err != nil {
 		return nil, err
 	}
@@ -333,6 +341,95 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 		}
 	}
 
+	// Prepare CPU info
+	var cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo
+	if len(cpuTimes) > 0 {
+		// Get CPU usage percentage (total)
+		totalCpuUsage, err := cpu.Percent(time.Second, false)
+		if err != nil {
+			log.Printf("Error getting total CPU usage: %v", err)
+		} else {
+			// Get CPU usage percentage per core
+			perCoreCpuUsage, err := cpu.Percent(time.Second, true)
+			if err != nil {
+				log.Printf("Error getting per-core CPU usage: %v", err)
+			} else {
+				// Get detailed CPU stats per core
+				cpuStats, err := cpu.Times(true)
+				if err != nil {
+					log.Printf("Error getting CPU stats: %v", err)
+				} else {
+					log.Printf("Debug: cpuTimes length: %d, cpuStats length: %d, runtime.NumCPU(): %d, perCoreCpuUsage length: %d",
+						len(cpuTimes), len(cpuStats), runtime.NumCPU(), len(perCoreCpuUsage))
+
+					// Use the first CPU core times (average across all cores)
+					times := cpuTimes[0]
+					cpuInfo = &cakeagent.CakeAgent_InfoReply_CpuInfo{
+						TotalUsagePercent: totalCpuUsage[0],
+						User:              times.User,
+						System:            times.System,
+						Idle:              times.Idle,
+						Iowait:            times.Iowait,
+						Irq:               times.Irq,
+						Softirq:           times.Softirq,
+						Steal:             times.Steal,
+						Guest:             times.Guest,
+						GuestNice:         times.GuestNice,
+					}
+
+					// Use cpuStats for per-core data, fallback to cpuTimes if empty
+					coreStatsToUse := cpuStats
+					if len(cpuStats) == 0 {
+						log.Printf("Warning: cpuStats is empty, using cpuTimes as fallback")
+						coreStatsToUse = cpuTimes
+					}
+
+					// Add per-core information
+					log.Printf("Debug: Using %d core statistics", len(coreStatsToUse))
+
+					// Some platforms include total as first element
+					startIndex := 0
+					if len(coreStatsToUse) > runtime.NumCPU() {
+						// Likely includes total as first element
+						startIndex = 1
+						log.Printf("Debug: Detected total CPU stat as first element, skipping it")
+					}
+
+					// Process up to NumCPU cores
+					for i := startIndex; i < len(coreStatsToUse) && (i-startIndex) < runtime.NumCPU(); i++ {
+						coreTime := coreStatsToUse[i]
+						coreIndex := i - startIndex // Real core index starting from 0
+
+						usagePercent := float64(0)
+						if coreIndex < len(perCoreCpuUsage) {
+							usagePercent = perCoreCpuUsage[coreIndex]
+						}
+
+						log.Printf("Debug: Processing core %d (array index %d), CPU: %s, usage: %.2f%%",
+							coreIndex, i, coreTime.CPU, usagePercent)
+
+						coreInfo := &cakeagent.CakeAgent_InfoReply_CpuCoreInfo{
+							CoreId:       int32(coreIndex),
+							UsagePercent: usagePercent,
+							User:         coreTime.User,
+							System:       coreTime.System,
+							Idle:         coreTime.Idle,
+							Iowait:       coreTime.Iowait,
+							Irq:          coreTime.Irq,
+							Softirq:      coreTime.Softirq,
+							Steal:        coreTime.Steal,
+							Guest:        coreTime.Guest,
+							GuestNice:    coreTime.GuestNice,
+						}
+						cpuInfo.Cores = append(cpuInfo.Cores, coreInfo)
+					}
+
+					log.Printf("Debug: Added %d cores to CPU info", len(cpuInfo.Cores))
+				}
+			}
+		}
+	}
+
 	reply = &cakeagent.CakeAgent_InfoReply{
 		Ipaddresses: []string{},
 		CpuCount:    int32(runtime.NumCPU()),
@@ -342,6 +439,7 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 			Free:  memoryFree,
 			Used:  memoryTotal - memoryFree,
 		},
+		Cpu: cpuInfo,
 	}
 
 	// Retrieve system information

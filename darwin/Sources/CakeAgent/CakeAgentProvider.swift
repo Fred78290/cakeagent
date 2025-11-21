@@ -193,6 +193,34 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 
 		reply.ipaddresses = ipAddresses
 
+		// Collecter les informations CPU
+		let coreInfos = MacOSCPUCollector.getCPUInfo()
+		let globalCPUInfo = MacOSCPUCollector.getGlobalCPUInfo()
+		
+		// Créer les informations par cœur
+		var cores: [CakeAgent.InfoReply.CpuCoreInfo] = []
+		for coreInfo in coreInfos {
+			let core = CakeAgent.InfoReply.CpuCoreInfo.create(
+				coreID: coreInfo.coreID,
+				usagePercent: coreInfo.usage,
+				user: coreInfo.user,
+				system: coreInfo.system,
+				idle: coreInfo.idle
+			)
+			cores.append(core)
+		}
+		
+		// Créer l'information CPU globale
+		let cpuInfo = CakeAgent.InfoReply.CpuInfo.create(
+			totalUsagePercent: globalCPUInfo.totalUsage,
+			cores: cores,
+			user: globalCPUInfo.user,
+			system: globalCPUInfo.system,
+			idle: globalCPUInfo.idle
+		)
+		
+		reply.cpu = cpuInfo
+
 		return reply
 	}
 

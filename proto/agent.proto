@@ -85,6 +85,34 @@ message CakeAgent {
 			uint64 free = 6;
 		}
 
+		message CpuCoreInfo {
+			int32 core_id = 1;
+			double usage_percent = 2;
+			double user = 3;
+			double system = 4;
+			double idle = 5;
+			double iowait = 6;
+			double irq = 7;
+			double softirq = 8;
+			double steal = 9;
+			double guest = 10;
+			double guestNice = 11;
+		}
+
+		message CpuInfo {
+			double total_usage_percent = 1;
+			double user = 2;
+			double system = 3;
+			double idle = 4;
+			double iowait = 5;
+			double irq = 6;
+			double softirq = 7;
+			double steal = 8;
+			double guest = 9;
+			double guestNice = 10;
+			repeated CpuCoreInfo cores = 11;
+		}
+
 		string version = 1;
 		uint64 uptime = 2;
 		MemoryInfo memory = 3;
@@ -94,6 +122,7 @@ message CakeAgent {
 		string osname = 7;
 		string hostname = 8;
 		string release = 9;
+		CpuInfo cpu = 10;
 	}
 
 	message RunCommand {
