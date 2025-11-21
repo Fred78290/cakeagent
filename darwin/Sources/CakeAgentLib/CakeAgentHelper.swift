@@ -293,7 +293,7 @@ public struct SocketInfo: Sendable, Codable {
 	}
 }
 
-public struct CpuInfo: Sendable, Codable {
+public struct CpuInformations: Sendable, Codable {
 	public struct CpuCoreInfo: Sendable, Codable {
 		public var coreID: Int32 = 0
 		public var usagePercent: Double = 0
@@ -322,7 +322,7 @@ public struct CpuInfo: Sendable, Codable {
 }
 
 extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
-	var agent: CakeAgentLib.CpuInfo.CpuCoreInfo {
+	var agent: CpuInformations.CpuCoreInfo {
 		.init(
 			coreID: self.coreID,
 			usagePercent: self.usagePercent,
@@ -340,7 +340,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
 }
 
 extension Cakeagent_CakeAgent.InfoReply.CpuInfo {
-	var agent: CakeAgentLib.CpuInfo {
+	var agent: CpuInformations {
 		return .init(
 			totalUsagePercent: self.totalUsagePercent,
 			user: self.user,
@@ -373,7 +373,7 @@ public struct InfoReply: Sendable, Codable {
 	public var attachedNetworks: [AttachedNetwork]?
 	public var tunnelInfos: [TunnelInfo]?
 	public var socketInfos: [SocketInfo]?
-	public var cpuInfo: CakeAgentLib.CpuInfo?
+	public var cpuInfo: CpuInformations?
 
 	init() {
 		self.name = ""
