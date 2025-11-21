@@ -112,6 +112,7 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		}
 		let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: []) ?? []
 		
+		reply.agentVersion = CI.version
 		reply.diskInfos = volumes.compactMap { volume in
 			if let resourceValues = try? volume.resourceValues(forKeys: Set(keys)),
 				let volumeIsBrowsable = resourceValues.volumeIsBrowsable,

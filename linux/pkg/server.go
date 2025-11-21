@@ -30,6 +30,7 @@ import (
 	"github.com/Fred78290/cakeagent/pkg/serialport"
 	"github.com/Fred78290/cakeagent/pkg/tunnel"
 	"github.com/Fred78290/cakeagent/pkg/utils"
+	"github.com/Fred78290/cakeagent/version"
 	"github.com/creack/pty"
 	"github.com/elastic/go-sysinfo"
 	"github.com/mdlayher/vsock"
@@ -431,15 +432,16 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 	}
 
 	reply = &cakeagent.CakeAgent_InfoReply{
-		Ipaddresses: []string{},
-		CpuCount:    int32(runtime.NumCPU()),
-		DiskInfos:   diskInfos,
+		Ipaddresses:  []string{},
+		CpuCount:     int32(runtime.NumCPU()),
+		DiskInfos:    diskInfos,
+		Cpu:          cpuInfo,
+		AgentVersion: version.VERSION,
 		Memory: &cakeagent.CakeAgent_InfoReply_MemoryInfo{
 			Total: memoryTotal,
 			Free:  memoryFree,
 			Used:  memoryTotal - memoryFree,
 		},
-		Cpu: cpuInfo,
 	}
 
 	// Retrieve system information

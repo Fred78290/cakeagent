@@ -123,6 +123,7 @@ message CakeAgent {
 		string hostname = 8;
 		string release = 9;
 		CpuInfo cpu = 10;
+		string agentVersion = 11;
 	}
 
 	message RunCommand {

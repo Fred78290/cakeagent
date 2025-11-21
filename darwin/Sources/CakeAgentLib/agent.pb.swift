@@ -314,6 +314,11 @@ public struct Cakeagent_CakeAgent: Sendable {
     /// Clears the value of `cpu`. Subsequent reads from it will return its default value.
     public mutating func clearCpu() {_uniqueStorage()._cpu = nil}
 
+    public var agentVersion: String {
+      get {return _storage._agentVersion}
+      set {_uniqueStorage()._agentVersion = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public struct MemoryInfo: Sendable {
@@ -1127,7 +1132,7 @@ extension Cakeagent_CakeAgent.ResizeReply: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".InfoReply"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}ipaddresses\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}ipaddresses\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0\u{1}agentVersion\0")
 
   fileprivate class _StorageClass {
     var _version: String = String()
@@ -1140,6 +1145,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
     var _hostname: String = String()
     var _release: String = String()
     var _cpu: Cakeagent_CakeAgent.InfoReply.CpuInfo? = nil
+    var _agentVersion: String = String()
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1160,6 +1166,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
       _hostname = source._hostname
       _release = source._release
       _cpu = source._cpu
+      _agentVersion = source._agentVersion
     }
   }
 
@@ -1188,6 +1195,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._hostname) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._release) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._cpu) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._agentVersion) }()
         default: break
         }
       }
@@ -1230,6 +1238,9 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
       try { if let v = _storage._cpu {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
       } }()
+      if !_storage._agentVersion.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._agentVersion, fieldNumber: 11)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1249,6 +1260,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._hostname != rhs_storage._hostname {return false}
         if _storage._release != rhs_storage._release {return false}
         if _storage._cpu != rhs_storage._cpu {return false}
+        if _storage._agentVersion != rhs_storage._agentVersion {return false}
         return true
       }
       if !storagesAreEqual {return false}

@@ -426,6 +426,7 @@ public struct InfoReply: Sendable, Codable {
 	public var tunnelInfos: [TunnelInfo]?
 	public var socketInfos: [SocketInfo]?
 	public var cpuInfo: CpuInformations?
+	public var agentVersion: String
 
 	init() {
 		self.name = ""
@@ -444,6 +445,7 @@ public struct InfoReply: Sendable, Codable {
 		self.tunnelInfos = nil
 		self.socketInfos = nil
 		self.cpuInfo = nil
+		self.agentVersion = ""
 	}
 
 	public init(info: CakeAgent.InfoReply) {
@@ -456,6 +458,7 @@ public struct InfoReply: Sendable, Codable {
 		self.hostname = info.hostname
 		self.release = info.release
 		self.status = .running
+		self.agentVersion = info.agentVersion
 		self.diskInfos = info.diskInfos.map { diskInfo in
 			DiskInfo(device: diskInfo.device, mount: diskInfo.mount, fsType: diskInfo.fsType, total: diskInfo.size, free: diskInfo.free, used: diskInfo.used)
 		}
