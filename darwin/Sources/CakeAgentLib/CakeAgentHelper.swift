@@ -293,6 +293,70 @@ public struct SocketInfo: Sendable, Codable {
 	}
 }
 
+public struct CpuInfo: Sendable, Codable {
+	public struct CpuCoreInfo: Sendable, Codable {
+		public var coreID: Int32 = 0
+		public var usagePercent: Double = 0
+		public var user: Double = 0
+		public var system: Double = 0
+		public var idle: Double = 0
+		public var iowait: Double = 0
+		public var irq: Double = 0
+		public var softirq: Double = 0
+		public var steal: Double = 0
+		public var guest: Double = 0
+		public var guestNice: Double = 0
+	}
+
+	public var totalUsagePercent: Double = 0
+	public var user: Double = 0
+	public var system: Double = 0
+	public var idle: Double = 0
+	public var iowait: Double = 0
+	public var irq: Double = 0
+	public var softirq: Double = 0
+	public var steal: Double = 0
+	public var guest: Double = 0
+	public var guestNice: Double = 0
+	public var cores: [CpuCoreInfo] = []
+}
+
+extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
+	var agent: CakeAgentLib.CpuInfo.CpuCoreInfo {
+		.init(
+			coreID: self.coreID,
+			usagePercent: self.usagePercent,
+			user: self.user,
+			system: self.system,
+			idle: self.idle,
+			iowait: self.iowait,
+			irq: self.irq,
+			softirq: self.softirq,
+			steal: self.steal,
+			guest: self.guest,
+			guestNice: self.guestNice
+		)
+	}
+}
+
+extension Cakeagent_CakeAgent.InfoReply.CpuInfo {
+	var agent: CakeAgentLib.CpuInfo {
+		return .init(
+			totalUsagePercent: self.totalUsagePercent,
+			user: self.user,
+			system: self.system,
+			idle: self.idle,
+			iowait: self.iowait,
+			irq: self.irq,
+			softirq: self.softirq,
+			steal: self.steal,
+			guest: self.guest,
+			guestNice: self.guestNice,
+			cores: self.cores.map(\.agent)
+		)
+	}
+}
+
 public struct InfoReply: Sendable, Codable {
 	public var name: String
 	public var version: String?
@@ -309,6 +373,7 @@ public struct InfoReply: Sendable, Codable {
 	public var attachedNetworks: [AttachedNetwork]?
 	public var tunnelInfos: [TunnelInfo]?
 	public var socketInfos: [SocketInfo]?
+	public var cpuInfo: CakeAgentLib.CpuInfo?
 
 	init() {
 		self.name = ""
@@ -326,6 +391,7 @@ public struct InfoReply: Sendable, Codable {
 		self.attachedNetworks = nil
 		self.tunnelInfos = nil
 		self.socketInfos = nil
+		self.cpuInfo = nil
 	}
 
 	public init(info: CakeAgent.InfoReply) {
@@ -348,6 +414,10 @@ public struct InfoReply: Sendable, Codable {
 				$0.free = info.memory.free
 				$0.used = info.memory.used
 			}
+		}
+		
+		if info.hasCpu {
+			self.cpuInfo = info.cpu.agent
 		}
 	}
 

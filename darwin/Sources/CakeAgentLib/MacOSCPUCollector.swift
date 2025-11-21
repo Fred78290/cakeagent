@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 /// Structure pour collecter les informations CPU sur macOS
-public struct CPUInfo {
+public struct CPUInfo: Sendable {
     public let coreID: Int32
     public let user: Double
     public let system: Double
