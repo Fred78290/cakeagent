@@ -306,6 +306,32 @@ public struct CpuInformations: Sendable, Codable {
 		public var steal: Double = 0
 		public var guest: Double = 0
 		public var guestNice: Double = 0
+
+        public init(
+            coreID: Int32,
+            usagePercent: Double,
+            user: Double,
+            system: Double,
+            idle: Double,
+            iowait: Double,
+            irq: Double,
+            softirq: Double,
+            steal: Double,
+            guest: Double,
+            guestNice: Double
+        ) {
+            self.coreID = coreID
+            self.usagePercent = usagePercent
+            self.user = user
+            self.system = system
+            self.idle = idle
+            self.iowait = iowait
+            self.irq = irq
+            self.softirq = softirq
+            self.steal = steal
+            self.guest = guest
+            self.guestNice = guestNice
+        }
 	}
 
 	public var totalUsagePercent: Double = 0
@@ -319,6 +345,32 @@ public struct CpuInformations: Sendable, Codable {
 	public var guest: Double = 0
 	public var guestNice: Double = 0
 	public var cores: [CpuCoreInfo] = []
+
+    public init(
+        totalUsagePercent: Double,
+        user: Double,
+        system: Double,
+        idle: Double,
+        iowait: Double,
+        irq: Double,
+        softirq: Double,
+        steal: Double,
+        guest: Double,
+        guestNice: Double,
+        cores: [CpuCoreInfo]
+    ) {
+        self.totalUsagePercent = totalUsagePercent
+        self.user = user
+        self.system = system
+        self.idle = idle
+        self.iowait = iowait
+        self.irq = irq
+        self.softirq = softirq
+        self.steal = steal
+        self.guest = guest
+        self.guestNice = guestNice
+        self.cores = cores
+    }
 }
 
 extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
@@ -945,3 +997,4 @@ public struct CakeAgentHelper: Sendable {
 
 	}
 }
+
