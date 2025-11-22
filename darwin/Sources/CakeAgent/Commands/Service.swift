@@ -117,8 +117,8 @@ struct Service: ParsableCommand {
 					try service.write(to: serviceURL, atomically: true, encoding: .ascii)
 
 					try Process.run("systemctl", ["daemon-reload"]).waitUntilExit()
-					try Process.run("systemctl", ["enable", "\(cakedSignature).service"]).waitUntilExit()
-					try Process.run("systemctl", ["start", "\(cakedSignature).service"]).waitUntilExit()
+					try Process.run("systemctl", ["enable", "\(cakerSignature).service"]).waitUntilExit()
+					try Process.run("systemctl", ["start", "\(cakerSignature).service"]).waitUntilExit()
 				} catch {
 					throw InstallError.failedToWriteServiceUnit(error.localizedDescription)
 				}
