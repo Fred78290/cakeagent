@@ -1,6 +1,10 @@
 #!/bin/bash
 set -ex
 
+if [ -f .env ]; then
+	source .env
+fi
+
 CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 GITHUB_REF=${GITHUB_REF:=$(git rev-parse --short=8 HEAD)}
 VERSION="${GITHUB_REF##*/v}"
@@ -17,8 +21,8 @@ TMPFILE=$(mktemp)
 envsubst < darwin/Sources/CakeAgent/CI/CI.swift > $TMPFILE
 cp $TMPFILE darwin/Sources/CakeAgent/CI/CI.swift
 
-swift build -c release --arch x86_64 --product cakeagent
-swift build -c release --arch arm64 --product cakeagent
+/usr/bin/swift build -c release --arch x86_64 --product cakeagent
+/usr/bin/swift build -c release --arch arm64 --product cakeagent
 
 mkdir -p _artifacts
 pushd linux
