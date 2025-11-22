@@ -6,6 +6,7 @@ struct Root: AsyncParsableCommand {
 	static let configuration = CommandConfiguration(commandName:"cakeagent", abstract: "Cake agent running in guest",
 	                                                version: CI.version,
 	                                                subcommands: [
+	                                                	Version.self,
 	                                                	Run.self,
 	                                                	Service.self,
 	                                                	ResizeDisk.self,
