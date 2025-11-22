@@ -9,6 +9,40 @@ import (
 	"github.com/Fred78290/cakeagent/cmd/types"
 )
 
+func StopService(cfg *types.Config) (err error) {
+	plistPath := "/Library/LaunchDaemons/com.aldunelabs.cakeagent.plist"
+
+	// Vérifier si le service est installé
+	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+		return fmt.Errorf("service is not installed")
+	}
+
+	// Arrêter et décharger le service
+	cmd := exec.Command("launchctl", "unload", plistPath)
+	if output, e := cmd.CombinedOutput(); e != nil {
+		err = fmt.Errorf("failed to unload launch daemon: %w, output: %s", e, string(output))
+	}
+
+	return
+}
+
+func StartService(cfg *types.Config) (err error) {
+	plistPath := "/Library/LaunchDaemons/com.aldunelabs.cakeagent.plist"
+
+	// Vérifier si le service est installé
+	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+		return fmt.Errorf("service is not installed")
+	}
+
+	// Démarrer et charger le service
+	cmd := exec.Command("launchctl", "load", plistPath)
+	if output, e := cmd.CombinedOutput(); e != nil {
+		err = fmt.Errorf("failed to load launch daemon: %w, output: %s", e, string(output))
+	}
+
+	return
+}
+
 func InstallService(cfg *types.Config) (err error) {
 	plistPath := "/Library/LaunchDaemons/com.aldunelabs.cakeagent.plist"
 

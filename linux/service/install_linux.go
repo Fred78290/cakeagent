@@ -20,9 +20,7 @@ func (p *program) Stop(s svc.Service) error {
 	return nil
 }
 
-func InstallService(cfg *types.Config) (err error) {
-	var service svc.Service
-
+func getService(cfg *types.Config) (svc.Service, error) {
 	args := []string{
 		fmt.Sprintf("--listen=%s", cfg.Address),
 	}
@@ -56,7 +54,41 @@ func InstallService(cfg *types.Config) (err error) {
 
 	prg := &program{}
 
-	if service, err = svc.New(prg, svcConfig); err == nil {
+	return svc.New(prg, svcConfig)
+}
+
+func StopService(cfg *types.Config) (err error) {
+	var service svc.Service
+
+	if service, err = getService(cfg); err == nil {
+		if err = service.Stop(); err != nil {
+			glog.Errorf("Failed to stop service: %v", err)
+		} else {
+			glog.Info("Service stopped successfully")
+		}
+	}
+
+	return
+}
+
+func StartService(cfg *types.Config) (err error) {
+	var service svc.Service
+
+	if service, err = getService(cfg); err == nil {
+		if err = service.Start(); err != nil {
+			glog.Errorf("Failed to start service: %v", err)
+		} else {
+			glog.Info("Service started successfully")
+		}
+	}
+
+	return
+}
+
+func InstallService(cfg *types.Config) (err error) {
+	var service svc.Service
+
+	if service, err = getService(cfg); err == nil {
 		if err = service.Install(); err != nil {
 			glog.Errorf("Failed to install service: %v", err)
 		} else {

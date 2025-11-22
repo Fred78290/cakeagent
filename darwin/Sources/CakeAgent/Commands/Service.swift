@@ -32,7 +32,7 @@ extension InstallError: CustomStringConvertible {
 
 struct Service: ParsableCommand {
 	static let configuration = CommandConfiguration(abstract: "cake agent",
-	                                                subcommands: [Install.self])
+	                                                subcommands: [Install.self, Start.self, Stop.self])
 
 	struct LaunchAgent: Codable {
 		let label: String
@@ -223,6 +223,54 @@ struct Service: ParsableCommand {
 			}
 
 			try install(arguments: arguments)
+		}
+	}
+
+	struct Start: ParsableCommand {
+		static let configuration = CommandConfiguration(abstract: "Start cake agent service")
+
+		mutating func run() throws {
+			#if os(Linux)
+				try Process.run("systemctl", ["start", "\(cakerSignature).service"]).waitUntilExit()
+				print("Service \(cakerSignature) started successfully")
+			#else
+				let plistPath = "/Library/LaunchDaemons/\(cakerSignature).plist"
+				
+				if !FileManager.default.fileExists(atPath: plistPath) {
+					throw InstallError.failedToWriteLaunchAgentPlist("Service is not installed")
+				}
+				
+				let process = Process()
+				process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+				process.arguments = ["load", plistPath]
+				try process.run()
+				process.waitUntilExit()
+				print("Service \(cakerSignature) started successfully")
+			#endif
+		}
+	}
+
+	struct Stop: ParsableCommand {
+		static let configuration = CommandConfiguration(abstract: "Stop cake agent service")
+
+		mutating func run() throws {
+			#if os(Linux)
+				try Process.run("systemctl", ["stop", "\(cakerSignature).service"]).waitUntilExit()
+				print("Service \(cakerSignature) stopped successfully")
+			#else
+				let plistPath = "/Library/LaunchDaemons/\(cakerSignature).plist"
+				
+				if !FileManager.default.fileExists(atPath: plistPath) {
+					throw InstallError.failedToWriteLaunchAgentPlist("Service is not installed")
+				}
+				
+				let process = Process()
+				process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+				process.arguments = ["unload", plistPath]
+				try process.run()
+				process.waitUntilExit()
+				print("Service \(cakerSignature) stopped successfully")
+			#endif
 		}
 	}
 }

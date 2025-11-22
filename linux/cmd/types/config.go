@@ -16,6 +16,8 @@ const (
 
 type Config struct {
 	InstallService  bool
+	StopService     bool
+	StartService    bool
 	Mounts          []string
 	Address         string
 	CaCert          string
@@ -62,6 +64,8 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.DefaultEnvars()
 
 	app.Flag("install", "Install as service").Default("false").BoolVar(&cfg.InstallService)
+	app.Flag("stop", "Stop the service").Default("false").BoolVar(&cfg.StopService)
+	app.Flag("start", "Start the service").Default("false").BoolVar(&cfg.StartService)
 	app.Flag("mount", "Mount endpoint").StringsVar(&cfg.Mounts)
 	app.Flag("listen", "Listen on address").Default(cfg.Address).StringVar(&cfg.Address)
 	app.Flag("console", "Console endpoint").Default(cfg.ConsoleEndpoint).StringVar(&cfg.ConsoleEndpoint)

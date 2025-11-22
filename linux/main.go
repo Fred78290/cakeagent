@@ -44,6 +44,10 @@ func main() {
 		if err == nil {
 			if cfg.InstallService {
 				err = service.InstallService(cfg)
+			} else if cfg.StopService {
+				err = service.StopService(cfg)
+			} else if cfg.StartService {
+				err = service.StartService(cfg)
 			} else {
 				_, err = pkg.StartServer(cfg)
 			}
