@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/Fred78290/cakeagent/cmd/types"
@@ -31,11 +32,11 @@ func main() {
 		glog.SetFormatter(&glog.JSONFormatter{})
 	}
 
-	glog.Infof("config: %s", cfg)
-
 	if cfg.DisplayVersion {
-		glog.Infof("The current version is: %s, build at: %s", version.VERSION, version.BUILD_DATE)
+		fmt.Printf("The current version is: %s, build at: %s\n", version.VERSION, version.BUILD_DATE)
 	} else {
+		glog.Infof("config: %s", cfg)
+
 		if len(cfg.Mounts) > 0 {
 			err = mount.MountEndpoints(cfg.Mounts)
 		}
