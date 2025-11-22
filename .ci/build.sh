@@ -22,7 +22,7 @@ swift build -c release --arch arm64 --product cakeagent
 
 mkdir -p _artifacts
 pushd linux
-LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE={BUILD_DATE}"
+LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE=${BUILD_DATE}"
 
 GOARCH=amd64 GOOS=linux go build  -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
 GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64

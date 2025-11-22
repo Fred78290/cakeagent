@@ -51,7 +51,7 @@ jobs:
           pushd linux
           VERSION="${GITHUB_REF##*/}"
           BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ`
-          LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE={BUILD_DATE}"
+          LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE=${BUILD_DATE}"
           GOARCH=amd64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
           GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
           GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
