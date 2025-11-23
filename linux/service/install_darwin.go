@@ -52,6 +52,7 @@ func InstallService(cfg *types.Config) (err error) {
 
 	args := []string{
 		fmt.Sprintf("<string>%s</string>", os.Args[0]),
+		"<string>serve</string>",
 		fmt.Sprintf("<string>--listen=%s</string>", cfg.Address),
 	}
 

@@ -37,8 +37,8 @@ var versionCmd = &cobra.Command{
 	},
 }
 
-var runCmd = &cobra.Command{
-	Use:   "run",
+var serveCmd = &cobra.Command{
+	Use:   "serve",
 	Short: "Start the cakeagent server",
 	Long:  "Start the cakeagent server and listen for incoming connections",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -394,16 +394,16 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfg.LogFormat, "log-format", cfg.LogFormat, "The format in which log messages are printed (text, json)")
 
 	// Run command flags
-	runCmd.Flags().StringVar(&cfg.Address, "listen", cfg.Address, "Listen on address")
-	runCmd.Flags().StringVar(&cfg.CaCert, "ca-cert", cfg.CaCert, "CA TLS certificate")
-	runCmd.Flags().StringVar(&cfg.TlsCert, "tls-cert", cfg.TlsCert, "Server TLS certificate")
-	runCmd.Flags().StringVar(&cfg.TlsKey, "tls-key", cfg.TlsKey, "Server private key")
-	runCmd.Flags().DurationVar(&cfg.Timeout, "timeout", cfg.Timeout, "Request timeout for operation. 0s means no timeout")
-	runCmd.Flags().DurationVar(&cfg.TickEvent, "tick", cfg.TickEvent, "Tick event idling")
+	serveCmd.Flags().StringVar(&cfg.Address, "listen", cfg.Address, "Listen on address")
+	serveCmd.Flags().StringVar(&cfg.CaCert, "ca-cert", cfg.CaCert, "CA TLS certificate")
+	serveCmd.Flags().StringVar(&cfg.TlsCert, "tls-cert", cfg.TlsCert, "Server TLS certificate")
+	serveCmd.Flags().StringVar(&cfg.TlsKey, "tls-key", cfg.TlsKey, "Server private key")
+	serveCmd.Flags().DurationVar(&cfg.Timeout, "timeout", cfg.Timeout, "Request timeout for operation. 0s means no timeout")
+	serveCmd.Flags().DurationVar(&cfg.TickEvent, "tick", cfg.TickEvent, "Tick event idling")
 
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(serviceCmd)
 	rootCmd.AddCommand(infosCmd)
 	rootCmd.AddCommand(pingCmd)

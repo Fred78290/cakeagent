@@ -23,6 +23,7 @@ func (p *program) Stop(s svc.Service) error {
 
 func getService(cfg *types.Config) (svc.Service, error) {
 	args := []string{
+		"serve",
 		fmt.Sprintf("--listen=%s", cfg.Address),
 	}
 
