@@ -471,6 +471,189 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 	return reply, nil
 }
 
+func (s *server) Ping(ctx context.Context, req *cakeagent.CakeAgent_PingRequest) (reply *cakeagent.CakeAgent_PingReply, err error) {
+	now := time.Now().UnixNano()
+
+	reply = &cakeagent.CakeAgent_PingReply{
+		Message:           fmt.Sprintf("pong: %s", req.Message),
+		RequestTimestamp:  req.Timestamp,
+		ResponseTimestamp: now,
+	}
+
+	glog.Debugf("Ping received: %s, responding at %d", req.Message, now)
+
+	return reply, nil
+}
+
+// GetSystemInfo returns system information using the same logic as the gRPC Info method
+func GetSystemInfo() (*cakeagent.CakeAgent_InfoReply, error) {
+	agent, err := event.NewAgent(time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &server{
+		agent: agent,
+	}
+
+	ctx := context.Background()
+	empty := &cakeagent.CakeAgent_Empty{}
+
+	return s.Info(ctx, empty)
+}
+
+// PingService sends a ping request to the server and returns the response
+func PingService(message string) (*cakeagent.CakeAgent_PingReply, error) {
+	agent, err := event.NewAgent(time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &server{
+		agent: agent,
+	}
+
+	ctx := context.Background()
+	req := &cakeagent.CakeAgent_PingRequest{
+		Message:   message,
+		Timestamp: time.Now().UnixNano(),
+	}
+
+	return s.Ping(ctx, req)
+}
+
+// MountService performs mount operations and returns the response
+func MountService(mounts []MountVirtioFSRequest) (*cakeagent.CakeAgent_MountReply, error) {
+	agent, err := event.NewAgent(time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &server{
+		agent: agent,
+	}
+
+	ctx := context.Background()
+
+	// Convert input to proto format
+	var protoMounts []*cakeagent.CakeAgent_MountRequest_MountVirtioFS
+	for _, mount := range mounts {
+		protoMounts = append(protoMounts, &cakeagent.CakeAgent_MountRequest_MountVirtioFS{
+			Name:     mount.Name,
+			Target:   mount.Target,
+			Uid:      int32(mount.Uid),
+			Gid:      int32(mount.Gid),
+			Readonly: mount.Readonly,
+			Early:    mount.Early,
+		})
+	}
+
+	req := &cakeagent.CakeAgent_MountRequest{
+		Mounts: protoMounts,
+	}
+
+	return s.Mount(ctx, req)
+}
+
+// MountVirtioFSRequest represents a mount request for the CLI
+type MountVirtioFSRequest struct {
+	Name     string
+	Target   string
+	Uid      int
+	Gid      int
+	Readonly bool
+	Early    bool
+}
+
+// ParseMountString parses a mount string in the format "name:target[,uid=X,gid=Y,ro,early]"
+// Examples:
+//   - "share:/mnt/share"
+//   - "data:/data,uid=1000,gid=1000"
+//   - "logs:/var/log,uid=0,gid=0,ro"
+//   - "config:/etc/config,ro,early"
+func ParseMountString(mountStr string, early bool) (*MountVirtioFSRequest, error) {
+	if mountStr == "" {
+		return nil, fmt.Errorf("empty mount string")
+	}
+
+	parts := strings.Split(mountStr, ",")
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("invalid mount string format")
+	}
+
+	// Parse name:target
+	nameTarget := strings.Split(parts[0], ":")
+	if len(nameTarget) != 2 {
+		return nil, fmt.Errorf("mount string must be in format 'name:target[,options]'")
+	}
+
+	mount := &MountVirtioFSRequest{
+		Name:     strings.TrimSpace(nameTarget[0]),
+		Target:   strings.TrimSpace(nameTarget[1]),
+		Uid:      1000, // Default user
+		Gid:      1000, // Default group
+		Readonly: false,
+		Early:    early,
+	}
+
+	if mount.Name == "" {
+		return nil, fmt.Errorf("mount name cannot be empty")
+	}
+	if mount.Target == "" {
+		return nil, fmt.Errorf("mount target cannot be empty")
+	}
+
+	// Parse options
+	for i := 1; i < len(parts); i++ {
+		option := strings.TrimSpace(parts[i])
+		if option == "" {
+			continue
+		}
+
+		if option == "ro" || option == "readonly" {
+			mount.Readonly = true
+		} else if option == "early" {
+			mount.Early = true
+		} else if strings.HasPrefix(option, "uid=") {
+			uidStr := strings.TrimPrefix(option, "uid=")
+			if uid, err := strconv.Atoi(uidStr); err != nil {
+				return nil, fmt.Errorf("invalid uid value '%s': %v", uidStr, err)
+			} else {
+				mount.Uid = uid
+			}
+		} else if strings.HasPrefix(option, "gid=") {
+			gidStr := strings.TrimPrefix(option, "gid=")
+			if gid, err := strconv.Atoi(gidStr); err != nil {
+				return nil, fmt.Errorf("invalid gid value '%s': %v", gidStr, err)
+			} else {
+				mount.Gid = gid
+			}
+		} else {
+			return nil, fmt.Errorf("unknown mount option: %s", option)
+		}
+	}
+
+	return mount, nil
+}
+
+// ParseMountStrings parses multiple mount strings and returns a slice of MountVirtioFSRequest
+func ParseMountStrings(mountStrings []string, early bool) ([]MountVirtioFSRequest, error) {
+	if len(mountStrings) == 0 {
+		return nil, fmt.Errorf("no mount strings provided")
+	}
+
+	mounts := make([]MountVirtioFSRequest, 0, len(mountStrings))
+	for i, mountStr := range mountStrings {
+		mount, err := ParseMountString(mountStr, early)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing mount string %d ('%s'): %v", i+1, mountStr, err)
+		}
+		mounts = append(mounts, *mount)
+	}
+
+	return mounts, nil
+}
+
 func (s *server) Shutdown(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_RunReply, err error) {
 	home, _ := os.UserHomeDir()
 	reply = &cakeagent.CakeAgent_RunReply{}

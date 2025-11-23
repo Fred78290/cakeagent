@@ -7,6 +7,7 @@ import (
 	glog "github.com/sirupsen/logrus"
 
 	"github.com/Fred78290/cakeagent/cmd/types"
+	"github.com/Fred78290/cakeagent/pkg"
 	svc "github.com/kardianos/service"
 )
 
@@ -93,6 +94,18 @@ func InstallService(cfg *types.Config) (err error) {
 			glog.Errorf("Failed to install service: %v", err)
 		} else {
 			glog.Info("Service installed successfully")
+
+			if len(cfg.Mounts) > 0 {
+				var mounts []pkg.MountVirtioFSRequest
+
+				glog.Infof("Configure mounts")
+
+				if mounts, err = pkg.ParseMountStrings(cfg.Mounts, true); err != nil {
+					glog.Errorf("Failed to parse mounts: %v, %v", cfg.Mounts, err)
+				} else if _, err = pkg.MountService(mounts); err != nil {
+					glog.Errorf("Failed to mount service: %v", err)
+				}
+			}
 
 			if err = service.Start(); err != nil {
 				glog.Errorf("Failed to start service: %v", err)

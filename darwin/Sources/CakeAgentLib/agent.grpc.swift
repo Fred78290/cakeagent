@@ -16,6 +16,11 @@ public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
   var serviceName: String { get }
   var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? { get }
 
+  func ping(
+    _ request: Cakeagent_CakeAgent.PingRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<Cakeagent_CakeAgent.PingRequest, Cakeagent_CakeAgent.PingReply>
+
   func resizeDisk(
     _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
@@ -66,6 +71,24 @@ public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
 extension Cakeagent_CakeAgentServiceClientProtocol {
   public var serviceName: String {
     return "cakeagent.CakeAgentService"
+  }
+
+  /// Unary call to Ping
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Ping.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func ping(
+    _ request: Cakeagent_CakeAgent.PingRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<Cakeagent_CakeAgent.PingRequest, Cakeagent_CakeAgent.PingReply> {
+    return self.makeUnaryCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.ping.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makePingInterceptors() ?? []
+    )
   }
 
   /// Unary call to ResizeDisk
@@ -302,6 +325,11 @@ public protocol Cakeagent_CakeAgentServiceAsyncClientProtocol: GRPCClient {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
   var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? { get }
 
+  func makePingCall(
+    _ request: Cakeagent_CakeAgent.PingRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.PingRequest, Cakeagent_CakeAgent.PingReply>
+
   func makeResizeDiskCall(
     _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
@@ -354,6 +382,18 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
 
   public var interceptors: Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol? {
     return nil
+  }
+
+  public func makePingCall(
+    _ request: Cakeagent_CakeAgent.PingRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<Cakeagent_CakeAgent.PingRequest, Cakeagent_CakeAgent.PingReply> {
+    return self.makeAsyncUnaryCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.ping.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makePingInterceptors() ?? []
+    )
   }
 
   public func makeResizeDiskCall(
@@ -463,6 +503,18 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
+  public func ping(
+    _ request: Cakeagent_CakeAgent.PingRequest,
+    callOptions: CallOptions? = nil
+  ) async throws -> Cakeagent_CakeAgent.PingReply {
+    return try await self.performAsyncUnaryCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.ping.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makePingInterceptors() ?? []
+    )
+  }
+
   public func resizeDisk(
     _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions? = nil
@@ -615,6 +667,9 @@ public struct Cakeagent_CakeAgentServiceAsyncClient: Cakeagent_CakeAgentServiceA
 
 public protocol Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol: Sendable {
 
+  /// - Returns: Interceptors to use when invoking 'ping'.
+  func makePingInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.PingRequest, Cakeagent_CakeAgent.PingReply>]
+
   /// - Returns: Interceptors to use when invoking 'resizeDisk'.
   func makeResizeDiskInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply>]
 
@@ -648,6 +703,7 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
     name: "CakeAgentService",
     fullName: "cakeagent.CakeAgentService",
     methods: [
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.ping,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.resizeDisk,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.info,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.shutdown,
@@ -661,6 +717,12 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
   )
 
   public enum Methods {
+    public static let ping = GRPCMethodDescriptor(
+      name: "Ping",
+      path: "/cakeagent.CakeAgentService/Ping",
+      type: GRPCCallType.unary
+    )
+
     public static let resizeDisk = GRPCMethodDescriptor(
       name: "ResizeDisk",
       path: "/cakeagent.CakeAgentService/ResizeDisk",
@@ -721,6 +783,8 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
 public protocol Cakeagent_CakeAgentServiceProvider: CallHandlerProvider {
   var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? { get }
 
+  func ping(request: Cakeagent_CakeAgent.PingRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.PingReply>
+
   func resizeDisk(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.ResizeReply>
 
   func info(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.InfoReply>
@@ -752,6 +816,15 @@ extension Cakeagent_CakeAgentServiceProvider {
     context: CallHandlerContext
   ) -> GRPCServerHandlerProtocol? {
     switch name {
+    case "Ping":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.PingRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.PingReply>(),
+        interceptors: self.interceptors?.makePingInterceptors() ?? [],
+        userFunction: self.ping(request:context:)
+      )
+
     case "ResizeDisk":
       return UnaryServerHandler(
         context: context,
@@ -845,6 +918,11 @@ public protocol Cakeagent_CakeAgentServiceAsyncProvider: CallHandlerProvider, Se
   static var serviceDescriptor: GRPCServiceDescriptor { get }
   var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? { get }
 
+  func ping(
+    request: Cakeagent_CakeAgent.PingRequest,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> Cakeagent_CakeAgent.PingReply
+
   func resizeDisk(
     request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
@@ -913,6 +991,15 @@ extension Cakeagent_CakeAgentServiceAsyncProvider {
     context: CallHandlerContext
   ) -> GRPCServerHandlerProtocol? {
     switch name {
+    case "Ping":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.PingRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.PingReply>(),
+        interceptors: self.interceptors?.makePingInterceptors() ?? [],
+        wrapping: { try await self.ping(request: $0, context: $1) }
+      )
+
     case "ResizeDisk":
       return GRPCAsyncServerHandler(
         context: context,
@@ -1002,6 +1089,10 @@ extension Cakeagent_CakeAgentServiceAsyncProvider {
 
 public protocol Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol: Sendable {
 
+  /// - Returns: Interceptors to use when handling 'ping'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makePingInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.PingRequest, Cakeagent_CakeAgent.PingReply>]
+
   /// - Returns: Interceptors to use when handling 'resizeDisk'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeResizeDiskInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.ResizeReply>]
@@ -1044,6 +1135,7 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
     name: "CakeAgentService",
     fullName: "cakeagent.CakeAgentService",
     methods: [
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.ping,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.resizeDisk,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.info,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.shutdown,
@@ -1057,6 +1149,12 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
   )
 
   public enum Methods {
+    public static let ping = GRPCMethodDescriptor(
+      name: "Ping",
+      path: "/cakeagent.CakeAgentService/Ping",
+      type: GRPCCallType.unary
+    )
+
     public static let resizeDisk = GRPCMethodDescriptor(
       name: "ResizeDisk",
       path: "/cakeagent.CakeAgentService/ResizeDisk",

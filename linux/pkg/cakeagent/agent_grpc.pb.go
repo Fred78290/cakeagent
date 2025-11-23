@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	CakeAgentService_Ping_FullMethodName       = "/cakeagent.CakeAgentService/Ping"
 	CakeAgentService_ResizeDisk_FullMethodName = "/cakeagent.CakeAgentService/ResizeDisk"
 	CakeAgentService_Info_FullMethodName       = "/cakeagent.CakeAgentService/Info"
 	CakeAgentService_Shutdown_FullMethodName   = "/cakeagent.CakeAgentService/Shutdown"
@@ -34,6 +35,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CakeAgentServiceClient interface {
+	Ping(ctx context.Context, in *CakeAgent_PingRequest, opts ...grpc.CallOption) (*CakeAgent_PingReply, error)
 	ResizeDisk(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_ResizeReply, error)
 	Info(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_InfoReply, error)
 	Shutdown(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_RunReply, error)
@@ -51,6 +53,16 @@ type cakeAgentServiceClient struct {
 
 func NewCakeAgentServiceClient(cc grpc.ClientConnInterface) CakeAgentServiceClient {
 	return &cakeAgentServiceClient{cc}
+}
+
+func (c *cakeAgentServiceClient) Ping(ctx context.Context, in *CakeAgent_PingRequest, opts ...grpc.CallOption) (*CakeAgent_PingReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CakeAgent_PingReply)
+	err := c.cc.Invoke(ctx, CakeAgentService_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *cakeAgentServiceClient) ResizeDisk(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_ResizeReply, error) {
@@ -162,6 +174,7 @@ type CakeAgentService_EventsClient = grpc.ServerStreamingClient[CakeAgent_Tunnel
 // All implementations must embed UnimplementedCakeAgentServiceServer
 // for forward compatibility.
 type CakeAgentServiceServer interface {
+	Ping(context.Context, *CakeAgent_PingRequest) (*CakeAgent_PingReply, error)
 	ResizeDisk(context.Context, *CakeAgent_Empty) (*CakeAgent_ResizeReply, error)
 	Info(context.Context, *CakeAgent_Empty) (*CakeAgent_InfoReply, error)
 	Shutdown(context.Context, *CakeAgent_Empty) (*CakeAgent_RunReply, error)
@@ -181,6 +194,9 @@ type CakeAgentServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCakeAgentServiceServer struct{}
 
+func (UnimplementedCakeAgentServiceServer) Ping(context.Context, *CakeAgent_PingRequest) (*CakeAgent_PingReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (UnimplementedCakeAgentServiceServer) ResizeDisk(context.Context, *CakeAgent_Empty) (*CakeAgent_ResizeReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResizeDisk not implemented")
 }
@@ -227,6 +243,24 @@ func RegisterCakeAgentServiceServer(s grpc.ServiceRegistrar, srv CakeAgentServic
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&CakeAgentService_ServiceDesc, srv)
+}
+
+func _CakeAgentService_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CakeAgent_PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CakeAgentServiceServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CakeAgentService_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CakeAgentServiceServer).Ping(ctx, req.(*CakeAgent_PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CakeAgentService_ResizeDisk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -369,6 +403,10 @@ var CakeAgentService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "cakeagent.CakeAgentService",
 	HandlerType: (*CakeAgentServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Ping",
+			Handler:    _CakeAgentService_Ping_Handler,
+		},
 		{
 			MethodName: "ResizeDisk",
 			Handler:    _CakeAgentService_ResizeDisk_Handler,

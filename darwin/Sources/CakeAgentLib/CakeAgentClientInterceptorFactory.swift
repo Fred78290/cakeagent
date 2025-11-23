@@ -158,4 +158,12 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		return [CakeAgentClientInterceptor<CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>(inputHandle: inputHandle, state: state)]
 	}
 
+	public func makePingInterceptors() -> [ClientInterceptor<CakeAgent.PingRequest, CakeAgent.PingReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.ping) == false {
+			return []
+		}
+
+		return [CakeAgentClientInterceptor<CakeAgent.PingRequest, CakeAgent.PingReply>(inputHandle: inputHandle, state: state)]
+	}
+	
 }

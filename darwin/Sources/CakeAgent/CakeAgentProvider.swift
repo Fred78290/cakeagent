@@ -24,10 +24,6 @@ class ServiceError : Error, CustomStringConvertible, @unchecked Sendable {
 	}
 }
 
-extension TaskGroup<Void>: @retroactive @unchecked Sendable {
-
-}
-
 extension String {
 	var expandingTildeInPath: String {
 		if self.hasPrefix("~") {
@@ -78,15 +74,15 @@ extension CakeAgent.ExecuteRequest {
 final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 	let group: EventLoopGroup
 	let logger: Logger = Logger("CakeAgentProvider")
-
+	
 	init(group: EventLoopGroup) {
 		self.group = group
 	}
-
+	
 	func resizeDisk(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.ResizeReply {
 		do {
 			try ResizeHandler.resizeDisk()
-
+			
 			return CakeAgent.ResizeReply.with {
 				$0.success = true
 			}
@@ -96,7 +92,7 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 			}
 		}
 	}
-
+	
 	func info(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.InfoReply {
 		let processInfo = ProcessInfo.processInfo
 		var reply = CakeAgent.InfoReply()
@@ -115,10 +111,10 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		reply.agentVersion = CI.version
 		reply.diskInfos = volumes.compactMap { volume in
 			if let resourceValues = try? volume.resourceValues(forKeys: Set(keys)),
-				let volumeIsBrowsable = resourceValues.volumeIsBrowsable,
-				let volumeIsRootFileSystem = resourceValues.volumeIsRootFileSystem,
-				let volumeName = resourceValues.volumeName {
-
+			   let volumeIsBrowsable = resourceValues.volumeIsBrowsable,
+			   let volumeIsRootFileSystem = resourceValues.volumeIsRootFileSystem,
+			   let volumeName = resourceValues.volumeName {
+				
 				if volumeIsBrowsable {
 					return CakeAgent.InfoReply.DiskInfo.with {
 						if volumeIsRootFileSystem {
@@ -126,7 +122,7 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 						} else {
 							$0.mount = "/Volumes/\(volumeName)"
 						}
-
+						
 						if #available(macOS 13.3, *) {
 							$0.fsType = resourceValues.volumeTypeName ?? ""
 							if let volumeMountFromLocation = resourceValues.volumeMountFromLocation {
@@ -135,65 +131,65 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 								$0.device = ""
 							}
 						}
-
+						
 						$0.size = UInt64(resourceValues.volumeTotalCapacity ?? 0)
 						$0.free = UInt64(resourceValues.volumeAvailableCapacity ?? 0)
 						$0.used = $0.size - $0.free
 					}
 				}
 			}
-
+			
 			return nil
 		}
-
+		
 		size = MemoryLayout<UInt64>.size
 		sysctlbyname("hw.memsize", &memSize, &size, nil, 0)
-
+		
 		size = MemoryLayout<UInt64>.size
 		sysctlbyname("vm.page_free_count", &freeMemory, &size, nil, 0)
-
+		
 		memory.free = freeMemory * UInt64(vm_page_size)
 		memory.total = processInfo.physicalMemory
 		memory.used = memory.total - memory.free
-
+		
 		reply.cpuCount = Int32(processInfo.processorCount)
 		reply.memory = memory
-
+		
 		reply.osname = processInfo.operatingSystemVersionString
 		reply.release = "\(processInfo.operatingSystemVersion.majorVersion).\(processInfo.operatingSystemVersion.minorVersion).\(processInfo.operatingSystemVersion.patchVersion)"
 		reply.hostname = processInfo.hostName
-
+		
 		var ipAddresses: [String] = []
 		var ifaddr: UnsafeMutablePointer<ifaddrs>? = nil
-
+		
 		if getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr {
 			var ptr = firstAddr
-
+			
 			while ptr.pointee.ifa_next != nil {
 				let interface = ptr.pointee
 				let addrFamily = interface.ifa_addr.pointee.sa_family
-
+				
 				if addrFamily == UInt8(AF_INET) || addrFamily == UInt8(AF_INET6) {
 					var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-
+					
 					getnameinfo(interface.ifa_addr,
-					            socklen_t(interface.ifa_addr.pointee.sa_len),
-					            &hostname, socklen_t(hostname.count),
-					            nil, socklen_t(0), NI_NUMERICHOST)
-
+								socklen_t(interface.ifa_addr.pointee.sa_len),
+								&hostname, socklen_t(hostname.count),
+								nil, socklen_t(0), NI_NUMERICHOST)
+					
 					let address = String(cString: hostname)
-
+					
 					ipAddresses.append(address)
 				}
-
+				
 				ptr = interface.ifa_next
 			}
-
+			
 			freeifaddrs(ifaddr)
 		}
-
+		
 		reply.ipaddresses = ipAddresses
-
+		
 		// Collecter les informations CPU
 		let coreInfos = MacOSCPUCollector.getCPUInfo()
 		let globalCPUInfo = MacOSCPUCollector.getGlobalCPUInfo()
@@ -221,30 +217,30 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		)
 		
 		reply.cpu = cpuInfo
-
+		
 		return reply
 	}
-
+	
 	func shutdown(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.RunReply {
 		let process = Process()
 		let arguments: [String] = ["shutdown", "-h", "+1s"]
-
+		
 		logger.info("execute shutdown")
-
+		
 		process.executableURL = URL(fileURLWithPath: "/bin/sh")
 		process.arguments = ["-c", arguments.joined(separator: " ")]
 		process.standardInput = FileHandle.nullDevice
 		process.standardOutput = FileHandle.nullDevice
 		process.standardError = FileHandle.nullDevice
 		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-
+		
 		do {
 			try process.run()
-
+			
 			return .init()
 		} catch {
 			logger.error("Failed to run shutdown command: \(error)")
-
+			
 			return CakeAgent.RunReply.with { reply in
 				reply.stderr = error.localizedDescription.data(using: .utf8) ?? Data()
 				reply.stdout = Data()
@@ -254,8 +250,8 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 			}
 		}
 	}
-
-
+	
+	
 	func run(request: CakeAgent.RunCommand, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.RunReply {
 		let process = Process()
 		let outputPipe = Pipe()
@@ -263,34 +259,34 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		var outputData = Data()
 		var errorData = Data()
 		var arguments: [String] = [request.command.command]
-
+		
 		arguments.append(contentsOf: request.command.args)
-
+		
 		let outputQueue = DispatchQueue(label: "bash-output-queue")
-
+		
 		logger.info("execute \(request.command)")
-
+		
 		process.executableURL = URL(fileURLWithPath: "/bin/sh")
 		process.arguments = ["-c", arguments.joined(separator: " ")]
 		process.standardOutput = outputPipe
 		process.standardError = errorPipe
 		process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-
+		
 		if request.hasInput {
 			let inputPipe = Pipe()
-
+			
 			process.standardInput = inputPipe
-
+			
 			inputPipe.fileHandleForWriting.writeabilityHandler = { handler in
 				handler.write(request.input)
-			}	
+			}
 		} else {
 			process.standardInput = FileHandle.nullDevice
 		}
-
+		
 		outputPipe.fileHandleForReading.readabilityHandler = { handler in
 			let data = handler.availableData
-
+			
 			if data.isEmpty == false {
 				self.logger.info("outputPipe data \(String(data: data, encoding: .utf8) ?? "")")
 				outputQueue.async {
@@ -298,10 +294,10 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 				}
 			}
 		}
-
+		
 		errorPipe.fileHandleForReading.readabilityHandler = { handler in
 			let data = handler.availableData
-
+			
 			if data.isEmpty == false {
 				self.logger.info("errorPipe data \(String(data: data, encoding: .utf8) ?? "")")
 				outputQueue.async {
@@ -309,41 +305,50 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 				}
 			}
 		}
-
+		
 		try process.run()
-
+		
 		process.waitUntilExit()
-
+		
 		return CakeAgent.RunReply.with { reply in
 			if outputData.isEmpty == false {
 				reply.stdout = outputData
 			}
-
+			
 			if errorData.isEmpty == false {
 				reply.stderr = errorData
 			}
-
+			
 			reply.exitCode = Int32(process.terminationStatus)
 		}
 	}
-
+	
 	func execute(requestStream: CakeAgentExecuteRequestStream, responseStream: CakeAgentExecuteResponseStream, context: GRPCAsyncServerCallContext) async throws {
 		try await ExecuteHandleStream(on: self.group.next(), requestStream: requestStream, responseStream: responseStream).stream()
 	}
-
-	func tunnel(requestStream: CakeAgentTunnelRequestStream, responseStream: CakeAgentTunnelResponseStream, context: GRPC.GRPCAsyncServerCallContext) async throws {
+	
+	func tunnel(requestStream: CakeAgentTunnelRequestStream, responseStream: CakeAgentTunnelResponseStream, context: GRPCAsyncServerCallContext) async throws {
 		try await TunnelHandlerStream(on: self.group.next(), requestStream: requestStream, responseStream: responseStream).stream()
 	}
-
+	
 	func mount(request: CakeAgent.MountRequest, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
 		CakeAgent.MountReply.with { $0.error = "Not supported" }
 	}
-
+	
 	func umount(request: CakeAgent.MountRequest, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.MountReply {
 		CakeAgent.MountReply.with { $0.error = "Not supported" }
 	}
-
-    func events(request: CakeAgent.Empty, responseStream: GRPCAsyncResponseStreamWriter<CakeAgent.TunnelPortForwardEvent>, context: GRPC.GRPCAsyncServerCallContext) async throws {
-        try await responseStream.send(CakeAgent.TunnelPortForwardEvent.with { $0.error = "Not supported" })
-    }
-}	
+	
+	func events(request: CakeAgent.Empty, responseStream: GRPCAsyncResponseStreamWriter<CakeAgent.TunnelPortForwardEvent>, context: GRPCAsyncServerCallContext) async throws {
+		try await responseStream.send(CakeAgent.TunnelPortForwardEvent.with { $0.error = "Not supported" })
+	}
+	
+	func ping(request: CakeAgent.PingRequest, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.PingReply {
+		.with {
+			$0.message = request.message
+			$0.requestTimestamp = request.timestamp
+			$0.responseTimestamp = Int64(Date().timeIntervalSince1970 * 1_000_000_000)
+		}
+	}
+	
+}
