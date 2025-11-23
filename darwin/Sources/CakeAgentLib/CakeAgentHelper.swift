@@ -788,6 +788,22 @@ public struct CakeAgentHelper: Sendable {
 		                                    interceptors: interceptors)
 	}
 
+	public func close() async throws {
+		try await self.client.close()
+	}
+
+	public func close() -> EventLoopFuture<Void>  {
+		return self.client.close()
+	}
+
+	public func close(promise: EventLoopPromise<Void>) {
+		self.client.close(promise: promise)
+	}
+
+	public func closeSync() throws {
+		try self.client.close().wait()
+	}
+
 	public static func createClient(on: EventLoopGroup,
 	                                listeningAddress: URL,
 	                                connectionTimeout: Int64,
