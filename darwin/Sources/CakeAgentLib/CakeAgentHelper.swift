@@ -127,6 +127,18 @@ public struct ShutdownReply: Sendable, Codable {
 	}
 }
 
+public struct PingReply: Sendable, Codable {
+	public let message: String
+	public let requestTimestamp: Int64
+	public let responseTimestamp: Int64
+
+	public init(info: CakeAgent.PingReply) {
+		self.requestTimestamp = info.requestTimestamp
+		self.responseTimestamp = info.responseTimestamp
+		self.message = info.message
+	}
+}
+
 public enum ResizeReply: Sendable, Codable {
 	case success(Bool)
 	case failure(String)
@@ -868,6 +880,12 @@ public struct CakeAgentHelper: Sendable {
 		let response = client.info(.init(), callOptions: callOptions)
 
 		return InfoReply(info: try response.response.wait())
+	}
+
+	public func ping(message: String, callOptions: CallOptions? = nil) throws -> PingReply {
+		let response = client.ping(.with { $0.timestamp = Int64(Date().timeIntervalSince1970 * 1_000_000_000); $0.message = message }, callOptions: callOptions)
+
+		return PingReply(info: try response.response.wait())
 	}
 
 	public func run(command: String,
