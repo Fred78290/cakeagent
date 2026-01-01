@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/netip"
 	"net/url"
@@ -68,6 +67,138 @@ type networkInterface struct {
 	Name      string
 	Index     int
 	Addresses []string
+}
+
+func collectDiskInfos() (diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo, err error) {
+	var partitions []disk.PartitionStat
+
+	if partitions, err = disk.Partitions(true); err != nil {
+		return
+	}
+
+	diskInfos = make([]*cakeagent.CakeAgent_InfoReply_DiskInfo, 0, len(partitions))
+
+	for _, partition := range partitions {
+		if !slices.Contains(partition.Opts, "nobrowse") && !slices.Contains(partition.Opts, "nodev") {
+			if diskInfo, err := disk.Usage(partition.Mountpoint); err == nil {
+				if diskInfo != nil {
+					diskInfos = append(diskInfos, &cakeagent.CakeAgent_InfoReply_DiskInfo{
+						Device: partition.Device,
+						Mount:  partition.Mountpoint,
+						FsType: partition.Fstype,
+						Size:   diskInfo.Total,
+						Free:   diskInfo.Free,
+						Used:   diskInfo.Used,
+					})
+				}
+			}
+		}
+	}
+
+	return
+}
+
+func collectMemoryUsage() *cakeagent.CakeAgent_InfoReply_MemoryInfo {
+	memoryTotal := memory.TotalMemory()
+	memoryFree := memory.FreeMemory()
+
+	return &cakeagent.CakeAgent_InfoReply_MemoryInfo{
+		Total: memoryTotal,
+		Free:  memoryFree,
+		Used:  memoryTotal - memoryFree,
+	}
+}
+
+func collectCpuUsage() (cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo, err error) {
+	var cpuTimes []cpu.TimesStat
+	var cpuStats []cpu.TimesStat
+	var totalCpuUsage []float64
+	var perCoreCpuUsage []float64
+
+	// Get detailed CPU times
+	if cpuTimes, err = cpu.Times(false); err != nil {
+		glog.Errorf("Failed to get CPU times: %v", err)
+		return
+	}
+
+	// Get CPU usage percentage (total)
+	if totalCpuUsage, err = cpu.Percent(time.Second, false); err != nil {
+		glog.Errorf("Error getting total CPU usage: %v", err)
+		return
+	}
+
+	// Get CPU usage percentage per core
+	if perCoreCpuUsage, err = cpu.Percent(time.Second, true); err != nil {
+		glog.Errorf("Error getting per-core CPU usage: %v", err)
+		return
+	}
+
+	// Get detailed CPU stats per core
+	if cpuStats, err = cpu.Times(true); err != nil {
+		glog.Errorf("Error getting CPU stats: %v", err)
+		return
+	}
+
+	if len(cpuTimes) == 0 || len(totalCpuUsage) == 0 {
+		return
+	}
+
+	// Use times from the first core (average of all cores)
+	times := cpuTimes[0]
+	cpuInfo = &cakeagent.CakeAgent_InfoReply_CpuInfo{
+		TotalUsagePercent: totalCpuUsage[0],
+		User:              times.User,
+		System:            times.System,
+		Idle:              times.Idle,
+		Iowait:            times.Iowait,
+		Irq:               times.Irq,
+		Softirq:           times.Softirq,
+		Steal:             times.Steal,
+		Guest:             times.Guest,
+		GuestNice:         times.GuestNice,
+	}
+
+	// Use cpuStats for per-core data, fallback to cpuTimes if empty
+	coreStatsToUse := cpuStats
+	if len(cpuStats) == 0 {
+		coreStatsToUse = cpuTimes
+	}
+
+	// Some platforms include total as first element
+	startIndex := 0
+	if len(coreStatsToUse) > runtime.NumCPU() {
+		// Probably includes total as first element
+		startIndex = 1
+	}
+
+	// Process up to NumCPU cores
+	for i := startIndex; i < len(coreStatsToUse) && (i-startIndex) < runtime.NumCPU(); i++ {
+		coreTime := coreStatsToUse[i]
+		coreIndex := i - startIndex // Actual core index starting at 0
+
+		usagePercent := float64(0)
+		if coreIndex < len(perCoreCpuUsage) {
+			usagePercent = perCoreCpuUsage[coreIndex]
+		}
+
+		coreInfo := &cakeagent.CakeAgent_InfoReply_CpuCoreInfo{
+			CoreId:       int32(coreIndex),
+			UsagePercent: usagePercent,
+			User:         coreTime.User,
+			System:       coreTime.System,
+			Idle:         coreTime.Idle,
+			Iowait:       coreTime.Iowait,
+			Irq:          coreTime.Irq,
+			Softirq:      coreTime.Softirq,
+			Steal:        coreTime.Steal,
+			Guest:        coreTime.Guest,
+			GuestNice:    coreTime.GuestNice,
+		}
+
+		cpuInfo.Cores = append(cpuInfo.Cores, coreInfo)
+	}
+
+	return
 }
 
 func (p *pipe) Close() {
@@ -308,127 +439,16 @@ func (s *server) IpAddresses() ([]networkInterface, error) {
 }
 
 func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_InfoReply, err error) {
-	var partitions []disk.PartitionStat
+	var cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo
+	var diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo
 
-	memoryTotal := memory.TotalMemory()
-	memoryFree := memory.FreeMemory()
-
-	// Get detailed CPU times
-	cpuTimes, err := cpu.Times(false)
-	if err != nil {
-		glog.Warnf("Failed to get CPU times: %v", err)
-	}
-
-	if partitions, err = disk.Partitions(true); err != nil {
+	// Prepare CPU info
+	if cpuInfo, err = collectCpuUsage(); err != nil {
 		return nil, err
 	}
 
-	var diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo = make([]*cakeagent.CakeAgent_InfoReply_DiskInfo, 0, len(partitions))
-
-	for _, partition := range partitions {
-		if !slices.Contains(partition.Opts, "nobrowse") && !slices.Contains(partition.Opts, "nodev") {
-			if diskInfo, err := disk.Usage(partition.Mountpoint); err == nil {
-				if diskInfo != nil {
-					diskInfos = append(diskInfos, &cakeagent.CakeAgent_InfoReply_DiskInfo{
-						Device: partition.Device,
-						Mount:  partition.Mountpoint,
-						FsType: partition.Fstype,
-						Size:   diskInfo.Total,
-						Free:   diskInfo.Free,
-						Used:   diskInfo.Used,
-					})
-				}
-			}
-		}
-	}
-
-	// Prepare CPU info
-	var cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo
-	if len(cpuTimes) > 0 {
-		// Get CPU usage percentage (total)
-		totalCpuUsage, err := cpu.Percent(time.Second, false)
-		if err != nil {
-			log.Printf("Error getting total CPU usage: %v", err)
-		} else {
-			// Get CPU usage percentage per core
-			perCoreCpuUsage, err := cpu.Percent(time.Second, true)
-			if err != nil {
-				log.Printf("Error getting per-core CPU usage: %v", err)
-			} else {
-				// Get detailed CPU stats per core
-				cpuStats, err := cpu.Times(true)
-				if err != nil {
-					log.Printf("Error getting CPU stats: %v", err)
-				} else {
-					log.Printf("Debug: cpuTimes length: %d, cpuStats length: %d, runtime.NumCPU(): %d, perCoreCpuUsage length: %d",
-						len(cpuTimes), len(cpuStats), runtime.NumCPU(), len(perCoreCpuUsage))
-
-					// Use the first CPU core times (average across all cores)
-					times := cpuTimes[0]
-					cpuInfo = &cakeagent.CakeAgent_InfoReply_CpuInfo{
-						TotalUsagePercent: totalCpuUsage[0],
-						User:              times.User,
-						System:            times.System,
-						Idle:              times.Idle,
-						Iowait:            times.Iowait,
-						Irq:               times.Irq,
-						Softirq:           times.Softirq,
-						Steal:             times.Steal,
-						Guest:             times.Guest,
-						GuestNice:         times.GuestNice,
-					}
-
-					// Use cpuStats for per-core data, fallback to cpuTimes if empty
-					coreStatsToUse := cpuStats
-					if len(cpuStats) == 0 {
-						log.Printf("Warning: cpuStats is empty, using cpuTimes as fallback")
-						coreStatsToUse = cpuTimes
-					}
-
-					// Add per-core information
-					log.Printf("Debug: Using %d core statistics", len(coreStatsToUse))
-
-					// Some platforms include total as first element
-					startIndex := 0
-					if len(coreStatsToUse) > runtime.NumCPU() {
-						// Likely includes total as first element
-						startIndex = 1
-						log.Printf("Debug: Detected total CPU stat as first element, skipping it")
-					}
-
-					// Process up to NumCPU cores
-					for i := startIndex; i < len(coreStatsToUse) && (i-startIndex) < runtime.NumCPU(); i++ {
-						coreTime := coreStatsToUse[i]
-						coreIndex := i - startIndex // Real core index starting from 0
-
-						usagePercent := float64(0)
-						if coreIndex < len(perCoreCpuUsage) {
-							usagePercent = perCoreCpuUsage[coreIndex]
-						}
-
-						log.Printf("Debug: Processing core %d (array index %d), CPU: %s, usage: %.2f%%",
-							coreIndex, i, coreTime.CPU, usagePercent)
-
-						coreInfo := &cakeagent.CakeAgent_InfoReply_CpuCoreInfo{
-							CoreId:       int32(coreIndex),
-							UsagePercent: usagePercent,
-							User:         coreTime.User,
-							System:       coreTime.System,
-							Idle:         coreTime.Idle,
-							Iowait:       coreTime.Iowait,
-							Irq:          coreTime.Irq,
-							Softirq:      coreTime.Softirq,
-							Steal:        coreTime.Steal,
-							Guest:        coreTime.Guest,
-							GuestNice:    coreTime.GuestNice,
-						}
-						cpuInfo.Cores = append(cpuInfo.Cores, coreInfo)
-					}
-
-					log.Printf("Debug: Added %d cores to CPU info", len(cpuInfo.Cores))
-				}
-			}
-		}
+	if diskInfos, err = collectDiskInfos(); err != nil {
+		return nil, err
 	}
 
 	reply = &cakeagent.CakeAgent_InfoReply{
@@ -437,11 +457,7 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 		DiskInfos:    diskInfos,
 		Cpu:          cpuInfo,
 		AgentVersion: version.VERSION,
-		Memory: &cakeagent.CakeAgent_InfoReply_MemoryInfo{
-			Total: memoryTotal,
-			Free:  memoryFree,
-			Used:  memoryTotal - memoryFree,
-		},
+		Memory:       collectMemoryUsage(),
 	}
 
 	// Retrieve system information
@@ -1240,6 +1256,40 @@ func (s *server) Events(_ *cakeagent.CakeAgent_Empty, stream cakeagent.CakeAgent
 	}
 
 	return nil
+}
+
+func (s *server) CurrentUsage(req *cakeagent.CakeAgent_CurrentUsageRequest, stream grpc.ServerStreamingServer[cakeagent.CakeAgent_CurrentUsageReply]) error {
+	if req.Frequency == 0 {
+		req.Frequency = 1
+	}
+
+	frequency := time.Second / time.Duration(req.Frequency)
+	ticker := time.NewTicker(frequency)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case <-ticker.C:
+			// Get detailed CPU times
+			if cpuInfo, err := collectCpuUsage(); err != nil {
+				glog.Warnf("Failed to collect CPU usage: %v", err)
+				continue
+			} else {
+				reply := cakeagent.CakeAgent_CurrentUsageReply{
+					CpuCount: int32(runtime.NumCPU()),
+					CpuInfos: cpuInfo,
+					Memory:   collectMemoryUsage(),
+				}
+
+				if err = stream.Send(&reply); err != nil {
+					glog.Errorf("Failed to send current usage data: %v", err)
+					return err
+				}
+			}
+		}
+	}
 }
 
 func createListener(listen string) (listener net.Listener, err error) {

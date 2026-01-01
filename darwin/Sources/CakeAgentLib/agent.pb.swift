@@ -281,6 +281,51 @@ public struct Cakeagent_CakeAgent: Sendable {
     public init() {}
   }
 
+  public struct CurrentUsageRequest: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var frequency: Int32 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public struct CurrentUsageReply: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cpuCount: Int32 = 0
+
+    public var cpuInfos: Cakeagent_CakeAgent.InfoReply.CpuInfo {
+      get {return _cpuInfos ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
+      set {_cpuInfos = newValue}
+    }
+    /// Returns true if `cpuInfos` has been explicitly set.
+    public var hasCpuInfos: Bool {return self._cpuInfos != nil}
+    /// Clears the value of `cpuInfos`. Subsequent reads from it will return its default value.
+    public mutating func clearCpuInfos() {self._cpuInfos = nil}
+
+    public var memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo {
+      get {return _memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
+      set {_memory = newValue}
+    }
+    /// Returns true if `memory` has been explicitly set.
+    public var hasMemory: Bool {return self._memory != nil}
+    /// Clears the value of `memory`. Subsequent reads from it will return its default value.
+    public mutating func clearMemory() {self._memory = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _cpuInfos: Cakeagent_CakeAgent.InfoReply.CpuInfo? = nil
+    fileprivate var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
+  }
+
   public struct InfoReply: @unchecked Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1230,6 +1275,80 @@ extension Cakeagent_CakeAgent.ResizeReply: SwiftProtobuf.Message, SwiftProtobuf.
 
   public static func ==(lhs: Cakeagent_CakeAgent.ResizeReply, rhs: Cakeagent_CakeAgent.ResizeReply) -> Bool {
     if lhs.response != rhs.response {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.CurrentUsageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".CurrentUsageRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}frequency\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.frequency) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.frequency != 0 {
+      try visitor.visitSingularInt32Field(value: self.frequency, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.CurrentUsageRequest, rhs: Cakeagent_CakeAgent.CurrentUsageRequest) -> Bool {
+    if lhs.frequency != rhs.frequency {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.CurrentUsageReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".CurrentUsageReply"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cpuCount\0\u{1}cpuInfos\0\u{1}memory\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.cpuCount) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._cpuInfos) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._memory) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cpuCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.cpuCount, fieldNumber: 1)
+    }
+    try { if let v = self._cpuInfos {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._memory {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.CurrentUsageReply, rhs: Cakeagent_CakeAgent.CurrentUsageReply) -> Bool {
+    if lhs.cpuCount != rhs.cpuCount {return false}
+    if lhs._cpuInfos != rhs._cpuInfos {return false}
+    if lhs._memory != rhs._memory {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

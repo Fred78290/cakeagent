@@ -166,4 +166,12 @@ public final class CakeAgentClientInterceptorFactory: CakeAgentClientInterceptor
 		return [CakeAgentClientInterceptor<CakeAgent.PingRequest, CakeAgent.PingReply>(inputHandle: inputHandle, state: state)]
 	}
 	
+    public func makeCurrentUsageInterceptors() -> [ClientInterceptor<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>] {
+		if callback?(CakeAgentServiceClientMetadata.Methods.currentUsage) == false {
+			return []
+		}
+
+		return [CakeAgentClientInterceptor<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>(inputHandle: inputHandle, state: state)]
+    }
+
 }

@@ -96,10 +96,6 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 	func info(request: CakeAgent.Empty, context: GRPCAsyncServerCallContext) async throws -> CakeAgent.InfoReply {
 		let processInfo = ProcessInfo.processInfo
 		var reply = CakeAgent.InfoReply()
-		var memory = CakeAgent.InfoReply.MemoryInfo()
-		var size: size_t = 0
-		var memSize: UInt64 = 0
-		var freeMemory: UInt64 = 0
 		let keys: [URLResourceKey]
 		if #available(macOS 13.3, *) {
 			keys = [.volumeNameKey, .volumeIsBrowsableKey, .volumeIsAutomountedKey, .volumeIsRemovableKey, .volumeIsInternalKey, .volumeLocalizedNameKey, .volumeIsRootFileSystemKey, .volumeTotalCapacityKey, .volumeAvailableCapacityKey, .volumeMountFromLocationKey, .volumeTypeNameKey]
@@ -141,19 +137,22 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 			
 			return nil
 		}
-		
-		size = MemoryLayout<UInt64>.size
-		sysctlbyname("hw.memsize", &memSize, &size, nil, 0)
-		
-		size = MemoryLayout<UInt64>.size
-		sysctlbyname("vm.page_free_count", &freeMemory, &size, nil, 0)
-		
-		memory.free = freeMemory * UInt64(vm_page_size)
-		memory.total = processInfo.physicalMemory
-		memory.used = memory.total - memory.free
-		
-		reply.cpuCount = Int32(processInfo.processorCount)
-		reply.memory = memory
+
+		reply.memory = .with {
+			var size: size_t = 0
+			var memSize: UInt64 = 0
+			var freeMemory: UInt64 = 0
+
+			size = MemoryLayout<UInt64>.size
+			sysctlbyname("hw.memsize", &memSize, &size, nil, 0)
+			
+			size = MemoryLayout<UInt64>.size
+			sysctlbyname("vm.page_free_count", &freeMemory, &size, nil, 0)
+
+			$0.free = freeMemory * UInt64(vm_page_size)
+			$0.total = ProcessInfo.processInfo.physicalMemory
+			$0.used = $0.total - $0.free
+		}
 		
 		reply.osname = processInfo.operatingSystemVersionString
 		reply.release = "\(processInfo.operatingSystemVersion.majorVersion).\(processInfo.operatingSystemVersion.minorVersion).\(processInfo.operatingSystemVersion.patchVersion)"
@@ -191,32 +190,9 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		reply.ipaddresses = ipAddresses
 		
 		// Collecter les informations CPU
-		let coreInfos = MacOSCPUCollector.getCPUInfo()
-		let globalCPUInfo = MacOSCPUCollector.getGlobalCPUInfo()
-		
-		// Créer les informations par cœur
-		var cores: [CakeAgent.InfoReply.CpuCoreInfo] = []
-		for coreInfo in coreInfos {
-			let core = CakeAgent.InfoReply.CpuCoreInfo.create(
-				coreID: coreInfo.coreID,
-				usagePercent: coreInfo.usage,
-				user: coreInfo.user,
-				system: coreInfo.system,
-				idle: coreInfo.idle
-			)
-			cores.append(core)
-		}
-		
-		// Créer l'information CPU globale
-		let cpuInfo = CakeAgent.InfoReply.CpuInfo.create(
-			totalUsagePercent: globalCPUInfo.totalUsage,
-			cores: cores,
-			user: globalCPUInfo.user,
-			system: globalCPUInfo.system,
-			idle: globalCPUInfo.idle
-		)
-		
-		reply.cpu = cpuInfo
+		let cpuInfos = CakeAgent.InfoReply.CpuInfo.collect()
+		reply.cpuCount = Int32(cpuInfos.numOfCpus)
+		reply.cpu = cpuInfos.cpuInfo
 		
 		return reply
 	}
@@ -348,6 +324,32 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 			$0.message = request.message
 			$0.requestTimestamp = request.timestamp
 			$0.responseTimestamp = Int64(Date().timeIntervalSince1970 * 1_000_000_000)
+		}
+	}
+	
+	func currentUsage(request: CakeAgent.CurrentUsageRequest, responseStream: GRPCAsyncResponseStreamWriter<CakeAgent.CurrentUsageReply>, context: GRPCAsyncServerCallContext) async throws {
+		var frequency = UInt64(request.frequency)
+
+		if frequency == 0 {
+			frequency = 1
+		}
+
+		frequency = 1_000_000_000 / frequency
+
+		// Stream des informations d'usage CPU en temps réel
+		while true {
+			do {
+				// Collecter les informations CPU
+				// Envoyer les données CPU via le stream
+				try await responseStream.send(CakeAgent.CurrentUsageReply.collect())
+
+				// Attendre 1 seconde avant la prochaine collecte
+				try await Task.sleep(nanoseconds: frequency)
+				
+			} catch {
+				logger.error("Erreur lors de la collecte des informations CPU : \(error)")
+				break
+			}
 		}
 	}
 	

@@ -19,32 +19,49 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CakeAgentService_Ping_FullMethodName       = "/cakeagent.CakeAgentService/Ping"
-	CakeAgentService_ResizeDisk_FullMethodName = "/cakeagent.CakeAgentService/ResizeDisk"
-	CakeAgentService_Info_FullMethodName       = "/cakeagent.CakeAgentService/Info"
-	CakeAgentService_Shutdown_FullMethodName   = "/cakeagent.CakeAgentService/Shutdown"
-	CakeAgentService_Run_FullMethodName        = "/cakeagent.CakeAgentService/Run"
-	CakeAgentService_Execute_FullMethodName    = "/cakeagent.CakeAgentService/Execute"
-	CakeAgentService_Mount_FullMethodName      = "/cakeagent.CakeAgentService/Mount"
-	CakeAgentService_Umount_FullMethodName     = "/cakeagent.CakeAgentService/Umount"
-	CakeAgentService_Tunnel_FullMethodName     = "/cakeagent.CakeAgentService/Tunnel"
-	CakeAgentService_Events_FullMethodName     = "/cakeagent.CakeAgentService/Events"
+	CakeAgentService_Ping_FullMethodName         = "/cakeagent.CakeAgentService/Ping"
+	CakeAgentService_ResizeDisk_FullMethodName   = "/cakeagent.CakeAgentService/ResizeDisk"
+	CakeAgentService_Info_FullMethodName         = "/cakeagent.CakeAgentService/Info"
+	CakeAgentService_Shutdown_FullMethodName     = "/cakeagent.CakeAgentService/Shutdown"
+	CakeAgentService_Run_FullMethodName          = "/cakeagent.CakeAgentService/Run"
+	CakeAgentService_Execute_FullMethodName      = "/cakeagent.CakeAgentService/Execute"
+	CakeAgentService_Mount_FullMethodName        = "/cakeagent.CakeAgentService/Mount"
+	CakeAgentService_Umount_FullMethodName       = "/cakeagent.CakeAgentService/Umount"
+	CakeAgentService_Tunnel_FullMethodName       = "/cakeagent.CakeAgentService/Tunnel"
+	CakeAgentService_Events_FullMethodName       = "/cakeagent.CakeAgentService/Events"
+	CakeAgentService_CurrentUsage_FullMethodName = "/cakeagent.CakeAgentService/CurrentUsage"
 )
 
 // CakeAgentServiceClient is the client API for CakeAgentService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// CakeAgentService provides remote management capabilities for virtual machines,
+// including system information retrieval, command execution, file system operations,
+// and network tunneling functionality.
 type CakeAgentServiceClient interface {
+	// Ping tests connectivity and measures round-trip time to the agent.
 	Ping(ctx context.Context, in *CakeAgent_PingRequest, opts ...grpc.CallOption) (*CakeAgent_PingReply, error)
+	// ResizeDisk resizes the disk to use all available space.
 	ResizeDisk(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_ResizeReply, error)
+	// Info retrieves system information including memory, disk, CPU, and network details.
 	Info(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_InfoReply, error)
+	// Shutdown gracefully shuts down the system.
 	Shutdown(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (*CakeAgent_RunReply, error)
+	// Run executes a command and returns the result after completion.
 	Run(ctx context.Context, in *CakeAgent_RunCommand, opts ...grpc.CallOption) (*CakeAgent_RunReply, error)
+	// Execute runs a command in an interactive session with streaming input/output.
 	Execute(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse], error)
+	// Mount mounts VirtioFS filesystems to specified target directories.
 	Mount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
+	// Umount unmounts VirtioFS filesystems from specified target directories.
 	Umount(ctx context.Context, in *CakeAgent_MountRequest, opts ...grpc.CallOption) (*CakeAgent_MountReply, error)
+	// Tunnel establishes a bidirectional streaming tunnel for network communication.
 	Tunnel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage], error)
+	// Events streams tunnel port forwarding events for monitoring network connections.
 	Events(ctx context.Context, in *CakeAgent_Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CakeAgent_TunnelPortForwardEvent], error)
+	// CurrentUsage streams real-time CPU usage information including per-core statistics.
+	CurrentUsage(ctx context.Context, in *CakeAgent_CurrentUsageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CakeAgent_CurrentUsageReply], error)
 }
 
 type cakeAgentServiceClient struct {
@@ -170,20 +187,55 @@ func (c *cakeAgentServiceClient) Events(ctx context.Context, in *CakeAgent_Empty
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CakeAgentService_EventsClient = grpc.ServerStreamingClient[CakeAgent_TunnelPortForwardEvent]
 
+func (c *cakeAgentServiceClient) CurrentUsage(ctx context.Context, in *CakeAgent_CurrentUsageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CakeAgent_CurrentUsageReply], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &CakeAgentService_ServiceDesc.Streams[3], CakeAgentService_CurrentUsage_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[CakeAgent_CurrentUsageRequest, CakeAgent_CurrentUsageReply]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CakeAgentService_CurrentUsageClient = grpc.ServerStreamingClient[CakeAgent_CurrentUsageReply]
+
 // CakeAgentServiceServer is the server API for CakeAgentService service.
 // All implementations must embed UnimplementedCakeAgentServiceServer
 // for forward compatibility.
+//
+// CakeAgentService provides remote management capabilities for virtual machines,
+// including system information retrieval, command execution, file system operations,
+// and network tunneling functionality.
 type CakeAgentServiceServer interface {
+	// Ping tests connectivity and measures round-trip time to the agent.
 	Ping(context.Context, *CakeAgent_PingRequest) (*CakeAgent_PingReply, error)
+	// ResizeDisk resizes the disk to use all available space.
 	ResizeDisk(context.Context, *CakeAgent_Empty) (*CakeAgent_ResizeReply, error)
+	// Info retrieves system information including memory, disk, CPU, and network details.
 	Info(context.Context, *CakeAgent_Empty) (*CakeAgent_InfoReply, error)
+	// Shutdown gracefully shuts down the system.
 	Shutdown(context.Context, *CakeAgent_Empty) (*CakeAgent_RunReply, error)
+	// Run executes a command and returns the result after completion.
 	Run(context.Context, *CakeAgent_RunCommand) (*CakeAgent_RunReply, error)
+	// Execute runs a command in an interactive session with streaming input/output.
 	Execute(grpc.BidiStreamingServer[CakeAgent_ExecuteRequest, CakeAgent_ExecuteResponse]) error
+	// Mount mounts VirtioFS filesystems to specified target directories.
 	Mount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
+	// Umount unmounts VirtioFS filesystems from specified target directories.
 	Umount(context.Context, *CakeAgent_MountRequest) (*CakeAgent_MountReply, error)
+	// Tunnel establishes a bidirectional streaming tunnel for network communication.
 	Tunnel(grpc.BidiStreamingServer[CakeAgent_TunnelMessage, CakeAgent_TunnelMessage]) error
+	// Events streams tunnel port forwarding events for monitoring network connections.
 	Events(*CakeAgent_Empty, grpc.ServerStreamingServer[CakeAgent_TunnelPortForwardEvent]) error
+	// CurrentUsage streams real-time CPU usage information including per-core statistics.
+	CurrentUsage(*CakeAgent_CurrentUsageRequest, grpc.ServerStreamingServer[CakeAgent_CurrentUsageReply]) error
 	mustEmbedUnimplementedCakeAgentServiceServer()
 }
 
@@ -223,6 +275,9 @@ func (UnimplementedCakeAgentServiceServer) Tunnel(grpc.BidiStreamingServer[CakeA
 }
 func (UnimplementedCakeAgentServiceServer) Events(*CakeAgent_Empty, grpc.ServerStreamingServer[CakeAgent_TunnelPortForwardEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method Events not implemented")
+}
+func (UnimplementedCakeAgentServiceServer) CurrentUsage(*CakeAgent_CurrentUsageRequest, grpc.ServerStreamingServer[CakeAgent_CurrentUsageReply]) error {
+	return status.Errorf(codes.Unimplemented, "method CurrentUsage not implemented")
 }
 func (UnimplementedCakeAgentServiceServer) mustEmbedUnimplementedCakeAgentServiceServer() {}
 func (UnimplementedCakeAgentServiceServer) testEmbeddedByValue()                          {}
@@ -396,6 +451,17 @@ func _CakeAgentService_Events_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CakeAgentService_EventsServer = grpc.ServerStreamingServer[CakeAgent_TunnelPortForwardEvent]
 
+func _CakeAgentService_CurrentUsage_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(CakeAgent_CurrentUsageRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CakeAgentServiceServer).CurrentUsage(m, &grpc.GenericServerStream[CakeAgent_CurrentUsageRequest, CakeAgent_CurrentUsageReply]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CakeAgentService_CurrentUsageServer = grpc.ServerStreamingServer[CakeAgent_CurrentUsageReply]
+
 // CakeAgentService_ServiceDesc is the grpc.ServiceDesc for CakeAgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -448,6 +514,11 @@ var CakeAgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Events",
 			Handler:       _CakeAgentService_Events_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "CurrentUsage",
+			Handler:       _CakeAgentService_CurrentUsage_Handler,
 			ServerStreams: true,
 		},
 	},

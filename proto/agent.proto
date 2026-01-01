@@ -8,17 +8,32 @@ option go_package = "linux/pkg/cakeagent";
 
 package cakeagent;
 
+// CakeAgentService provides remote management capabilities for virtual machines,
+// including system information retrieval, command execution, file system operations,
+// and network tunneling functionality.
 service CakeAgentService {
+	// Ping tests connectivity and measures round-trip time to the agent.
 	rpc Ping (CakeAgent.PingRequest) returns (CakeAgent.PingReply);
+	// ResizeDisk resizes the disk to use all available space.
 	rpc ResizeDisk (CakeAgent.Empty) returns (CakeAgent.ResizeReply);
+	// Info retrieves system information including memory, disk, CPU, and network details.
 	rpc Info (CakeAgent.Empty) returns (CakeAgent.InfoReply);
+	// Shutdown gracefully shuts down the system.
 	rpc Shutdown (CakeAgent.Empty) returns (CakeAgent.RunReply);
+	// Run executes a command and returns the result after completion.
 	rpc Run (CakeAgent.RunCommand) returns (CakeAgent.RunReply);
+	// Execute runs a command in an interactive session with streaming input/output.
 	rpc Execute (stream CakeAgent.ExecuteRequest) returns (stream CakeAgent.ExecuteResponse);
+	// Mount mounts VirtioFS filesystems to specified target directories.
 	rpc Mount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
+	// Umount unmounts VirtioFS filesystems from specified target directories.
 	rpc Umount(CakeAgent.MountRequest) returns (CakeAgent.MountReply);
+	// Tunnel establishes a bidirectional streaming tunnel for network communication.
 	rpc Tunnel(stream CakeAgent.TunnelMessage) returns (stream CakeAgent.TunnelMessage);
+	// Events streams tunnel port forwarding events for monitoring network connections.
 	rpc Events(CakeAgent.Empty) returns (stream CakeAgent.TunnelPortForwardEvent);
+	// CurrentUsage streams real-time CPU usage information including per-core statistics.
+	rpc CurrentUsage(CakeAgent.CurrentUsageRequest) returns (stream CakeAgent.CurrentUsageReply);
 }
 
 message CakeAgent {
@@ -79,6 +94,16 @@ message CakeAgent {
 			bool success = 1;
 			string failure = 2;
 		}
+	}
+
+	message CurrentUsageRequest {
+		int32 frequency = 1;
+	}
+
+	message CurrentUsageReply {
+		int32 cpuCount = 1;
+		CakeAgent.InfoReply.CpuInfo cpuInfos = 2;
+		CakeAgent.InfoReply.MemoryInfo memory = 3;
 	}
 
 	message InfoReply {

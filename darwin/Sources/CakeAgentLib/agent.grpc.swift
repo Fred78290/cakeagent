@@ -11,6 +11,10 @@ import NIOConcurrencyHelpers
 import SwiftProtobuf
 
 
+/// CakeAgentService provides remote management capabilities for virtual machines,
+/// including system information retrieval, command execution, file system operations,
+/// and network tunneling functionality.
+///
 /// Usage: instantiate `Cakeagent_CakeAgentServiceClient`, then call methods of this protocol to make API calls.
 public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
   var serviceName: String { get }
@@ -66,6 +70,12 @@ public protocol Cakeagent_CakeAgentServiceClientProtocol: GRPCClient {
     callOptions: CallOptions?,
     handler: @escaping (Cakeagent_CakeAgent.TunnelPortForwardEvent) -> Void
   ) -> ServerStreamingCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>
+
+  func currentUsage(
+    _ request: Cakeagent_CakeAgent.CurrentUsageRequest,
+    callOptions: CallOptions?,
+    handler: @escaping (Cakeagent_CakeAgent.CurrentUsageReply) -> Void
+  ) -> ServerStreamingCall<Cakeagent_CakeAgent.CurrentUsageRequest, Cakeagent_CakeAgent.CurrentUsageReply>
 }
 
 extension Cakeagent_CakeAgentServiceClientProtocol {
@@ -73,7 +83,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     return "cakeagent.CakeAgentService"
   }
 
-  /// Unary call to Ping
+  /// Ping tests connectivity and measures round-trip time to the agent.
   ///
   /// - Parameters:
   ///   - request: Request to send to Ping.
@@ -91,7 +101,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Unary call to ResizeDisk
+  /// ResizeDisk resizes the disk to use all available space.
   ///
   /// - Parameters:
   ///   - request: Request to send to ResizeDisk.
@@ -109,7 +119,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Unary call to Info
+  /// Info retrieves system information including memory, disk, CPU, and network details.
   ///
   /// - Parameters:
   ///   - request: Request to send to Info.
@@ -127,7 +137,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Unary call to Shutdown
+  /// Shutdown gracefully shuts down the system.
   ///
   /// - Parameters:
   ///   - request: Request to send to Shutdown.
@@ -145,7 +155,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Unary call to Run
+  /// Run executes a command and returns the result after completion.
   ///
   /// - Parameters:
   ///   - request: Request to send to Run.
@@ -163,7 +173,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Bidirectional streaming call to Execute
+  /// Execute runs a command in an interactive session with streaming input/output.
   ///
   /// Callers should use the `send` method on the returned object to send messages
   /// to the server. The caller should send an `.end` after the final message has been sent.
@@ -184,7 +194,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Unary call to Mount
+  /// Mount mounts VirtioFS filesystems to specified target directories.
   ///
   /// - Parameters:
   ///   - request: Request to send to Mount.
@@ -202,7 +212,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Unary call to Umount
+  /// Umount unmounts VirtioFS filesystems from specified target directories.
   ///
   /// - Parameters:
   ///   - request: Request to send to Umount.
@@ -220,7 +230,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Bidirectional streaming call to Tunnel
+  /// Tunnel establishes a bidirectional streaming tunnel for network communication.
   ///
   /// Callers should use the `send` method on the returned object to send messages
   /// to the server. The caller should send an `.end` after the final message has been sent.
@@ -241,7 +251,7 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
     )
   }
 
-  /// Server streaming call to Events
+  /// Events streams tunnel port forwarding events for monitoring network connections.
   ///
   /// - Parameters:
   ///   - request: Request to send to Events.
@@ -258,6 +268,27 @@ extension Cakeagent_CakeAgentServiceClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeEventsInterceptors() ?? [],
+      handler: handler
+    )
+  }
+
+  /// CurrentUsage streams real-time CPU usage information including per-core statistics.
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to CurrentUsage.
+  ///   - callOptions: Call options.
+  ///   - handler: A closure called when each response is received from the server.
+  /// - Returns: A `ServerStreamingCall` with futures for the metadata and status.
+  public func currentUsage(
+    _ request: Cakeagent_CakeAgent.CurrentUsageRequest,
+    callOptions: CallOptions? = nil,
+    handler: @escaping (Cakeagent_CakeAgent.CurrentUsageReply) -> Void
+  ) -> ServerStreamingCall<Cakeagent_CakeAgent.CurrentUsageRequest, Cakeagent_CakeAgent.CurrentUsageReply> {
+    return self.makeServerStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.currentUsage.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeCurrentUsageInterceptors() ?? [],
       handler: handler
     )
   }
@@ -320,6 +351,9 @@ public struct Cakeagent_CakeAgentServiceNIOClient: Cakeagent_CakeAgentServiceCli
   }
 }
 
+/// CakeAgentService provides remote management capabilities for virtual machines,
+/// including system information retrieval, command execution, file system operations,
+/// and network tunneling functionality.
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 public protocol Cakeagent_CakeAgentServiceAsyncClientProtocol: GRPCClient {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
@@ -372,6 +406,11 @@ public protocol Cakeagent_CakeAgentServiceAsyncClientProtocol: GRPCClient {
     _ request: Cakeagent_CakeAgent.Empty,
     callOptions: CallOptions?
   ) -> GRPCAsyncServerStreamingCall<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>
+
+  func makeCurrentUsageCall(
+    _ request: Cakeagent_CakeAgent.CurrentUsageRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncServerStreamingCall<Cakeagent_CakeAgent.CurrentUsageRequest, Cakeagent_CakeAgent.CurrentUsageReply>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -497,6 +536,18 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeEventsInterceptors() ?? []
+    )
+  }
+
+  public func makeCurrentUsageCall(
+    _ request: Cakeagent_CakeAgent.CurrentUsageRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncServerStreamingCall<Cakeagent_CakeAgent.CurrentUsageRequest, Cakeagent_CakeAgent.CurrentUsageReply> {
+    return self.makeAsyncServerStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.currentUsage.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeCurrentUsageInterceptors() ?? []
     )
   }
 }
@@ -646,6 +697,18 @@ extension Cakeagent_CakeAgentServiceAsyncClientProtocol {
       interceptors: self.interceptors?.makeEventsInterceptors() ?? []
     )
   }
+
+  public func currentUsage(
+    _ request: Cakeagent_CakeAgent.CurrentUsageRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncResponseStream<Cakeagent_CakeAgent.CurrentUsageReply> {
+    return self.performAsyncServerStreamingCall(
+      path: Cakeagent_CakeAgentServiceClientMetadata.Methods.currentUsage.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeCurrentUsageInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -696,6 +759,9 @@ public protocol Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol: Send
 
   /// - Returns: Interceptors to use when invoking 'events'.
   func makeEventsInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>]
+
+  /// - Returns: Interceptors to use when invoking 'currentUsage'.
+  func makeCurrentUsageInterceptors() -> [ClientInterceptor<Cakeagent_CakeAgent.CurrentUsageRequest, Cakeagent_CakeAgent.CurrentUsageReply>]
 }
 
 public enum Cakeagent_CakeAgentServiceClientMetadata {
@@ -713,6 +779,7 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
       Cakeagent_CakeAgentServiceClientMetadata.Methods.umount,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.tunnel,
       Cakeagent_CakeAgentServiceClientMetadata.Methods.events,
+      Cakeagent_CakeAgentServiceClientMetadata.Methods.currentUsage,
     ]
   )
 
@@ -776,32 +843,55 @@ public enum Cakeagent_CakeAgentServiceClientMetadata {
       path: "/cakeagent.CakeAgentService/Events",
       type: GRPCCallType.serverStreaming
     )
+
+    public static let currentUsage = GRPCMethodDescriptor(
+      name: "CurrentUsage",
+      path: "/cakeagent.CakeAgentService/CurrentUsage",
+      type: GRPCCallType.serverStreaming
+    )
   }
 }
 
+/// CakeAgentService provides remote management capabilities for virtual machines,
+/// including system information retrieval, command execution, file system operations,
+/// and network tunneling functionality.
+///
 /// To build a server, implement a class that conforms to this protocol.
 public protocol Cakeagent_CakeAgentServiceProvider: CallHandlerProvider {
   var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? { get }
 
+  /// Ping tests connectivity and measures round-trip time to the agent.
   func ping(request: Cakeagent_CakeAgent.PingRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.PingReply>
 
+  /// ResizeDisk resizes the disk to use all available space.
   func resizeDisk(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.ResizeReply>
 
+  /// Info retrieves system information including memory, disk, CPU, and network details.
   func info(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.InfoReply>
 
+  /// Shutdown gracefully shuts down the system.
   func shutdown(request: Cakeagent_CakeAgent.Empty, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.RunReply>
 
+  /// Run executes a command and returns the result after completion.
   func run(request: Cakeagent_CakeAgent.RunCommand, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.RunReply>
 
+  /// Execute runs a command in an interactive session with streaming input/output.
   func execute(context: StreamingResponseCallContext<Cakeagent_CakeAgent.ExecuteResponse>) -> EventLoopFuture<(StreamEvent<Cakeagent_CakeAgent.ExecuteRequest>) -> Void>
 
+  /// Mount mounts VirtioFS filesystems to specified target directories.
   func mount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
 
+  /// Umount unmounts VirtioFS filesystems from specified target directories.
   func umount(request: Cakeagent_CakeAgent.MountRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Cakeagent_CakeAgent.MountReply>
 
+  /// Tunnel establishes a bidirectional streaming tunnel for network communication.
   func tunnel(context: StreamingResponseCallContext<Cakeagent_CakeAgent.TunnelMessage>) -> EventLoopFuture<(StreamEvent<Cakeagent_CakeAgent.TunnelMessage>) -> Void>
 
+  /// Events streams tunnel port forwarding events for monitoring network connections.
   func events(request: Cakeagent_CakeAgent.Empty, context: StreamingResponseCallContext<Cakeagent_CakeAgent.TunnelPortForwardEvent>) -> EventLoopFuture<GRPCStatus>
+
+  /// CurrentUsage streams real-time CPU usage information including per-core statistics.
+  func currentUsage(request: Cakeagent_CakeAgent.CurrentUsageRequest, context: StreamingResponseCallContext<Cakeagent_CakeAgent.CurrentUsageReply>) -> EventLoopFuture<GRPCStatus>
 }
 
 extension Cakeagent_CakeAgentServiceProvider {
@@ -906,68 +996,98 @@ extension Cakeagent_CakeAgentServiceProvider {
         userFunction: self.events(request:context:)
       )
 
+    case "CurrentUsage":
+      return ServerStreamingServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.CurrentUsageRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.CurrentUsageReply>(),
+        interceptors: self.interceptors?.makeCurrentUsageInterceptors() ?? [],
+        userFunction: self.currentUsage(request:context:)
+      )
+
     default:
       return nil
     }
   }
 }
 
+/// CakeAgentService provides remote management capabilities for virtual machines,
+/// including system information retrieval, command execution, file system operations,
+/// and network tunneling functionality.
+///
 /// To implement a server, implement an object which conforms to this protocol.
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 public protocol Cakeagent_CakeAgentServiceAsyncProvider: CallHandlerProvider, Sendable {
   static var serviceDescriptor: GRPCServiceDescriptor { get }
   var interceptors: Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol? { get }
 
+  /// Ping tests connectivity and measures round-trip time to the agent.
   func ping(
     request: Cakeagent_CakeAgent.PingRequest,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.PingReply
 
+  /// ResizeDisk resizes the disk to use all available space.
   func resizeDisk(
     request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.ResizeReply
 
+  /// Info retrieves system information including memory, disk, CPU, and network details.
   func info(
     request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.InfoReply
 
+  /// Shutdown gracefully shuts down the system.
   func shutdown(
     request: Cakeagent_CakeAgent.Empty,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.RunReply
 
+  /// Run executes a command and returns the result after completion.
   func run(
     request: Cakeagent_CakeAgent.RunCommand,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.RunReply
 
+  /// Execute runs a command in an interactive session with streaming input/output.
   func execute(
     requestStream: GRPCAsyncRequestStream<Cakeagent_CakeAgent.ExecuteRequest>,
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.ExecuteResponse>,
     context: GRPCAsyncServerCallContext
   ) async throws
 
+  /// Mount mounts VirtioFS filesystems to specified target directories.
   func mount(
     request: Cakeagent_CakeAgent.MountRequest,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.MountReply
 
+  /// Umount unmounts VirtioFS filesystems from specified target directories.
   func umount(
     request: Cakeagent_CakeAgent.MountRequest,
     context: GRPCAsyncServerCallContext
   ) async throws -> Cakeagent_CakeAgent.MountReply
 
+  /// Tunnel establishes a bidirectional streaming tunnel for network communication.
   func tunnel(
     requestStream: GRPCAsyncRequestStream<Cakeagent_CakeAgent.TunnelMessage>,
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.TunnelMessage>,
     context: GRPCAsyncServerCallContext
   ) async throws
 
+  /// Events streams tunnel port forwarding events for monitoring network connections.
   func events(
     request: Cakeagent_CakeAgent.Empty,
     responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.TunnelPortForwardEvent>,
+    context: GRPCAsyncServerCallContext
+  ) async throws
+
+  /// CurrentUsage streams real-time CPU usage information including per-core statistics.
+  func currentUsage(
+    request: Cakeagent_CakeAgent.CurrentUsageRequest,
+    responseStream: GRPCAsyncResponseStreamWriter<Cakeagent_CakeAgent.CurrentUsageReply>,
     context: GRPCAsyncServerCallContext
   ) async throws
 }
@@ -1081,6 +1201,15 @@ extension Cakeagent_CakeAgentServiceAsyncProvider {
         wrapping: { try await self.events(request: $0, responseStream: $1, context: $2) }
       )
 
+    case "CurrentUsage":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<Cakeagent_CakeAgent.CurrentUsageRequest>(),
+        responseSerializer: ProtobufSerializer<Cakeagent_CakeAgent.CurrentUsageReply>(),
+        interceptors: self.interceptors?.makeCurrentUsageInterceptors() ?? [],
+        wrapping: { try await self.currentUsage(request: $0, responseStream: $1, context: $2) }
+      )
+
     default:
       return nil
     }
@@ -1128,6 +1257,10 @@ public protocol Cakeagent_CakeAgentServiceServerInterceptorFactoryProtocol: Send
   /// - Returns: Interceptors to use when handling 'events'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeEventsInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.Empty, Cakeagent_CakeAgent.TunnelPortForwardEvent>]
+
+  /// - Returns: Interceptors to use when handling 'currentUsage'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeCurrentUsageInterceptors() -> [ServerInterceptor<Cakeagent_CakeAgent.CurrentUsageRequest, Cakeagent_CakeAgent.CurrentUsageReply>]
 }
 
 public enum Cakeagent_CakeAgentServiceServerMetadata {
@@ -1145,6 +1278,7 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
       Cakeagent_CakeAgentServiceServerMetadata.Methods.umount,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.tunnel,
       Cakeagent_CakeAgentServiceServerMetadata.Methods.events,
+      Cakeagent_CakeAgentServiceServerMetadata.Methods.currentUsage,
     ]
   )
 
@@ -1206,6 +1340,12 @@ public enum Cakeagent_CakeAgentServiceServerMetadata {
     public static let events = GRPCMethodDescriptor(
       name: "Events",
       path: "/cakeagent.CakeAgentService/Events",
+      type: GRPCCallType.serverStreaming
+    )
+
+    public static let currentUsage = GRPCMethodDescriptor(
+      name: "CurrentUsage",
+      path: "/cakeagent.CakeAgentService/CurrentUsage",
       type: GRPCCallType.serverStreaming
     )
   }

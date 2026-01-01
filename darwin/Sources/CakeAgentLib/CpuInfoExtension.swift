@@ -25,6 +25,32 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
     }
 }
 
+extension Cakeagent_CakeAgent.CurrentUsageReply {
+    public static func collect() -> Cakeagent_CakeAgent.CurrentUsageReply {
+        let cpuInfos = Cakeagent_CakeAgent.InfoReply.CpuInfo.collect()
+
+        return Cakeagent_CakeAgent.CurrentUsageReply.with {
+            $0.cpuCount = Int32(cpuInfos.numOfCpus)
+            $0.cpuInfos = cpuInfos.cpuInfo
+			$0.memory = .with {
+                var size: size_t = 0
+                var memSize: UInt64 = 0
+                var freeMemory: UInt64 = 0
+
+                size = MemoryLayout<UInt64>.size
+                sysctlbyname("hw.memsize", &memSize, &size, nil, 0)
+                
+                size = MemoryLayout<UInt64>.size
+                sysctlbyname("vm.page_free_count", &freeMemory, &size, nil, 0)
+
+                $0.free = freeMemory * UInt64(vm_page_size)
+                $0.total = ProcessInfo.processInfo.physicalMemory
+                $0.used = $0.total - $0.free
+            }
+        }
+    }
+}
+
 extension Cakeagent_CakeAgent.InfoReply.CpuInfo {
     public static func create(
         totalUsagePercent: Double,
@@ -46,5 +72,35 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo {
         cpuInfo.guest = 0.0
         cpuInfo.guestNice = 0.0
         return cpuInfo
+    }
+
+    public static func collect() -> (numOfCpus: Int, cpuInfo: Cakeagent_CakeAgent.InfoReply.CpuInfo) {
+        // Collecter les informations CPU
+        let coreInfos = MacOSCPUCollector.getCPUInfo()
+        let globalCPUInfo = MacOSCPUCollector.getGlobalCPUInfo()
+        
+        // Créer les informations par cœur
+        var cores: [CakeAgent.InfoReply.CpuCoreInfo] = []
+        for coreInfo in coreInfos {
+            let core = CakeAgent.InfoReply.CpuCoreInfo.create(
+                coreID: coreInfo.coreID,
+                usagePercent: coreInfo.usage,
+                user: coreInfo.user,
+                system: coreInfo.system,
+                idle: coreInfo.idle
+            )
+            cores.append(core)
+        }
+        
+        // Créer l'information CPU globale
+        let cpuInfo = CakeAgent.InfoReply.CpuInfo.create(
+            totalUsagePercent: globalCPUInfo.totalUsage,
+            cores: cores,
+            user: globalCPUInfo.user,
+            system: globalCPUInfo.system,
+            idle: globalCPUInfo.idle
+        )
+
+        return (ProcessInfo.processInfo.processorCount, cpuInfo)
     }
 }
