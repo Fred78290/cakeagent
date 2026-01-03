@@ -203,7 +203,13 @@ func displaySystemInfoText(info *cakeagent.CakeAgent_InfoReply) {
 		fmt.Printf("User Time: %.2f\n", info.Cpu.User)
 		fmt.Printf("System Time: %.2f\n", info.Cpu.System)
 		fmt.Printf("Idle Time: %.2f\n", info.Cpu.Idle)
+		fmt.Printf("Nice Time: %.2f\n", info.Cpu.Nice)
 		fmt.Printf("IO Wait: %.2f\n", info.Cpu.Iowait)
+		fmt.Printf("Guest Time: %.2f\n", info.Cpu.Guest)
+		fmt.Printf("Guest Nice Time: %.2f\n", info.Cpu.GuestNice)
+		fmt.Printf("IRQ: %.2f\n", info.Cpu.Irq)
+		fmt.Printf("Softirq: %.2f\n", info.Cpu.Softirq)
+		fmt.Printf("Steal Time: %.2f\n", info.Cpu.Steal)
 
 		if len(info.Cpu.Cores) > 0 {
 			fmt.Println("\n--- Per-Core CPU Usage ---")
