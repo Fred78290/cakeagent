@@ -10,6 +10,7 @@ struct Root: AsyncParsableCommand {
 	                                                	Run.self,
 	                                                	Service.self,
 	                                                	ResizeDisk.self,
+	                                                	Infos.self,
 	                                                ])
 
 	public static func main() async throws {

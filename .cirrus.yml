@@ -1,0 +1,31 @@
+use_compute_credits: true
+
+task:
+  name: build
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-ventura-xcode:latest
+  persistent_worker:
+    labels:
+      name: dev-mini
+    resources:
+      tart-vms: 1
+  build_script: |
+    CURDIR=${PWD}
+    source ~/.zprofile
+    brew install go
+    export PATH=$PATH:~/go/bin
+
+    source .env
+
+    export P12_PASSWORD
+    export KEYCHAIN_PASSWORD
+    export APP_PASSWORD
+    export APPLE_ID
+    export TEAM_ID=LE7988HTRN
+    export BUILD_CERTIFICATE_BASE64
+
+    ./.ci/build.sh
+
+  binary_artifacts:
+    path: _artifacts
+  

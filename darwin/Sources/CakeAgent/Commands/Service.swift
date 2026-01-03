@@ -31,7 +31,7 @@ extension InstallError: CustomStringConvertible {
 }
 
 struct Service: ParsableCommand {
-	static let configuration = CommandConfiguration(abstract: "cake agent",
+	static let configuration = CommandConfiguration(abstract: "cake agent service management",
 	                                                subcommands: [Install.self, Start.self, Stop.self])
 
 	struct LaunchAgent: Codable {
