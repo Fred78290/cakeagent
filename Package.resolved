@@ -1,5 +1,5 @@
 {
-  "originHash" : "4ed6a0e3e003e57706851e87bac77c2dabd201150981d6214177ee2a5083d1a6",
+  "originHash" : "046d014b21075d95a89c6d13b9bba66d0533de61df52047e1f6ab45ae5986a2e",
   "pins" : [
     {
       "identity" : "grpc-swift",
@@ -134,6 +134,15 @@
       "state" : {
         "revision" : "c8a44d836fe7913603e246acab7c528c2e780168",
         "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "texttable",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/cfilipov/TextTable",
+      "state" : {
+        "branch" : "master",
+        "revision" : "e03289289155b4e7aa565e32862f9cb42140596a"
       }
     }
   ],

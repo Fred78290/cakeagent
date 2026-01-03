@@ -22,6 +22,7 @@ let package = Package(
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
 		.package(url: "https://github.com/groue/Semaphore", from: "0.0.8"),
 		.package(url: "https://github.com/Fred78290/swift-nio-portforwarding.git", .upToNextMajor(from: "0.2.2")),
+		.package(url: "https://github.com/cfilipov/TextTable", branch: "master"),
 	],
 	targets: [
 		.target(name: "CakeAgentLib",
@@ -45,6 +46,7 @@ let package = Package(
 				.product(name: "NIOHTTP1", package: "swift-nio"),
 				.product(name: "NIOPosix", package: "swift-nio"),
 				.product(name: "NIOTLS", package: "swift-nio"),
+				.product(name: "TextTable", package: "TextTable"),
 				.target(name: "CakeAgentLib"),
 			],
 			path: "darwin/Sources/CakeAgent"),
@@ -59,6 +61,7 @@ let package = Package(
 				.product(name: "NIOHTTP1", package: "swift-nio"),
 				.product(name: "NIOPosix", package: "swift-nio"),
 				.product(name: "NIOTLS", package: "swift-nio"),
+				.product(name: "TextTable", package: "TextTable"),
 				.target(name: "CakeAgentLib"),
 			],
 			path: "darwin/Sources/TestAgent"),
