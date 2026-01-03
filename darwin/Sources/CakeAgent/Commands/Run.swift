@@ -8,7 +8,7 @@ import NIOPosix
 import Logging
 
 struct Run: ParsableCommand {
-	static let configuration: CommandConfiguration = CommandConfiguration(abstract: "cake agent running")
+	static let configuration: CommandConfiguration = CommandConfiguration(commandName: "serve", abstract: "cake agent running")
 
 	@Option(name: [.customLong("log-level")], help: "Log level")
 	var logLevel: Logging.Logger.Level = .info

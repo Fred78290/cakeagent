@@ -3,7 +3,7 @@ set -e
 
 #rm -rf ./.build *.o *.d *.swiftdeps
 
-swift build && exec ./.build/debug/cakeagent run \
+swift build && exec ./.build/debug/cakeagent serve \
 	--log-level=debug \
 	--listen=tcp://127.0.0.1:5010 \
 	--ca-cert="${HOME}/.cake/agent/ca.pem" \
