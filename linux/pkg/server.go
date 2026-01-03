@@ -156,6 +156,7 @@ func collectCpuUsage() (cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo, err erro
 		Steal:             times.Steal,
 		Guest:             times.Guest,
 		GuestNice:         times.GuestNice,
+		Nice:              times.Nice,
 	}
 
 	// Use cpuStats for per-core data, fallback to cpuTimes if empty
@@ -1164,9 +1165,10 @@ func (s *server) Events(_ *cakeagent.CakeAgent_Empty, stream cakeagent.CakeAgent
 	}
 
 	hostAddres := func(ip string) string {
-		if ip == "0.0.0.0" {
+		switch ip {
+		case "0.0.0.0":
 			return ipv4
-		} else if ip == "::" {
+		case "::":
 			if ipv6 == "" {
 				return ipv4
 			}
@@ -1300,11 +1302,12 @@ func createListener(listen string) (listener net.Listener, err error) {
 	} else {
 		var hostname = u.Hostname()
 
-		if u.Scheme == "virtio" {
+		switch u.Scheme {
+		case "virtio":
 			if listener, err = serialport.Listen("/dev/virtio-ports/" + hostname); err != nil {
 				err = fmt.Errorf("failed to listen on virtio: %v", err)
 			}
-		} else if u.Scheme == "vsock" {
+		case "vsock":
 			var port int
 			const vsockFailed = "failed to listen on vsock: %v"
 
@@ -1333,7 +1336,7 @@ func createListener(listen string) (listener net.Listener, err error) {
 					err = fmt.Errorf(vsockFailed, err)
 				}
 			}
-		} else if u.Scheme == "tcp" {
+		case "tcp":
 			var port int
 
 			if u.Port() == "" {
@@ -1343,9 +1346,9 @@ func createListener(listen string) (listener net.Listener, err error) {
 			} else {
 				listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", hostname, port))
 			}
-		} else if u.Scheme == "unix" {
+		case "unix":
 			listener, err = net.Listen("unix", u.Path)
-		} else {
+		default:
 			err = fmt.Errorf("unsupported address scheme: %s", u.Scheme)
 		}
 	}
