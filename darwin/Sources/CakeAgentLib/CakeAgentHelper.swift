@@ -1032,6 +1032,37 @@ public struct CakeAgentHelper: Sendable {
 			}
 		}
 	}
+
+	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, continuation: AsyncStream<CakeAgent.CurrentUsageReply>.Continuation) throws {
+		let stream: ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
+
+		stream = client.currentUsage(CakeAgent.CurrentUsageRequest.with { $0.frequency = frequency }, callOptions: callOptions) { reply in
+			continuation.yield(reply)
+		}
+
+		let subchannel = try stream.subchannel.wait()
+
+		continuation.onTermination = { _ in
+			subchannel.close(promise: nil)
+		}
+
+		stream.status.whenComplete { result in
+			switch result {
+			case .failure(let err):
+#if TRACE
+				redbold("currentUsage error: \(err)")
+#endif
+				subchannel.close(promise: nil)
+			case .success(let status):
+#if TRACE
+				redbold("currentUsage status: \(status)")
+#endif
+				if status.code != .ok {
+					subchannel.close(promise: nil)
+				}
+			}
+		}
+	}
 	
 	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.CurrentUsageReply) -> Void) throws {
 		let stream: ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
