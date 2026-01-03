@@ -2,124 +2,6 @@ import Foundation
 import Darwin
 import Cocoa
 
-public class CoreInfo: Codable {
-	public enum CoreType: Int, Codable {
-		case unknown = -1
-		case efficiency = 1
-		case performance = 2
-	}
-
-	public var id: Int32
-	public var type: CoreType
-	
-	public init(id: Int32, type: CoreType) {
-		self.id = id
-		self.type = type
-	}
-}
-
-@Observable
-public class CoreLoad {	
-	public var usage: Double
-	public var coreID: Int32
-	public var user: Int32
-	public var system: Int32
-	public var idle: Int32
-	public var nice: Int32
-	
-	public init(coreID: Int32, user: Int32 = 0, system: Int32 = 0, idle: Int32 = 0, nice: Int32 = 0, usage: Double = 0) {
-		self.coreID = coreID
-		self.user = user
-		self.system = system
-		self.idle = idle
-		self.nice = nice
-		self.usage = usage
-	}
-}
-
-@Observable
-public class CPULoad {
-	private enum CodingKeys: String, CodingKey {
-		case totalUsage
-		case usagePerCore
-		case usageECores
-		case usagePCores
-		case systemLoad
-		case userLoad
-		case idleLoad
-	}
-	
-	public var totalUsage: Double
-	public var usagePerCore: [CoreLoad]
-	public var usageECores: Double?
-	public var usagePCores: Double?
-	public var systemLoad: Double
-	public var userLoad: Double
-	public var idleLoad: Double
-	
-	public init(totalUsage: Double = 0, usagePerCore: [CoreLoad] = [], usageECores: Double? = nil, usagePCores: Double? = nil, systemLoad: Double = 0, userLoad: Double = 0, idleLoad: Double = 0) {
-		self.totalUsage = totalUsage
-		self.usagePerCore = usagePerCore
-		self.usageECores = usageECores
-		self.usagePCores = usagePCores
-		self.systemLoad = systemLoad
-		self.userLoad = userLoad
-		self.idleLoad = idleLoad
-	}
-}
-
-@Observable
-public class CpuInformations {
-	public var name: String?
-	public var physicalCores: Int8?
-	public var logicalCores: Int8?
-	public var eCores: Int32?
-	public var pCores: Int32?
-	public var cores: [CoreInfo]?
-	public var eCoreFrequencies: [Int32]?
-	public var pCoreFrequencies: [Int32]?
-	
-	public init(name: String? = nil, physicalCores: Int8? = nil, logicalCores: Int8? = nil, eCores: Int32? = nil, pCores: Int32? = nil, cores: [CoreInfo]? = nil, eCoreFrequencies: [Int32]? = nil, pCoreFrequencies: [Int32]? = nil) {
-		self.name = name
-		self.physicalCores = physicalCores
-		self.logicalCores = logicalCores
-		self.eCores = eCores
-		self.pCores = pCores
-		self.cores = cores
-		self.eCoreFrequencies = eCoreFrequencies
-		self.pCoreFrequencies = pCoreFrequencies
-	}
-}
-
-public func sysctlByName(_ name: String) -> String {
-	var sizeOfName = 0
-
-	guard sysctlbyname(name, nil, &sizeOfName, nil, 0) == 0  else {
-		print(POSIXError.Code(rawValue: errno).map { POSIXError($0) } ?? CocoaError(.fileReadUnknown))
-		return ""
-	}
-	
-	var nameChars = [CChar](repeating: 0, count: sizeOfName)
-
-	guard sysctlbyname(name, &nameChars, &sizeOfName, nil, 0) == 0 else {
-		print(POSIXError.Code(rawValue: errno).map { POSIXError($0) } ?? CocoaError(.fileReadUnknown))
-		return ""
-	}
-
-	return String(cString: nameChars)
-}
-
-public func sysctlByName(_ name: String) -> Int64 {
-	var num: Int64 = 0
-	var size = MemoryLayout<Int64>.size
-	
-	if sysctlbyname(name, &num, &size, nil, 0) != 0 {
-		print(POSIXError.Code(rawValue: errno).map { POSIXError($0) } ?? CocoaError(.fileReadUnknown))
-	}
-	
-	return num
-}
-
 extension String {
 	public func condenseWhitespace() -> String {
 		let components = self.components(separatedBy: .whitespacesAndNewlines)
@@ -150,8 +32,85 @@ extension String {
 }
 
 /// Collecteur d'informations CPU pour macOS
-@Observable
-public class CPUWatcher {
+public final class CPUWatcher: ObservableObject, Observable, @unchecked Sendable {
+	public struct CoreInfo {
+		public enum CoreType: Int {
+			case unknown = -1
+			case efficiency = 1
+			case performance = 2
+		}
+
+		public var id: Int32
+		public var type: CoreType
+		
+		public init(id: Int32, type: CoreType) {
+			self.id = id
+			self.type = type
+		}
+	}
+
+	public class CoreLoad: ObservableObject, Observable {
+		@Published public var usage: Double
+		@Published public var coreID: Int32
+		@Published public var user: Int32
+		@Published public var system: Int32
+		@Published public var idle: Int32
+		@Published public var nice: Int32
+		
+		public init(coreID: Int32, user: Int32 = 0, system: Int32 = 0, idle: Int32 = 0, nice: Int32 = 0, usage: Double = 0) {
+			self.coreID = coreID
+			self.user = user
+			self.system = system
+			self.idle = idle
+			self.nice = nice
+			self.usage = usage
+		}
+	}
+
+	public class CPULoad: ObservableObject, Observable {
+		@Published public var totalUsage: Double
+		@Published public var usagePerCore: [CoreLoad]
+		@Published public var usageECores: Double?
+		@Published public var usagePCores: Double?
+		@Published public var systemLoad: Double
+		@Published public var userLoad: Double
+		@Published public var idleLoad: Double
+		@Published public var niceLoad: Double
+		
+		public init(totalUsage: Double = 0, usagePerCore: [CoreLoad] = [], usageECores: Double? = nil, usagePCores: Double? = nil, systemLoad: Double = 0, userLoad: Double = 0, idleLoad: Double = 0, niceLoad: Double = 0) {
+			self.totalUsage = totalUsage
+			self.usagePerCore = usagePerCore
+			self.usageECores = usageECores
+			self.usagePCores = usagePCores
+			self.systemLoad = systemLoad
+			self.userLoad = userLoad
+			self.idleLoad = idleLoad
+			self.niceLoad = niceLoad
+		}
+	}
+
+	public class CpuInformations: ObservableObject, Observable {
+		@Published public var name: String?
+		@Published public var physicalCores: Int8?
+		@Published public var logicalCores: Int8?
+		@Published public var eCores: Int32?
+		@Published public var pCores: Int32?
+		@Published public var cores: [CoreInfo]?
+		@Published public var eCoreFrequencies: [Int32]?
+		@Published public var pCoreFrequencies: [Int32]?
+		
+		public init(name: String? = nil, physicalCores: Int8? = nil, logicalCores: Int8? = nil, eCores: Int32? = nil, pCores: Int32? = nil, cores: [CoreInfo]? = nil, eCoreFrequencies: [Int32]? = nil, pCoreFrequencies: [Int32]? = nil) {
+			self.name = name
+			self.physicalCores = physicalCores
+			self.logicalCores = logicalCores
+			self.eCores = eCores
+			self.pCores = pCores
+			self.cores = cores
+			self.eCoreFrequencies = eCoreFrequencies
+			self.pCoreFrequencies = pCoreFrequencies
+		}
+	}
+
 	private var cpuInfo: processor_info_array_t!
 	private var prevCpuInfo: processor_info_array_t?
 	private var numCpuInfo: mach_msg_type_number_t = 0
@@ -165,7 +124,36 @@ public class CPUWatcher {
 	private var usagePerCore: [CoreLoad] = []
 	private var cores: [CoreInfo]? = nil
 	
-	public var cpuLoad = CPULoad()
+	@Published public private(set) var cpuLoad = CPULoad()
+
+	private static func sysctlByName(_ name: String) -> String {
+		var sizeOfName = 0
+
+		guard sysctlbyname(name, nil, &sizeOfName, nil, 0) == 0  else {
+			print(POSIXError.Code(rawValue: errno).map { POSIXError($0) } ?? CocoaError(.fileReadUnknown))
+			return ""
+		}
+		
+		var nameChars = [CChar](repeating: 0, count: sizeOfName)
+
+		guard sysctlbyname(name, &nameChars, &sizeOfName, nil, 0) == 0 else {
+			print(POSIXError.Code(rawValue: errno).map { POSIXError($0) } ?? CocoaError(.fileReadUnknown))
+			return ""
+		}
+
+		return String(cString: nameChars)
+	}
+
+	private static func sysctlByName(_ name: String) -> Int64 {
+		var num: Int64 = 0
+		var size = MemoryLayout<Int64>.size
+		
+		if sysctlbyname(name, &num, &size, nil, 0) != 0 {
+			print(POSIXError.Code(rawValue: errno).map { POSIXError($0) } ?? CocoaError(.fileReadUnknown))
+		}
+		
+		return num
+	}
 
 	private static func getIOProperties(_ entry: io_registry_entry_t) -> NSDictionary? {
 		var properties: Unmanaged<CFMutableDictionary>? = nil
@@ -379,7 +367,7 @@ public class CPUWatcher {
 	}
 
 	public init() {
-		self.hasHyperthreadingCores = sysctlByName("hw.physicalcpu") != sysctlByName("hw.logicalcpu")
+		self.hasHyperthreadingCores = Self.sysctlByName("hw.physicalcpu") != Self.sysctlByName("hw.logicalcpu")
 
 		[CTL_HW, HW_NCPU].withUnsafeBufferPointer { mib in
 			var sizeOfNumCPUs: size_t = MemoryLayout<uint>.size
@@ -394,18 +382,23 @@ public class CPUWatcher {
 		self.refresh()
 	}
 
-	public func refresh() {
+	@discardableResult
+	public func refresh() -> CPULoad {
 		let result: kern_return_t = host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &self.numCPUsU, &self.cpuInfo, &self.numCpuInfo)
 		guard result == KERN_SUCCESS else {
-			return
+			return self.cpuLoad
 		}
 
 		guard let cpuInfo = hostCPULoadInfo() else {
-			return
+			return self.cpuLoad
 		}
 
 		self.CPUUsageLock.lock()
 		self.usagePerCore = []
+
+		defer {
+			self.CPUUsageLock.unlock()
+		}
 
 		for i in 0 ..< Int32(numCPUs) {
 			var inUse: Int32
@@ -471,7 +464,8 @@ public class CPUWatcher {
 		let system = sysDiff / totalTicks
 		let user = userDiff / totalTicks
 		let idle = idleDiff / totalTicks
-		
+		let nice = niceDiff / totalTicks
+
 		if !system.isNaN {
 			self.cpuLoad.systemLoad  = system
 		}
@@ -482,6 +476,10 @@ public class CPUWatcher {
 
 		if !idle.isNaN {
 			self.cpuLoad.idleLoad = idle
+		}
+
+		if !nice.isNaN {
+			self.cpuLoad.niceLoad = nice
 		}
 
 		self.previousInfo = cpuInfo
@@ -507,7 +505,7 @@ public class CPUWatcher {
 			self.cpuLoad.usagePCores = pCoresList.reduce(0, { $0 + $1.usage }) / Double(pCoresList.count)
 		}
 
-		self.CPUUsageLock.unlock()
+		return self.cpuLoad
 	}
 }
 
