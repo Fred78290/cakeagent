@@ -769,63 +769,63 @@ final class CakeChannelStreamer: @unchecked Sendable {
 public struct CakeAgentHelper: Sendable {
 	internal let eventLoopGroup: EventLoopGroup
 	internal let client: CakeAgentClient
-
+	
 	public struct RunReply: Sendable {
 		public var exitCode: Int32
 		public var stdout: Data
 		public var stderr: Data
 	}
-
+	
 	public init(on: EventLoopGroup, client: CakeAgentClient) {
 		self.eventLoopGroup = on
 		self.client = client
 	}
-
+	
 	public init(on: EventLoopGroup,
-	            listeningAddress: URL,
-	            connectionTimeout: Int64,
-	            caCert: String?,
-	            tlsCert: String?,
-	            tlsKey: String?,
-	            retries: ConnectionBackoff.Retries = .unlimited,
-	            interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws {
+				listeningAddress: URL,
+				connectionTimeout: Int64,
+				caCert: String?,
+				tlsCert: String?,
+				tlsKey: String?,
+				retries: ConnectionBackoff.Retries = .unlimited,
+				interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws {
 		self.eventLoopGroup = on
 		self.client = try Self.createClient(on: on,
-		                                    listeningAddress: listeningAddress,
-		                                    connectionTimeout: connectionTimeout,
-		                                    caCert: caCert,
-		                                    tlsCert: tlsCert,
-		                                    tlsKey: tlsKey,
-		                                    retries: retries,
-		                                    interceptors: interceptors)
+											listeningAddress: listeningAddress,
+											connectionTimeout: connectionTimeout,
+											caCert: caCert,
+											tlsCert: tlsCert,
+											tlsKey: tlsKey,
+											retries: retries,
+											interceptors: interceptors)
 	}
-
+	
 	public func close() async throws {
 		try await self.client.close()
 	}
-
+	
 	public func close() -> EventLoopFuture<Void>  {
 		return self.client.close()
 	}
-
+	
 	public func close(promise: EventLoopPromise<Void>) {
 		self.client.close(promise: promise)
 	}
-
+	
 	public func closeSync() throws {
 		try self.client.close().wait()
 	}
-
+	
 	public static func createClient(on: EventLoopGroup,
-	                                listeningAddress: URL,
-	                                connectionTimeout: Int64,
-	                                caCert: String?,
-	                                tlsCert: String?,
-	                                tlsKey: String?,
-	                                retries: ConnectionBackoff.Retries = .unlimited,
-	                                interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws -> CakeAgentClient {
+									listeningAddress: URL,
+									connectionTimeout: Int64,
+									caCert: String?,
+									tlsCert: String?,
+									tlsKey: String?,
+									retries: ConnectionBackoff.Retries = .unlimited,
+									interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? = nil) throws -> CakeAgentClient {
 		let target: ConnectionTarget
-
+		
 		if listeningAddress.scheme == "unix" || listeningAddress.isFileURL {
 			target = ConnectionTarget.unixDomainSocket(listeningAddress.path())
 		} else if listeningAddress.scheme == "tcp" {
@@ -833,184 +833,212 @@ public struct CakeAgentHelper: Sendable {
 		} else {
 			throw ValidationError("unsupported address scheme: \(listeningAddress)")
 		}
-
+		
 		var clientConfiguration = ClientConnection.Configuration.default(target: target, eventLoopGroup: on)
-
+		
 		if let tlsCert = tlsCert, let tlsKey = tlsKey {
 			let tlsCert = try NIOSSLCertificate(file: tlsCert, format: .pem)
 			let tlsKey = try NIOSSLPrivateKey(file: tlsKey, format: .pem)
 			let trustRoots: NIOSSLTrustRoots
-
+			
 			if let caCert: String = caCert {
 				trustRoots = .certificates([try NIOSSLCertificate(file: caCert, format: .pem)])
 			} else {
 				trustRoots = NIOSSLTrustRoots.default
 			}
-
+			
 			clientConfiguration.tlsConfiguration = GRPCTLSConfiguration.makeClientConfigurationBackedByNIOSSL(
 				certificateChain: [.certificate(tlsCert)],
 				privateKey: .privateKey(tlsKey),
 				trustRoots: trustRoots,
 				certificateVerification: .noHostnameVerification)
 		}
-
+		
 		if retries != .unlimited {
 			clientConfiguration.connectionBackoff = ConnectionBackoff(maximumBackoff: TimeInterval(connectionTimeout), minimumConnectionTimeout: TimeInterval(connectionTimeout), retries: retries)
 		} else {
 			clientConfiguration.connectionBackoff = ConnectionBackoff(maximumBackoff: TimeInterval(connectionTimeout))
 		}
-
+		
 		return CakeAgentClient(channel: ClientConnection(configuration: clientConfiguration), interceptors: interceptors)
 	}
-
+	
 	public func resizeDisk(callOptions: CallOptions? = nil) throws -> ResizeReply {
 		let response = client.resizeDisk(.init(), callOptions: callOptions)
 		let infos = try response.response.wait()
-
+		
 		if case let .success(success) = infos.response {
 			return .success(success)
 		} else if case let .failure(error) = infos.response {
 			return .failure(error)
 		}
-
+		
 		return .failure("unknown error")
 	}
-
+	
 	public func info(callOptions: CallOptions? = nil) throws -> InfoReply {
 		let response = client.info(.init(), callOptions: callOptions)
-
+		
 		return InfoReply(info: try response.response.wait())
 	}
-
+	
 	public func ping(message: String, callOptions: CallOptions? = nil) throws -> PingReply {
 		let response = client.ping(.with { $0.timestamp = Int64(Date().timeIntervalSince1970 * 1_000_000_000); $0.message = message }, callOptions: callOptions)
-
+		
 		return PingReply(info: try response.response.wait())
 	}
-
+	
 	public func run(command: String,
-	                arguments: [String],
-	                input: Data? = nil,
-	                callOptions: CallOptions? = nil) throws -> RunReply {
-
+					arguments: [String],
+					input: Data? = nil,
+					callOptions: CallOptions? = nil) throws -> RunReply {
+		
 		let response = try client.run(CakeAgent.RunCommand.with { req in
 			if let input = input {
 				req.input = input
 			}
-
-			req.command = CakeAgent.RunCommand.Command.with { 
+			
+			req.command = CakeAgent.RunCommand.Command.with {
 				$0.command = command
 				$0.args = arguments
 			}
 		}).response.wait()
-
+		
 		return RunReply(exitCode: response.exitCode, stdout: response.stdout, stderr: response.stderr)
 	}
-
+	
 	public func shutdown(callOptions: CallOptions? = nil) throws -> ShutdownReply {
 		let response = try client.shutdown(.init()).response.wait()
-
+		
 		return ShutdownReply(exitCode: response.exitCode, stdout: String(data: response.stdout, encoding: .utf8), stderr: String(data: response.stderr, encoding: .utf8))
 	}
-
+	
 	public func run(command: String,
-	                arguments: [String],
-	                inputHandle: FileHandle = FileHandle.standardInput,
-	                outputHandle: FileHandle = FileHandle.standardOutput,
-	                errorHandle: FileHandle = FileHandle.standardError,
-	                callOptions: CallOptions? = nil) throws -> Int32 {
+					arguments: [String],
+					inputHandle: FileHandle = FileHandle.standardInput,
+					outputHandle: FileHandle = FileHandle.standardOutput,
+					errorHandle: FileHandle = FileHandle.standardError,
+					callOptions: CallOptions? = nil) throws -> Int32 {
 		let response = try client.run(CakeAgent.RunCommand.with { req in
 			if isatty(inputHandle.fileDescriptor) == 0 {
 				req.input = inputHandle.readDataToEndOfFile()
 			}
-
-			req.command = CakeAgent.RunCommand.Command.with { 
+			
+			req.command = CakeAgent.RunCommand.Command.with {
 				$0.command = command
 				$0.args = arguments
 			}
 		}).response.wait()
-
+		
 		if response.stderr.isEmpty == false {
 			errorHandle.write(response.stderr)
 		}
-
+		
 		if response.stdout.isEmpty == false {
 			outputHandle.write(response.stdout)
 		}
-
+		
 		return response.exitCode
 	}
-
+	
 	func exec(command: CakeChannelStreamer.ExecuteCommand,
-	          inputHandle: FileHandle = FileHandle.standardInput,
-	          outputHandle: FileHandle = FileHandle.standardOutput,
-	          errorHandle: FileHandle = FileHandle.standardError,
-	          callOptions: CallOptions? = nil) async throws -> Int32 {
+			  inputHandle: FileHandle = FileHandle.standardInput,
+			  outputHandle: FileHandle = FileHandle.standardOutput,
+			  errorHandle: FileHandle = FileHandle.standardError,
+			  callOptions: CallOptions? = nil) async throws -> Int32 {
 		let handler = CakeChannelStreamer(on: self.eventLoopGroup.next(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle)
 		defer {
 			if let factory = client.interceptors as? CakeAgentClientInterceptorState {
 				factory.restoreState()
 			}
 		}
-
+		
 		return try await handler.stream(command: command) {
 			return client.execute(callOptions: callOptions, handler: handler.handleResponse)
 		}
 	}
-
+	
 	public func exec(command: String,
-	                 arguments: [String],
-	                 inputHandle: FileHandle = FileHandle.standardInput,
-	                 outputHandle: FileHandle = FileHandle.standardOutput,
-	                 errorHandle: FileHandle = FileHandle.standardError,
-	                 callOptions: CallOptions? = nil) async throws -> Int32 {
+					 arguments: [String],
+					 inputHandle: FileHandle = FileHandle.standardInput,
+					 outputHandle: FileHandle = FileHandle.standardOutput,
+					 errorHandle: FileHandle = FileHandle.standardError,
+					 callOptions: CallOptions? = nil) async throws -> Int32 {
 		return try await self.exec(command: .execute(command, arguments), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
 	}
-
+	
 	public func shell(inputHandle: FileHandle = FileHandle.standardInput,
-	                  outputHandle: FileHandle = FileHandle.standardOutput,
-	                  errorHandle: FileHandle = FileHandle.standardError,
-	                  callOptions: CallOptions? = nil) async throws -> Int32 {
+					  outputHandle: FileHandle = FileHandle.standardOutput,
+					  errorHandle: FileHandle = FileHandle.standardError,
+					  callOptions: CallOptions? = nil) async throws -> Int32 {
 		return try await self.exec(command: .shell(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
 	}
-
+	
 	public func mount(request: CakeAgent.MountRequest, callOptions: CallOptions? = nil) throws -> CakeAgent.MountReply {
 		let response = client.mount(request, callOptions: callOptions)
-
+		
 		return try response.response.wait()
 	}
-
+	
 	public func umount(request: CakeAgent.MountRequest, callOptions: CallOptions? = nil) throws -> CakeAgent.MountReply {
 		let response = client.umount(request, callOptions: callOptions)
-
+		
 		return try response.response.wait()
 	}
-
+	
 	public func tunnel(bindAddress: SocketAddress, remoteAddress: SocketAddress, proto: MappedPort.Proto, callOptions: CallOptions? = nil) throws -> Int32 {
 		let listener = try CakeAgentTunnelListener(group: self.eventLoopGroup, cakeAgentClient: client)
-
+		
 		_ = try listener.addPortForwardingServer(bindAddress: bindAddress, remoteAddress: remoteAddress, proto: proto, ttl: 5)
-
+		
 		try listener.bind().wait()
 		return 0
 	}
-
+	
 	public func events(callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.TunnelPortForwardEvent.ForwardEvent) -> Void) throws {
 		let stream: ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
 		var subchannel: Channel? = nil
-
+		
 		stream = client.events(.init(), callOptions: callOptions) { event in
 			if case let .forwardEvent(event) = event.event {
 				handler(event)
 			} else if case let .error(error) = event.event {
 				//	throw error
 				if let subchannel = subchannel {
-					#if TRACE
-						redbold("Event error: \(error)")
-					#endif
+#if TRACE
+					redbold("Event error: \(error)")
+#endif
 					subchannel.pipeline.fireErrorCaught(GRPCStatus(code: .internalError, message: error))
 				}
 			}
+		}
+		
+		subchannel = try stream.subchannel.wait()
+		
+		stream.status.whenComplete { result in
+			switch result {
+			case .failure(let err):
+#if TRACE
+				redbold("Event error: \(err)")
+#endif
+				subchannel?.close(promise: nil)
+			case .success(let status):
+#if TRACE
+				redbold("Tunnel status: \(status)")
+#endif
+				if status.code != .ok {
+					subchannel?.close(promise: nil)
+				}
+			}
+		}
+	}
+	
+	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.CurrentUsageReply) -> Void) throws {
+		let stream: ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
+		var subchannel: Channel? = nil
+
+		stream = client.currentUsage(CakeAgent.CurrentUsageRequest.with { $0.frequency = frequency }, callOptions: callOptions) { reply in
+			handler(reply)
 		}
 
 		subchannel = try stream.subchannel.wait()
@@ -1018,20 +1046,19 @@ public struct CakeAgentHelper: Sendable {
 		stream.status.whenComplete { result in
 			switch result {
 			case .failure(let err):
-				#if TRACE
-					redbold("Event error: \(err)")
-				#endif
+#if TRACE
+				redbold("currentUsage error: \(err)")
+#endif
 				subchannel?.close(promise: nil)
 			case .success(let status):
-				#if TRACE
-					redbold("Tunnel status: \(status)")
-				#endif
+#if TRACE
+				redbold("currentUsage status: \(status)")
+#endif
 				if status.code != .ok {
 					subchannel?.close(promise: nil)
 				}
 			}
 		}
-
 	}
 }
 
