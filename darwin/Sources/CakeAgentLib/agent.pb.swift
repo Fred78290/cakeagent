@@ -461,6 +461,8 @@ public struct Cakeagent_CakeAgent: Sendable {
 
       public var guestNice: Double = 0
 
+      public var nice: Double = 0
+
       public var unknownFields = SwiftProtobuf.UnknownStorage()
 
       public init() {}
@@ -490,6 +492,8 @@ public struct Cakeagent_CakeAgent: Sendable {
       public var guest: Double = 0
 
       public var guestNice: Double = 0
+
+      public var nice: Double = 0
 
       public var cores: [Cakeagent_CakeAgent.InfoReply.CpuCoreInfo] = []
 
@@ -1591,7 +1595,7 @@ extension Cakeagent_CakeAgent.InfoReply.DiskInfo: SwiftProtobuf.Message, SwiftPr
 
 extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".CpuCoreInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}core_id\0\u{3}usage_percent\0\u{1}user\0\u{1}system\0\u{1}idle\0\u{1}iowait\0\u{1}irq\0\u{1}softirq\0\u{1}steal\0\u{1}guest\0\u{1}guestNice\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}core_id\0\u{3}usage_percent\0\u{1}user\0\u{1}system\0\u{1}idle\0\u{1}iowait\0\u{1}irq\0\u{1}softirq\0\u{1}steal\0\u{1}guest\0\u{1}guestNice\0\u{1}nice\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1610,6 +1614,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo: SwiftProtobuf.Message, Swif
       case 9: try { try decoder.decodeSingularDoubleField(value: &self.steal) }()
       case 10: try { try decoder.decodeSingularDoubleField(value: &self.guest) }()
       case 11: try { try decoder.decodeSingularDoubleField(value: &self.guestNice) }()
+      case 12: try { try decoder.decodeSingularDoubleField(value: &self.nice) }()
       default: break
       }
     }
@@ -1649,6 +1654,9 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo: SwiftProtobuf.Message, Swif
     if self.guestNice.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.guestNice, fieldNumber: 11)
     }
+    if self.nice.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.nice, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1664,6 +1672,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo: SwiftProtobuf.Message, Swif
     if lhs.steal != rhs.steal {return false}
     if lhs.guest != rhs.guest {return false}
     if lhs.guestNice != rhs.guestNice {return false}
+    if lhs.nice != rhs.nice {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1671,7 +1680,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo: SwiftProtobuf.Message, Swif
 
 extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".CpuInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_usage_percent\0\u{1}user\0\u{1}system\0\u{1}idle\0\u{1}iowait\0\u{1}irq\0\u{1}softirq\0\u{1}steal\0\u{1}guest\0\u{1}guestNice\0\u{1}cores\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_usage_percent\0\u{1}user\0\u{1}system\0\u{1}idle\0\u{1}iowait\0\u{1}irq\0\u{1}softirq\0\u{1}steal\0\u{1}guest\0\u{1}guestNice\0\u{1}cores\0\u{1}nice\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1690,6 +1699,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftPro
       case 9: try { try decoder.decodeSingularDoubleField(value: &self.guest) }()
       case 10: try { try decoder.decodeSingularDoubleField(value: &self.guestNice) }()
       case 11: try { try decoder.decodeRepeatedMessageField(value: &self.cores) }()
+      case 12: try { try decoder.decodeSingularDoubleField(value: &self.nice) }()
       default: break
       }
     }
@@ -1729,6 +1739,9 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftPro
     if !self.cores.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.cores, fieldNumber: 11)
     }
+    if self.nice.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.nice, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1743,6 +1756,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftPro
     if lhs.steal != rhs.steal {return false}
     if lhs.guest != rhs.guest {return false}
     if lhs.guestNice != rhs.guestNice {return false}
+    if lhs.nice != rhs.nice {return false}
     if lhs.cores != rhs.cores {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

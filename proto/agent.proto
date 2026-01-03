@@ -134,6 +134,7 @@ message CakeAgent {
 			double steal = 9;
 			double guest = 10;
 			double guestNice = 11;
+			double nice = 12;
 		}
 
 		message CpuInfo {
@@ -147,6 +148,7 @@ message CakeAgent {
 			double steal = 8;
 			double guest = 9;
 			double guestNice = 10;
+			double nice = 12;
 			repeated CpuCoreInfo cores = 11;
 		}
 
