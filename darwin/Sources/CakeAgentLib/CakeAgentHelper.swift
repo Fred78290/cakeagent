@@ -995,6 +995,55 @@ public struct CakeAgentHelper: Sendable {
 		return 0
 	}
 	
+	public func events(callOptions: CallOptions? = nil, continuation: AsyncStream<CakeAgent.TunnelPortForwardEvent.ForwardEvent>.Continuation) throws {
+		let stream: ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
+		var subchannel: Channel? = nil
+		
+		stream = client.events(.init(), callOptions: callOptions) { event in
+			if case let .forwardEvent(event) = event.event {
+				continuation.yield(event)
+			} else if case let .error(error) = event.event {
+				//	throw error
+				if let subchannel = subchannel {
+#if TRACE
+					redbold("Event error: \(error)")
+#endif
+					subchannel.pipeline.fireErrorCaught(GRPCStatus(code: .internalError, message: error))
+				}
+			}
+		}
+		
+		subchannel = try stream.subchannel.wait()
+
+		if let subchannel {
+			continuation.onTermination = { _ in
+				continuation.onTermination = nil
+				subchannel.close(promise: nil)
+			}
+		}
+
+		stream.status.whenComplete { result in
+			continuation.onTermination = nil
+
+			continuation.finish()
+
+			switch result {
+			case .failure(let err):
+#if TRACE
+				redbold("Event error: \(err)")
+#endif
+				subchannel?.close(promise: nil)
+			case .success(let status):
+#if TRACE
+				redbold("Tunnel status: \(status)")
+#endif
+				if status.code != .ok {
+					subchannel?.close(promise: nil)
+				}
+			}
+		}
+	}
+
 	public func events(callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.TunnelPortForwardEvent.ForwardEvent) -> Void) throws {
 		let stream: ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
 		var subchannel: Channel? = nil
@@ -1043,10 +1092,15 @@ public struct CakeAgentHelper: Sendable {
 		let subchannel = try stream.subchannel.wait()
 
 		continuation.onTermination = { _ in
+			continuation.onTermination = nil
 			subchannel.close(promise: nil)
 		}
 
 		stream.status.whenComplete { result in
+			continuation.onTermination = nil
+
+			continuation.finish()
+
 			switch result {
 			case .failure(let err):
 #if TRACE
