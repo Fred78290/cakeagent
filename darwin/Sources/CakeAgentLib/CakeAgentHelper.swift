@@ -767,8 +767,8 @@ final class CakeChannelStreamer: @unchecked Sendable {
 }
 
 public struct CakeAgentHelper: Sendable {
-	internal let eventLoopGroup: EventLoopGroup
-	internal let client: CakeAgentClient
+	private let eventLoopGroup: EventLoopGroup
+	public let client: CakeAgentClient
 	
 	public struct RunReply: Sendable {
 		public var exitCode: Int32
