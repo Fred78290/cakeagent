@@ -91,6 +91,21 @@
 			"type": "swift",
 			"request": "launch",
 			"args": [
+				"--connect=tcp://127.0.0.1:5010",
+				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
+				"--tls-cert=${env:HOME}/.cake/agent/client.pem",
+				"--tls-key=${env:HOME}/.cake/agent/client.key",
+				"current",
+			],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "testagent current",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
+			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [
 				"--insecure",
 				"--connect=tcp://127.0.0.1:5010",
 				"exec",
@@ -113,6 +128,15 @@
 			"name": "testagent shell",
 			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
 			"preLaunchTask": "swift: Build Debug testagent"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": ["infos"],
+			"cwd": "${workspaceFolder:cakeagent}",
+			"name": "cakeagent infos",
+			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
+			"preLaunchTask": "swift: Build Debug cakeagent"
 		},
 		{
 			"type": "swift",

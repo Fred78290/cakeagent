@@ -34,7 +34,6 @@ import (
 	"github.com/elastic/go-sysinfo"
 	"github.com/mdlayher/vsock"
 	"github.com/pbnjay/memory"
-	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	glog "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
@@ -109,97 +108,12 @@ func collectMemoryUsage() *cakeagent.CakeAgent_InfoReply_MemoryInfo {
 	}
 }
 
-func collectCpuUsage() (cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo, err error) {
-	var cpuTimes []cpu.TimesStat
-	var cpuStats []cpu.TimesStat
-	var totalCpuUsage []float64
-	var perCoreCpuUsage []float64
-
-	// Get detailed CPU times
-	if cpuTimes, err = cpu.Times(false); err != nil {
-		glog.Errorf("Failed to get CPU times: %v", err)
-		return
+func collectCpuUsage() (*cakeagent.CakeAgent_InfoReply_CpuInfo, error) {
+	if usage, err := utils.NewCPUUsage(time.Millisecond * 100); err != nil {
+		return nil, err
+	} else {
+		return usage.Infos(), nil
 	}
-
-	// Get CPU usage percentage (total)
-	if totalCpuUsage, err = cpu.Percent(time.Second, false); err != nil {
-		glog.Errorf("Error getting total CPU usage: %v", err)
-		return
-	}
-
-	// Get CPU usage percentage per core
-	if perCoreCpuUsage, err = cpu.Percent(time.Second, true); err != nil {
-		glog.Errorf("Error getting per-core CPU usage: %v", err)
-		return
-	}
-
-	// Get detailed CPU stats per core
-	if cpuStats, err = cpu.Times(true); err != nil {
-		glog.Errorf("Error getting CPU stats: %v", err)
-		return
-	}
-
-	if len(cpuTimes) == 0 || len(totalCpuUsage) == 0 {
-		return
-	}
-
-	// Use times from the first core (average of all cores)
-	times := cpuTimes[0]
-	cpuInfo = &cakeagent.CakeAgent_InfoReply_CpuInfo{
-		TotalUsagePercent: totalCpuUsage[0],
-		User:              times.User,
-		System:            times.System,
-		Idle:              times.Idle,
-		Iowait:            times.Iowait,
-		Irq:               times.Irq,
-		Softirq:           times.Softirq,
-		Steal:             times.Steal,
-		Guest:             times.Guest,
-		GuestNice:         times.GuestNice,
-		Nice:              times.Nice,
-	}
-
-	// Use cpuStats for per-core data, fallback to cpuTimes if empty
-	coreStatsToUse := cpuStats
-	if len(cpuStats) == 0 {
-		coreStatsToUse = cpuTimes
-	}
-
-	// Some platforms include total as first element
-	startIndex := 0
-	if len(coreStatsToUse) > runtime.NumCPU() {
-		// Probably includes total as first element
-		startIndex = 1
-	}
-
-	// Process up to NumCPU cores
-	for i := startIndex; i < len(coreStatsToUse) && (i-startIndex) < runtime.NumCPU(); i++ {
-		coreTime := coreStatsToUse[i]
-		coreIndex := i - startIndex // Actual core index starting at 0
-
-		usagePercent := float64(0)
-		if coreIndex < len(perCoreCpuUsage) {
-			usagePercent = perCoreCpuUsage[coreIndex]
-		}
-
-		coreInfo := &cakeagent.CakeAgent_InfoReply_CpuCoreInfo{
-			CoreId:       int32(coreIndex),
-			UsagePercent: usagePercent,
-			User:         coreTime.User,
-			System:       coreTime.System,
-			Idle:         coreTime.Idle,
-			Iowait:       coreTime.Iowait,
-			Irq:          coreTime.Irq,
-			Softirq:      coreTime.Softirq,
-			Steal:        coreTime.Steal,
-			Guest:        coreTime.Guest,
-			GuestNice:    coreTime.GuestNice,
-		}
-
-		cpuInfo.Cores = append(cpuInfo.Cores, coreInfo)
-	}
-
-	return
 }
 
 func (p *pipe) Close() {
@@ -500,6 +414,10 @@ func (s *server) Ping(ctx context.Context, req *cakeagent.CakeAgent_PingRequest)
 	glog.Debugf("Ping received: %s, responding at %d", req.Message, now)
 
 	return reply, nil
+}
+
+func CurrentUsage() (usage *utils.CPUUsage, err error) {
+	return utils.NewCPUUsage(0)
 }
 
 // GetSystemInfo returns system information using the same logic as the gRPC Info method
@@ -1260,9 +1178,15 @@ func (s *server) Events(_ *cakeagent.CakeAgent_Empty, stream cakeagent.CakeAgent
 	return nil
 }
 
-func (s *server) CurrentUsage(req *cakeagent.CakeAgent_CurrentUsageRequest, stream grpc.ServerStreamingServer[cakeagent.CakeAgent_CurrentUsageReply]) error {
+func (s *server) CurrentUsage(req *cakeagent.CakeAgent_CurrentUsageRequest, stream grpc.ServerStreamingServer[cakeagent.CakeAgent_CurrentUsageReply]) (err error) {
 	if req.Frequency == 0 {
 		req.Frequency = 1
+	}
+	var usage *utils.CPUUsage
+
+	if usage, err = utils.NewCPUUsage(time.Millisecond * 100); err != nil {
+		glog.Errorf("Failed to setup CPU usage: %v", err)
+		return err
 	}
 
 	frequency := time.Second / time.Duration(req.Frequency)
@@ -1275,7 +1199,7 @@ func (s *server) CurrentUsage(req *cakeagent.CakeAgent_CurrentUsageRequest, stre
 			return stream.Context().Err()
 		case <-ticker.C:
 			// Get detailed CPU times
-			if cpuInfo, err := collectCpuUsage(); err != nil {
+			if cpuInfo, err := usage.Collect(); err != nil {
 				glog.Warnf("Failed to collect CPU usage: %v", err)
 				continue
 			} else {

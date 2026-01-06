@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Fred78290/cakeagent/cmd/types"
 	"github.com/Fred78290/cakeagent/pkg"
@@ -17,8 +18,6 @@ import (
 
 var cfg *types.Config
 var jsonOutput bool
-var pingJsonOutput bool
-var mountJsonOutput bool
 
 var rootCmd = &cobra.Command{
 	Use:   "cakeagent",
@@ -97,6 +96,15 @@ var infosCmd = &cobra.Command{
 	},
 }
 
+var cpuUsageCmd = &cobra.Command{
+	Use:   "cpu-usage",
+	Short: "Display CPU usage information",
+	Run: func(cmd *cobra.Command, args []string) {
+		setupLogging()
+		displayCpuUsage(jsonOutput)
+	},
+}
+
 var pingCmd = &cobra.Command{
 	Use:   "ping [message]",
 	Short: "Ping the cakeagent service",
@@ -108,7 +116,7 @@ var pingCmd = &cobra.Command{
 		if len(args) > 0 {
 			message = args[0]
 		}
-		pingService(message, pingJsonOutput)
+		pingService(message, jsonOutput)
 	},
 }
 
@@ -128,7 +136,7 @@ Examples:
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		setupLogging()
-		mountServiceWithArgs(args, mountJsonOutput)
+		mountServiceWithArgs(args, jsonOutput)
 	},
 }
 
@@ -159,6 +167,63 @@ func startServer() {
 
 	if err != nil {
 		glog.Fatalf("%v", err)
+	}
+}
+
+func displayCpuUsageJSON(cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo) {
+	fmt.Print("\033[2J\033[H") // Clear screen and move cursor to top
+	jsonData, err := json.MarshalIndent(cpuInfo, "", "  ")
+	if err != nil {
+		glog.Fatalf("failed to marshal CPU info to JSON: %v", err)
+		return
+	}
+	fmt.Println(string(jsonData))
+}
+
+func displayCpuUsageText(cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo) {
+	fmt.Print("\033[2J\033[H") // Clear screen and move cursor to top
+	fmt.Println("=== CPU Usage Information ===")
+	fmt.Printf("Total CPU Usage: %.2f%%\n", cpuInfo.TotalUsagePercent)
+	fmt.Printf("User Time: %.2f\n", cpuInfo.User)
+	fmt.Printf("System Time: %.2f\n", cpuInfo.System)
+	fmt.Printf("Idle Time: %.2f\n", cpuInfo.Idle)
+	fmt.Printf("Nice Time: %.2f\n", cpuInfo.Nice)
+	fmt.Printf("IO Wait: %.2f\n", cpuInfo.Iowait)
+	fmt.Printf("Guest Time: %.2f\n", cpuInfo.Guest)
+	fmt.Printf("Guest Nice Time: %.2f\n", cpuInfo.GuestNice)
+	fmt.Printf("IRQ: %.2f\n", cpuInfo.Irq)
+	fmt.Printf("Softirq: %.2f\n", cpuInfo.Softirq)
+	fmt.Printf("Steal Time: %.2f\n", cpuInfo.Steal)
+
+	if len(cpuInfo.Cores) > 0 {
+		fmt.Println("\n--- Per-Core CPU Usage ---")
+		for _, core := range cpuInfo.Cores {
+			fmt.Printf("Core %d: %.2f%% usage\n", core.CoreId, core.UsagePercent)
+		}
+	}
+}
+
+func displayCpuUsage(jsonFormat bool) {
+	if usage, err := pkg.CurrentUsage(); err != nil {
+		glog.Fatalf("failed to get CPU usage: %v", err)
+	} else {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			// Get detailed CPU times
+			if cpuInfo, err := usage.Collect(); err != nil {
+				glog.Fatalf("Failed to collect CPU usage: %v", err)
+			} else {
+				if jsonFormat {
+					// Implement JSON output for CPU usage
+					displayCpuUsageJSON(cpuInfo)
+				} else {
+					// Implement text output for CPU usage
+					displayCpuUsageText(cpuInfo)
+				}
+			}
+		}
 	}
 }
 
@@ -414,6 +479,7 @@ func init() {
 	rootCmd.AddCommand(infosCmd)
 	rootCmd.AddCommand(pingCmd)
 	rootCmd.AddCommand(mountCmd)
+	rootCmd.AddCommand(cpuUsageCmd)
 
 	// Add service subcommands
 	serviceInstallCmd.Flags().StringVar(&cfg.Address, "listen", cfg.Address, "Listen on address")
@@ -432,10 +498,13 @@ func init() {
 	infosCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output system information in JSON format")
 
 	// Add ping command flags
-	pingCmd.Flags().BoolVar(&pingJsonOutput, "json", false, "Output ping response in JSON format")
+	pingCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output ping response in JSON format")
 
 	// Add mount command flags
-	mountCmd.Flags().BoolVar(&mountJsonOutput, "json", false, "Output mount response in JSON format")
+	mountCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output mount response in JSON format")
+
+	// Add mount command flags
+	cpuUsageCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output CPU usage response in JSON format")
 }
 
 func main() {

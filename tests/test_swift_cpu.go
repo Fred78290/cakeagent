@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	pb "./cakeagent"
+	pb "github.com/fboltz/cakeagent/cakeagent"
 	"google.golang.org/grpc"
 )
 
