@@ -45,4 +45,55 @@ public enum Format: String, ExpressibleByArgument, CaseIterable, Sendable, Codab
 			return try! encoder.encode(data).toString()
 		}
 	}
+
+	public func render(_ data: InfoReply) -> String {
+		struct IP: Codable{
+			let ip: [String]
+		}
+
+		switch self {
+			case .json:
+				return self.renderSingle(data)
+			case .text:
+				var text = self.renderSingle(ShortInfoReply(from: data))
+
+				if let memory = data.memory {
+					text += "\n\nMemory usage:\n" + self.renderSingle(memory)
+				}
+
+				if let cpuInfo = data.cpuInfo {
+					text += "\n\nCPU information:\n" + self.renderSingle(ShortCpuInformations(from: cpuInfo))
+
+					if cpuInfo.cores.isEmpty == false {
+						text += "\n" + self.renderList(cpuInfo.cores)
+					}
+				}
+
+				if data.ipaddresses.isEmpty == false {
+					text += "\n\nIP addresses:\n" + self.renderSingle(IP(ip: data.ipaddresses))
+				}
+
+				if let mounts: [String] = data.mounts {
+					text += "\n\nMounts:\n" + self.renderList(mounts)
+				}
+
+				if data.diskInfos.isEmpty == false {
+					text += "\n\nDisk infos:\n" + self.renderList(data.diskInfos)
+				}
+
+				if let attachedNetworks = data.attachedNetworks, attachedNetworks.isEmpty == false {
+					text += "\n\nAttached networks:\n" + self.renderList(attachedNetworks)
+				}
+
+				if let tunnelInfos = data.tunnelInfos, tunnelInfos.isEmpty == false {
+					text += "\n\nTunnels:\n" + self.renderList(tunnelInfos)
+				}
+
+				if let socketInfos = data.socketInfos, socketInfos.isEmpty == false {
+					text += "\nSockets:\n" + self.renderList(socketInfos)
+				}
+
+				return text
+		}
+	}
 }

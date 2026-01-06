@@ -73,7 +73,6 @@ struct InfosHandler {
 		
 		if getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr {
 			var ptr = firstAddr
-			var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
 			
 			while ptr.pointee.ifa_next != nil {
 				let interface = ptr.pointee
@@ -81,6 +80,8 @@ struct InfosHandler {
 				let name = String(validatingUTF8: interface.ifa_name)!
 				
 				if (addrFamily == UInt8(AF_INET) || addrFamily == UInt8(AF_INET6)) && name != "lo0" {
+					var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+		
 					getnameinfo(interface.ifa_addr,
 								socklen_t(interface.ifa_addr.pointee.sa_len),
 								&hostname, socklen_t(hostname.count),

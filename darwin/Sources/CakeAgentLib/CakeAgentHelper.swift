@@ -305,6 +305,32 @@ public struct SocketInfo: Sendable, Codable {
 	}
 }
 
+public struct ShortCpuInformations: Sendable, Codable {
+	public var totalUsagePercent: Double = 0
+	public var user: Double = 0
+	public var system: Double = 0
+	public var idle: Double = 0
+	public var iowait: Double = 0
+	public var irq: Double = 0
+	public var softirq: Double = 0
+	public var steal: Double = 0
+	public var guest: Double = 0
+	public var guestNice: Double = 0
+
+	public init(from infos: CpuInformations) {
+		self.totalUsagePercent = infos.totalUsagePercent
+		self.user = infos.user
+		self.system = infos.system
+		self.idle = infos.idle
+		self.iowait = infos.iowait
+		self.irq = infos.irq
+		self.softirq = infos.softirq
+		self.steal = infos.steal
+		self.guest = infos.guest
+		self.guestNice = infos.guestNice
+	}
+}
+
 public struct CpuInformations: Sendable, Codable {
 	public struct CpuCoreInfo: Sendable, Codable {
 		public var coreID: Int32 = 0
@@ -386,7 +412,7 @@ public struct CpuInformations: Sendable, Codable {
 }
 
 extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
-	var agent: CpuInformations.CpuCoreInfo {
+	public var agent: CpuInformations.CpuCoreInfo {
 		.init(
 			coreID: self.coreID,
 			usagePercent: self.usagePercent,
@@ -404,7 +430,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuCoreInfo {
 }
 
 extension Cakeagent_CakeAgent.InfoReply.CpuInfo {
-	var agent: CpuInformations {
+	public var agent: CpuInformations {
 		return .init(
 			totalUsagePercent: self.totalUsagePercent,
 			user: self.user,
@@ -421,24 +447,48 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo {
 	}
 }
 
+public struct ShortInfoReply: Sendable, Codable {
+	public var name: String
+	public var version: String
+	public var uptime: UInt64
+	public var cpuCount: Int32
+	public var osname: String
+	public var hostname: String
+	public var release: String
+	public var status: Status
+	public var agentVersion: String
+
+	public init(from info: InfoReply) {
+		self.name = info.name
+		self.version = info.version ?? ""
+		self.uptime = info.uptime ?? 0
+		self.cpuCount = info.cpuCount
+		self.osname = info.osname
+		self.hostname = info.hostname ?? ""
+		self.release = info.release ?? ""
+		self.status = info.status
+		self.agentVersion = info.agentVersion
+	}
+}
+
 public struct InfoReply: Sendable, Codable {
 	public var name: String
 	public var version: String?
 	public var uptime: UInt64?
-	public var memory: MemoryInfo?
 	public var cpuCount: Int32
-	public var diskInfos: [DiskInfo]
-	public var ipaddresses: [String]
 	public var osname: String
 	public var hostname: String?
 	public var release: String?
-	public var mounts: [String]?
 	public var status: Status
+	public var agentVersion: String
+	public var memory: MemoryInfo?
+	public var cpuInfo: CpuInformations?
+	public var mounts: [String]?
+	public var diskInfos: [DiskInfo]
+	public var ipaddresses: [String]
 	public var attachedNetworks: [AttachedNetwork]?
 	public var tunnelInfos: [TunnelInfo]?
 	public var socketInfos: [SocketInfo]?
-	public var cpuInfo: CpuInformations?
-	public var agentVersion: String
 
 	init() {
 		self.name = ""
