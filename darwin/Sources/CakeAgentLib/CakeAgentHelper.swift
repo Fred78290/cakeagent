@@ -9,6 +9,8 @@ import NIOPortForwarding
 
 
 public typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
+public typealias CakeAgentCurrentUsageStream = ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
+public typealias CakeAgentTunnelPortForwardEventStream = ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
 
 public protocol CakeAgentClientInterceptorState {
 	func restoreState()
@@ -1046,7 +1048,7 @@ public struct CakeAgentHelper: Sendable {
 	}
 	
 	public func events(callOptions: CallOptions? = nil, continuation: AsyncStream<CakeAgent.TunnelPortForwardEvent.ForwardEvent>.Continuation) throws {
-		let stream: ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
+		let stream: CakeAgentTunnelPortForwardEventStream
 		var subchannel: Channel? = nil
 		
 		stream = client.events(.init(), callOptions: callOptions) { event in
@@ -1094,8 +1096,8 @@ public struct CakeAgentHelper: Sendable {
 		}
 	}
 
-	public func events(callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.TunnelPortForwardEvent.ForwardEvent) -> Void) throws {
-		let stream: ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
+	public func events(callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.TunnelPortForwardEvent.ForwardEvent) -> Void) throws -> CakeAgentTunnelPortForwardEventStream {
+		let stream: CakeAgentTunnelPortForwardEventStream
 		var subchannel: Channel? = nil
 		
 		stream = client.events(.init(), callOptions: callOptions) { event in
@@ -1130,10 +1132,12 @@ public struct CakeAgentHelper: Sendable {
 				}
 			}
 		}
+
+		return stream
 	}
 
 	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, continuation: AsyncStream<CakeAgent.CurrentUsageReply>.Continuation) throws {
-		let stream: ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
+		let stream: CakeAgentCurrentUsageStream
 
 		stream = client.currentUsage(CakeAgent.CurrentUsageRequest.with { $0.frequency = frequency }, callOptions: callOptions) { reply in
 			continuation.yield(reply)
@@ -1167,9 +1171,10 @@ public struct CakeAgentHelper: Sendable {
 			}
 		}
 	}
-	
-	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.CurrentUsageReply) -> Void) throws {
-		let stream: ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
+
+	@discardableResult
+	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.CurrentUsageReply) -> Void) throws -> CakeAgentCurrentUsageStream {
+		let stream: CakeAgentCurrentUsageStream
 		var subchannel: Channel? = nil
 
 		stream = client.currentUsage(CakeAgent.CurrentUsageRequest.with { $0.frequency = frequency }, callOptions: callOptions) { reply in
@@ -1194,6 +1199,8 @@ public struct CakeAgentHelper: Sendable {
 				}
 			}
 		}
+
+		return stream
 	}
 }
 
