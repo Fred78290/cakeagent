@@ -27,7 +27,8 @@ final class CatchRemoteClose: ChannelInboundHandler {
 final class Shell: GrpcParsableCommand {
 	static var configuration = CommandConfiguration(commandName: "shell", abstract: "Test shell")
 
-	@OptionGroup var options: CakeAgentClientOptions
+	@OptionGroup(title: "Client agent options")
+	var options: CakeAgentClientOptions
 
 	var interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? {
 		try? CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)

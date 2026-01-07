@@ -7,7 +7,8 @@ import NIO
 final class Run: GrpcParsableCommand {
 	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "run", abstract: "Test run")
 
-	@OptionGroup var options: CakeAgentClientOptions
+	@OptionGroup(title: "Client agent options")
+	var options: CakeAgentClientOptions
 
 	@Argument(help: "Command to execute")
 	var arguments: [String]

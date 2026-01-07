@@ -7,7 +7,8 @@ import NIO
 final class Shutdown: GrpcParsableCommand {
 	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "shutdown", abstract: "Test run")
 
-	@OptionGroup var options: CakeAgentClientOptions
+	@OptionGroup(title: "Client agent options")
+	var options: CakeAgentClientOptions
 
 	func validate() throws {
 		try self.options.validate(try Root.getDefaultServerAddress())

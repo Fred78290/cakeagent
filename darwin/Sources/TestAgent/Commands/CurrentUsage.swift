@@ -8,7 +8,8 @@ import TextTable
 final class CurrentUsage: GrpcParsableCommand {
 	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "current", abstract: "Test currentUsage")
 
-	@OptionGroup var options: CakeAgentClientOptions
+	@OptionGroup(title: "Client agent options")
+	var options: CakeAgentClientOptions
 
 	@Argument(help: "Frequency")
 	var frequency: Int32 = 1

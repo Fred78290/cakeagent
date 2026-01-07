@@ -8,7 +8,8 @@ import SwiftProtobuf
 final class Infos: GrpcParsableCommand {
 	static var configuration: CommandConfiguration = CommandConfiguration(commandName: "infos", abstract: "Test infos")
 
-	@OptionGroup var options: CakeAgentClientOptions
+	@OptionGroup(title: "Client agent options")
+	var options: CakeAgentClientOptions
 
 	@Flag(help: "Output format: text or json")
 	var format: Format = .text
