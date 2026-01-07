@@ -13,6 +13,7 @@
 			"mode": "auto",
 			"program": "${workspaceFolder}/linux",
 			"args": [
+				"serve",
 				"--listen=tcp://127.0.0.1:5010",
 				"--log-level=trace",
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
@@ -27,6 +28,7 @@
 			"mode": "auto",
 			"program": "${workspaceFolder}/linux",
 			"args": [
+				"serve",
 				"--listen=tcp://127.0.0.1:5010"
 			]
 		},
@@ -34,7 +36,7 @@
 			"type": "swift",
 			"request": "launch",
 			"args": [
-				"run",
+				"serve",
 				"--listen=tcp://127.0.0.1:5010",
 				"--log-level=trace",
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
@@ -42,7 +44,7 @@
 				"--tls-key=${env:HOME}/.cake/agent/server.key"
 			],
 			"cwd": "${workspaceFolder:cakeagent}",
-			"name": "cakeagent run",
+			"name": "swift cakeagent serve",
 			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
 			"preLaunchTask": "swift: Build Debug cakeagent"
 		},
