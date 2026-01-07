@@ -10,6 +10,16 @@ public typealias CakeAgentClient = Cakeagent_CakeAgentServiceNIOClient
 public typealias CakeAgentServiceClientInterceptorFactoryProtocol = Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol
 public typealias CakeAgentServiceClientMetadata = Cakeagent_CakeAgentServiceClientMetadata
 
+extension String {
+	var expandingTildeInPath: String {
+		if self.hasPrefix("~") {
+			return (self as NSString).expandingTildeInPath
+		}
+		
+		return self
+	}
+}
+
 public struct CakeAgentClientOptions: ParsableArguments {
 
 	@Option(help: "Connection timeout in seconds")
@@ -73,15 +83,15 @@ public struct CakeAgentClientOptions: ParsableArguments {
 				throw ValidationError("TLS key is required")
 			}
 
-			if !FileManager.default.fileExists(atPath: caCert) {
+			if !FileManager.default.fileExists(atPath: caCert.expandingTildeInPath) {
 				throw ValidationError("CA certificate \(caCert) not found")
 			}
 
-			if !FileManager.default.fileExists(atPath: tlsCert) {
+			if !FileManager.default.fileExists(atPath: tlsCert.expandingTildeInPath) {
 				throw ValidationError("TLS certificate \(tlsCert) not found")
 			}
 
-			if !FileManager.default.fileExists(atPath: tlsKey) {
+			if !FileManager.default.fileExists(atPath: tlsKey.expandingTildeInPath) {
 				throw ValidationError("TLS key \(tlsKey) not found")
 			}
 		}
@@ -91,9 +101,9 @@ public struct CakeAgentClientOptions: ParsableArguments {
 		return try CakeAgentHelper.createClient(on: on,
 		                                        listeningAddress: URL(string: self.address!)!,
 		                                        connectionTimeout: self.timeout,
-		                                        caCert: self.caCert,
-		                                        tlsCert: self.tlsCert,
-		                                        tlsKey: self.tlsKey,
+												caCert: self.caCert?.expandingTildeInPath,
+		                                        tlsCert: self.tlsCert?.expandingTildeInPath,
+		                                        tlsKey: self.tlsKey?.expandingTildeInPath,
 		                                        retries: retries,
 		                                        interceptors: interceptors)
 	}
