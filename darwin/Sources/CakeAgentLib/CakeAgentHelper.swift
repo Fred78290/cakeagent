@@ -10,7 +10,7 @@ import NIOPortForwarding
 
 public typealias CakeAgentExecuteStream = BidirectionalStreamingCall<CakeAgent.ExecuteRequest, CakeAgent.ExecuteResponse>
 public typealias CakeAgentCurrentUsageStream = ServerStreamingCall<CakeAgent.CurrentUsageRequest, CakeAgent.CurrentUsageReply>
-public typealias CakeAgentTunnelPortForwardEventStream = ServerStreamingCall<Cakeagent_CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
+public typealias CakeAgentTunnelPortForwardEventStream = ServerStreamingCall<CakeAgent.Empty, CakeAgent.TunnelPortForwardEvent>
 
 public protocol CakeAgentClientInterceptorState {
 	func restoreState()
