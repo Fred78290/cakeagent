@@ -32,17 +32,17 @@ import (
 	"github.com/Fred78290/cakeagent/version"
 	"github.com/creack/pty"
 	"github.com/elastic/go-sysinfo"
+	"github.com/lima-vm/lima/pkg/guestagent"
+	"github.com/lima-vm/lima/pkg/guestagent/api"
 	"github.com/mdlayher/vsock"
 	"github.com/pbnjay/memory"
+	"github.com/pkg/term/termios"
 	"github.com/shirou/gopsutil/v4/disk"
 	glog "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-
-	"github.com/lima-vm/lima/pkg/guestagent"
-	"github.com/lima-vm/lima/pkg/guestagent/api"
 )
 
 const (
@@ -143,6 +143,80 @@ type pseudoTTY struct {
 	stderr *pipe
 }
 
+func (t *pseudoTTY) SetupTrueTTY() (err error) {
+	if t.pty == nil {
+		return fmt.Errorf("no pty available")
+	}
+
+	// Make this a controlling terminal
+	if err := unix.IoctlSetInt(int(t.pty.Fd()), unix.TIOCSCTTY, 0); err != nil {
+		return fmt.Errorf("failed to set controlling terminal: %v", err)
+	}
+
+	// Set terminal attributes for proper terminal behavior
+	var terminalSettings unix.Termios
+	if err = termios.Tcgetattr(t.pty.Fd(), &terminalSettings); err != nil {
+		return fmt.Errorf("failed to get terminal attributes: %v", err)
+	}
+
+	// Enable canonical mode and echo
+	terminalSettings.Lflag |= unix.ICANON | unix.ECHO | unix.ECHOE | unix.ECHOK | unix.ISIG
+
+	// Set input flags
+	terminalSettings.Iflag |= unix.ICRNL | unix.IXON
+	terminalSettings.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.IXOFF
+
+	// Set output flags
+	terminalSettings.Oflag |= unix.OPOST | unix.ONLCR
+
+	// Set control flags
+	terminalSettings.Cflag |= unix.CREAD | unix.CLOCAL
+	terminalSettings.Cflag &^= unix.CSTOPB | unix.PARENB
+
+	// Set control characters
+	terminalSettings.Cc[unix.VINTR] = 0x03  // Ctrl-C
+	terminalSettings.Cc[unix.VQUIT] = 0x1C  // Ctrl-\
+	terminalSettings.Cc[unix.VERASE] = 0x7F // DEL
+	terminalSettings.Cc[unix.VKILL] = 0x15  // Ctrl-U
+	terminalSettings.Cc[unix.VEOF] = 0x04   // Ctrl-D
+	terminalSettings.Cc[unix.VSTART] = 0x11 // Ctrl-Q
+	terminalSettings.Cc[unix.VSTOP] = 0x13  // Ctrl-S
+	terminalSettings.Cc[unix.VSUSP] = 0x1A  // Ctrl-Z
+
+	if err = termios.Tcsetattr(t.pty.Fd(), termios.TCSANOW, &terminalSettings); err != nil {
+		return fmt.Errorf("failed to set terminal attributes: %v", err)
+	}
+
+	return nil
+}
+
+func (t *pseudoTTY) EnableRawMode() (err error) {
+	if t.pty == nil {
+		return fmt.Errorf("no pty available")
+	}
+
+	var terminalSettings unix.Termios
+	if err = termios.Tcgetattr(t.pty.Fd(), &terminalSettings); err != nil {
+		return fmt.Errorf("failed to get terminal attributes: %v", err)
+	}
+
+	termios.Cfmakeraw(&terminalSettings)
+	// Disable canonical mode and echo for raw mode
+	//terminalSettings.Lflag &^= unix.ICANON | unix.ECHO | unix.ECHOE | unix.ECHOK | unix.ECHONL | unix.ISIG | unix.IEXTEN
+	//terminalSettings.Iflag &^= unix.ICRNL | unix.INLCR | unix.IGNCR | unix.IXON | unix.IXOFF
+	//terminalSettings.Oflag &^= unix.OPOST
+
+	// Set minimum characters and timeout for non-blocking read
+	terminalSettings.Cc[unix.VMIN] = 1
+	terminalSettings.Cc[unix.VTIME] = 0
+
+	if err = termios.Tcsetattr(t.pty.Fd(), termios.TCSANOW, &terminalSettings); err != nil {
+		return fmt.Errorf("failed to set terminal attributes: %v", err)
+	}
+
+	return nil
+}
+
 func newPipe(name string, nonblocking bool) (p *pipe, err error) {
 	fds := []int{0, 0}
 
@@ -175,6 +249,9 @@ func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pse
 		}
 
 		if tty.ptx, tty.pty, err = pty.Open(); err == nil {
+			/*if err = tty.EnableRawMode(); err != nil {
+				return nil, fmt.Errorf("failed to setup true tty: %v", err)
+			}*/
 			tty.SetTermSize(termSize.Rows, termSize.Cols)
 		}
 	} else {
@@ -844,25 +921,23 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 								doCancel(fmt.Sprintf("Failed to receive message: %v", err))
 							}
 						}
-					} else {
-						if size := request.GetSize(); size != nil {
-							tty.SetTermSize(size.Rows, size.Cols)
-						} else if input := request.GetInput(); input != nil {
-							if len(input) > 0 {
-								if _, err := tty.WriteToStdin(input); err != nil {
-									doCancel(fmt.Sprintf("Failed to write to stdin: %v", err))
-								}
-
-								if glog.GetLevel() >= glog.TraceLevel {
-									glog.Tracef("Wrote to stdin: %d", len(input))
-								}
+					} else if size := request.GetSize(); size != nil {
+						tty.SetTermSize(size.Rows, size.Cols)
+					} else if input := request.GetInput(); input != nil {
+						if len(input) > 0 {
+							if _, err := tty.WriteToStdin(input); err != nil {
+								doCancel(fmt.Sprintf("Failed to write to stdin: %v", err))
 							}
-						} else if request.GetEof() {
-							tty.EOF()
-							return
-						} else {
-							glog.Error("Unknown message")
+
+							if glog.GetLevel() >= glog.TraceLevel {
+								glog.Tracef("Wrote to stdin: %d", len(input))
+							}
 						}
+					} else if request.GetEof() {
+						tty.EOF()
+						return
+					} else {
+						glog.Error("Unknown message")
 					}
 				}
 			}

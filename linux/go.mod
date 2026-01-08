@@ -5,7 +5,6 @@ go 1.23.7
 toolchain go1.24.2
 
 require (
-	github.com/alecthomas/kingpin v2.2.6+incompatible
 	github.com/creack/pty v1.1.24
 	github.com/elastic/go-sysinfo v1.15.0
 	github.com/kardianos/service v1.2.2
@@ -22,6 +21,7 @@ require (
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.5
 	howett.net/plist v1.0.1
+	github.com/pkg/term v1.1.0
 )
 
 require (
