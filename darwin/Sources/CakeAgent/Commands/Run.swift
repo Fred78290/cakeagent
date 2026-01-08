@@ -4,14 +4,13 @@ import GRPC
 import NIOSSL
 import NIOCore
 import NIOPosix
-//import Synchronization
-import Logging
+import CakeAgentLib
 
 struct Run: ParsableCommand {
 	static let configuration: CommandConfiguration = CommandConfiguration(commandName: "serve", abstract: "cake agent running")
 
 	@Option(name: [.customLong("log-level")], help: "Log level")
-	var logLevel: Logging.Logger.Level = .info
+	var logLevel: Logger.LogLevel = .info
 
 	@Option(name: [.customLong("listen"), .customShort("l")], help: "Listen on address")
 	var address: String?

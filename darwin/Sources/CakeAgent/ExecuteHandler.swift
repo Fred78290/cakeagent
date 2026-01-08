@@ -10,7 +10,6 @@ import NIO
 import NIOCore
 import SwiftProtobuf
 import Foundation
-import Logging
 import Darwin
 import Semaphore
 import Synchronization

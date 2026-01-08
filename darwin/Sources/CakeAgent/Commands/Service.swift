@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import Logging
+import CakeAgentLib
 
 enum InstallError: Error {
 	case failedToWriteLaunchAgentPlist(_ message: String)
@@ -72,7 +72,7 @@ struct Service: ParsableCommand {
 		static let configuration = CommandConfiguration(abstract: "Install cake agent as service")
 
 		@Option(name: [.customLong("log-level")], help: "Log level")
-		var logLevel: Logging.Logger.Level = .info
+		var logLevel: Logger.LogLevel = .info
 
 		@Option(name: [.customLong("listen"), .customShort("l")], help: "Listen on address")
 		var address: String?

@@ -1,13 +1,12 @@
 import Foundation
 import ArgumentParser
-import Logging
 import CakeAgentLib
 
 struct Infos: ParsableCommand {
 	static let configuration: CommandConfiguration = CommandConfiguration(abstract: "Display MacOS system information")
 
 	@Option(name: [.customLong("log-level")], help: "Log level")
-	var logLevel: Logging.Logger.Level = .info
+	var logLevel: Logger.LogLevel = .info
 
 	@Flag(help: "Output format: text or json")
 	var format: Format = .text
