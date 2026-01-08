@@ -18,7 +18,7 @@ class CakeAgentChannelTunnelHandlerAdapter: ChannelInboundHandler {
 	let remoteAddress: SocketAddress
 	let proto: CakeAgent.TunnelMessage.TunnelProtocol
 	var tunnel: BidirectionalStreamingCall<Cakeagent_CakeAgent.TunnelMessage, Cakeagent_CakeAgent.TunnelMessage>? = nil
-	let logger = Logger("CakedChannelTunnelHandlerAdapter")
+	let logger = Logger("CakeAgentChannelTunnelHandlerAdapter")
 
 	public init(proto: CakeAgent.TunnelMessage.TunnelProtocol, bindAddress: SocketAddress, remoteAddress: SocketAddress, cakeAgentClient: CakeAgentClient) {
 		self.proto = proto

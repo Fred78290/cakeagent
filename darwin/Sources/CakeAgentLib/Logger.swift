@@ -102,19 +102,20 @@ public final class Logger {
 	private static let moveBeginningOfLine = "\r"
 	private static var logLevel = LogLevel.info
 
-	private let label = "com.aldunelabs"
 	private var logger: Logging.Logger
 	private let isTTY: Bool
 
+	public static var prefix: String = ""
+
 	public init(_ target: Any) {
 		let thisType = type(of: target)
-		self.logger = Logging.Logger(label: "com.aldunelabs.\(String(describing: thisType))")
+		self.logger = Logging.Logger(label: "\(Self.prefix)\(String(describing: thisType))")
 		self.logger.logLevel = Self.logLevel.level
 		self.isTTY = FileHandle.standardOutput.isTTY()
 	}
 
 	public init(_ label: String) {
-		self.logger = Logging.Logger(label: "com.aldunelabs.\(label)")
+		self.logger = Logging.Logger(label: "\(Self.prefix)\(label)")
 		self.logger.logLevel = Self.logLevel.level
 		self.isTTY = FileHandle.standardOutput.isTTY()
 	}

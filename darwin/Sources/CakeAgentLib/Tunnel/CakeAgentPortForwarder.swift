@@ -105,7 +105,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 	internal let logger: Logger
 	internal var eventStream: CakeAgentTunnelPortForwardEventStream? = nil
 	internal var eventChannel: Channel? = nil
-	internal let queue = DispatchQueue(label: "CakedPortForwarder")
+	internal let queue = DispatchQueue(label: "CakeAgentPortForwarder")
 	internal var status: Status = .idle
 
 	public enum Status: Int {
