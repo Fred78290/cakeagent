@@ -23,7 +23,9 @@ extension Logging.Logger.Level {
 	}
 }
 
-public final class Logger {
+public final class Logger: Sendable {
+	public static var prefix: String = ""
+
 	public enum LogLevel: Int, ExpressibleByArgument, Equatable, Comparable, CustomStringConvertible {
 		case trace = 6
 		case debug = 5
@@ -102,10 +104,8 @@ public final class Logger {
 	private static let moveBeginningOfLine = "\r"
 	private static var logLevel = LogLevel.info
 
-	private var logger: Logging.Logger
+	private let logger: Logging.Logger
 	private let isTTY: Bool
-
-	public static var prefix: String = ""
 
 	private static func isColouredTTY(file: FileHandle) -> Bool {
 		guard FileHandle.standardOutput.isTTY() else {
@@ -121,14 +121,20 @@ public final class Logger {
 
 	public init(_ target: Any) {
 		let thisType = type(of: target)
-		self.logger = Logging.Logger(label: "\(Self.prefix)\(String(describing: thisType))")
-		self.logger.logLevel = Self.logLevel.level
+		var logger = Logging.Logger(label: "\(Self.prefix)\(String(describing: thisType))")
+
+		logger.logLevel = Self.logLevel.level
+
+		self.logger = logger
 		self.isTTY = Self.isColouredTTY(file: FileHandle.standardOutput)
 	}
 
 	public init(_ label: String) {
-		self.logger = Logging.Logger(label: "\(Self.prefix)\(label)")
-		self.logger.logLevel = Self.logLevel.level
+		var logger = Logging.Logger(label: "\(Self.prefix)\(label)")
+
+		logger.logLevel = Self.logLevel.level
+
+		self.logger = logger
 		self.isTTY = Self.isColouredTTY(file: FileHandle.standardOutput)
 	}
 
