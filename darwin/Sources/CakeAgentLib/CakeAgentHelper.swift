@@ -819,6 +819,7 @@ final class CakeChannelStreamer: @unchecked Sendable {
 }
 
 public struct CakeAgentHelper: Sendable {
+	private let logger = Logger("CakeAgentHelper")
 	private let eventLoopGroup: EventLoopGroup
 	public let client: CakeAgentClient
 	
@@ -1057,8 +1058,8 @@ public struct CakeAgentHelper: Sendable {
 			} else if case let .error(error) = event.event {
 				//	throw error
 				if let subchannel = subchannel {
-#if TRACE
-					redbold("Event error: \(error)")
+#if DEBUG
+					self.logger.error("Event error: \(error)")
 #endif
 					subchannel.pipeline.fireErrorCaught(GRPCStatus(code: .internalError, message: error))
 				}
@@ -1081,13 +1082,13 @@ public struct CakeAgentHelper: Sendable {
 
 			switch result {
 			case .failure(let err):
-#if TRACE
-				redbold("Event error: \(err)")
+#if DEBUG
+				self.logger.error("Event error: \(err)")
 #endif
 				subchannel?.close(promise: nil)
 			case .success(let status):
-#if TRACE
-				redbold("Tunnel status: \(status)")
+#if DEBUG
+				self.logger.trace("Tunnel status: \(status)")
 #endif
 				if status.code != .ok {
 					subchannel?.close(promise: nil)
@@ -1106,8 +1107,8 @@ public struct CakeAgentHelper: Sendable {
 			} else if case let .error(error) = event.event {
 				//	throw error
 				if let subchannel = subchannel {
-#if TRACE
-					redbold("Event error: \(error)")
+#if DEBUG
+					self.logger.error("Event error: \(error)")
 #endif
 					subchannel.pipeline.fireErrorCaught(GRPCStatus(code: .internalError, message: error))
 				}
@@ -1119,13 +1120,13 @@ public struct CakeAgentHelper: Sendable {
 		stream.status.whenComplete { result in
 			switch result {
 			case .failure(let err):
-#if TRACE
-				redbold("Event error: \(err)")
+#if DEBUG
+				self.logger.error("Event error: \(err)")
 #endif
 				subchannel?.close(promise: nil)
 			case .success(let status):
-#if TRACE
-				redbold("Tunnel status: \(status)")
+#if DEBUG
+				self.logger.trace("Tunnel status: \(status)")
 #endif
 				if status.code != .ok {
 					subchannel?.close(promise: nil)
@@ -1154,19 +1155,19 @@ public struct CakeAgentHelper: Sendable {
 
 				switch result {
 				case .failure(let err):
-	#if TRACE
-					redbold("currentUsage error: \(err)")
+	#if DEBUG
+					self.logger.error("currentUsage error: \(err)")
 	#endif
 					subchannel.close(promise: nil)
 					continuation.finish(throwing: err)
 				case .success(let status):
-	#if TRACE
-					redbold("currentUsage status: \(status)")
+	#if DEBUG
+					self.logger.trace("Agent monitoring currentUsage status: \(status)")
 	#endif
 					if status.code != .ok {
 						subchannel.close(promise: nil)
+						continuation.finish(throwing: status)
 					}
-					continuation.finish()
 				}
 			}
 		} catch {
@@ -1191,20 +1192,20 @@ public struct CakeAgentHelper: Sendable {
 		stream.status.whenComplete { result in
 			continuation.onTermination = nil
 
-			continuation.finish()
-
 			switch result {
 			case .failure(let err):
-#if TRACE
-				redbold("currentUsage error: \(err)")
+#if DEBUG
+				self.logger.error("currentUsage error: \(err)")
 #endif
 				subchannel.close(promise: nil)
+				continuation.finish()
 			case .success(let status):
-#if TRACE
-				redbold("currentUsage status: \(status)")
+#if DEBUG
+					self.logger.trace("Agent monitoring currentUsage status: \(status)")
 #endif
 				if status.code != .ok {
 					subchannel.close(promise: nil)
+					continuation.finish()
 				}
 			}
 		}
@@ -1224,13 +1225,13 @@ public struct CakeAgentHelper: Sendable {
 		stream.status.whenComplete { result in
 			switch result {
 			case .failure(let err):
-#if TRACE
-				redbold("currentUsage error: \(err)")
+#if DEBUG
+				self.logger.error("currentUsage error: \(err)")
 #endif
 				subchannel?.close(promise: nil)
 			case .success(let status):
-#if TRACE
-				redbold("currentUsage status: \(status)")
+#if DEBUG
+				self.logger.trace("Agent monitoring currentUsage status: \(status)")
 #endif
 				if status.code != .ok {
 					subchannel?.close(promise: nil)
