@@ -55,7 +55,6 @@ final class CurrentUsage: GrpcParsableCommand {
 			}
 		}
 
-		let callOptions = CallOptions(timeLimit: TimeLimit.none)
 		let cakeHelper = CakeAgentHelper(on: on, client: client)
 
 		func printUsage(_ currentUsage: CakeAgent.CurrentUsageReply) {
@@ -67,13 +66,13 @@ final class CurrentUsage: GrpcParsableCommand {
 		if self.async {
 			let stream = AsyncThrowingStream.makeStream(of: CakeAgent.CurrentUsageReply.self)
 
-			cakeHelper.currentUsage(frequency: self.frequency, callOptions: callOptions, continuation: stream.continuation)
+			cakeHelper.currentUsage(frequency: self.frequency, continuation: stream.continuation)
 
 			for try await currentUsage in stream.stream {
 				printUsage(currentUsage)
 			}
 		} else {
-			let stream = try cakeHelper.currentUsage(frequency: self.frequency, callOptions: callOptions) { currentUsage in
+			let stream = try cakeHelper.currentUsage(frequency: self.frequency) { currentUsage in
 				printUsage(currentUsage)
 			}
 			

@@ -1137,7 +1137,7 @@ public struct CakeAgentHelper: Sendable {
 		return stream
 	}
 
-	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, continuation: AsyncThrowingStream<CakeAgent.CurrentUsageReply, Error>.Continuation) {
+	public func currentUsage(frequency: Int32, callOptions: CallOptions? = CallOptions(timeLimit: TimeLimit.none), continuation: AsyncThrowingStream<CakeAgent.CurrentUsageReply, Error>.Continuation) {
 		let stream = client.currentUsage(CakeAgent.CurrentUsageRequest.with { $0.frequency = frequency }, callOptions: callOptions) { reply in
 			continuation.yield(reply)
 		}
@@ -1175,7 +1175,7 @@ public struct CakeAgentHelper: Sendable {
 		}
 	}
 
-	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, continuation: AsyncStream<CakeAgent.CurrentUsageReply>.Continuation) throws {
+	public func currentUsage(frequency: Int32, callOptions: CallOptions? = CallOptions(timeLimit: TimeLimit.none), continuation: AsyncStream<CakeAgent.CurrentUsageReply>.Continuation) throws {
 		let stream: CakeAgentCurrentUsageStream
 
 		stream = client.currentUsage(CakeAgent.CurrentUsageRequest.with { $0.frequency = frequency }, callOptions: callOptions) { reply in
@@ -1212,7 +1212,7 @@ public struct CakeAgentHelper: Sendable {
 	}
 
 	@discardableResult
-	public func currentUsage(frequency: Int32, callOptions: CallOptions? = nil, handler: @escaping (CakeAgent.CurrentUsageReply) -> Void) throws -> CakeAgentCurrentUsageStream {
+	public func currentUsage(frequency: Int32, callOptions: CallOptions? = CallOptions(timeLimit: TimeLimit.none), handler: @escaping (CakeAgent.CurrentUsageReply) -> Void) throws -> CakeAgentCurrentUsageStream {
 		let stream: CakeAgentCurrentUsageStream
 		var subchannel: Channel? = nil
 
