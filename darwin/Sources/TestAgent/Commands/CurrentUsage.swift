@@ -17,6 +17,9 @@ final class CurrentUsage: GrpcParsableCommand {
 	@Flag(help: "Output format: text or json")
 	var format: Format = .text
 
+	@Flag(help: "Use async method")
+	var async: Bool = false
+
 	var interceptors: CakeAgentServiceClientInterceptorFactoryProtocol? {
 		try? CakeAgentClientInterceptorFactory(inputHandle: FileHandle.standardInput)
 	}
@@ -53,14 +56,28 @@ final class CurrentUsage: GrpcParsableCommand {
 		}
 
 		let callOptions = CallOptions(timeLimit: TimeLimit.none)
-		let stream = AsyncStream.makeStream(of: CakeAgent.CurrentUsageReply.self)
+		let cakeHelper = CakeAgentHelper(on: on, client: client)
 
-		try CakeAgentHelper(on: on, client: client).currentUsage(frequency: self.frequency, callOptions: callOptions, continuation: stream.continuation)
-
-		for try await currentUsage in stream.stream {
+		func printUsage(_ currentUsage: CakeAgent.CurrentUsageReply) {
 			print("\u{001B}[2J\u{001B}[H")
 			print(self.format.renderSingle(CpuInfo(from: currentUsage.cpuInfos)))
 			print(self.format.renderList(currentUsage.cpuInfos.cores.map(\.agent)))
+		}
+
+		if self.async {
+			let stream = AsyncThrowingStream.makeStream(of: CakeAgent.CurrentUsageReply.self)
+
+			cakeHelper.currentUsage(frequency: self.frequency, callOptions: callOptions, continuation: stream.continuation)
+
+			for try await currentUsage in stream.stream {
+				printUsage(currentUsage)
+			}
+		} else {
+			let stream = try cakeHelper.currentUsage(frequency: self.frequency, callOptions: callOptions) { currentUsage in
+				printUsage(currentUsage)
+			}
+			
+			try await stream.subchannel.get().closeFuture.get()
 		}
 	}
 }
