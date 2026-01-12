@@ -20,13 +20,17 @@ func NewConsole() *Console {
 		return nil
 	}
 
-	glog.Debugf("Console virtio port found at %s", virtioPortPath)
+	if glog.GetLevel() >= glog.DebugLevel {
+		glog.Debugf("Console virtio port found at %s", virtioPortPath)
+	}
 
 	if path, err = syslogFile(); err != nil {
 		return nil
 	}
 
-	glog.Debugf("Syslog file found at %s", path)
+	if glog.GetLevel() >= glog.DebugLevel {
+		glog.Debugf("Syslog file found at %s", path)
+	}
 
 	return &Console{
 		Address:      virtioPortPath,
@@ -58,7 +62,9 @@ func (c *Console) Forward(ctx context.Context) {
 
 	defer file.Close()
 
-	glog.Debugf("Forwarding console messages from %s to syslog file %s", c.Address, c.SyslogFile)
+	if glog.GetLevel() >= glog.DebugLevel {
+		glog.Debugf("Forwarding console messages from %s to syslog file %s", c.Address, c.SyslogFile)
+	}
 
 	c.copyBuffer(ctx, file) // Forward messages from syslog to the console device
 }
@@ -80,7 +86,9 @@ func (c *Console) syslogChanged(console *os.File) (changed bool, newConsole *os.
 	// If this is the first time we are checking the file, we initialize lastSizeSeen and lastModified
 	// to the current file size and modification time
 	if c.lastSizeSeen < 0 {
-		glog.Debugf("Initializing console syslog file %s with size %d and modified at %s", c.SyslogFile, fileInfo.Size(), fileInfo.ModTime())
+		if glog.GetLevel() >= glog.DebugLevel {
+			glog.Debugf("Initializing console syslog file %s with size %d and modified at %s", c.SyslogFile, fileInfo.Size(), fileInfo.ModTime())
+		}
 
 		c.lastSizeSeen = 0
 		c.lastModified = fileInfo.ModTime()
@@ -89,14 +97,17 @@ func (c *Console) syslogChanged(console *os.File) (changed bool, newConsole *os.
 	}
 
 	if fileInfo.ModTime().After(c.lastModified) {
-		glog.Debugf("Syslog file %s has changed: size %d, modified at %s", c.SyslogFile, fileInfo.Size(), fileInfo.ModTime())
+		if glog.GetLevel() >= glog.DebugLevel {
+			glog.Debugf("Syslog file %s has changed: size %d, modified at %s", c.SyslogFile, fileInfo.Size(), fileInfo.ModTime())
+		}
 
 		c.lastModified = fileInfo.ModTime()
 
 		// If the file size has changed, we consider it as a logrotation or new log entry
 		if fileInfo.Size() <= c.lastSizeSeen {
-			glog.Debugf("Syslog file %s has been rotated or truncated, resetting lastSizeSeen", c.SyslogFile)
-
+			if glog.GetLevel() >= glog.DebugLevel {
+				glog.Debugf("Syslog file %s has been rotated or truncated, resetting lastSizeSeen", c.SyslogFile)
+			}
 			// If the file has been truncated or rotated, we reset lastSizeSeen
 			c.lastSizeSeen = 0
 			console.Close()
@@ -132,7 +143,9 @@ func (c *Console) copyBuffer(ctx context.Context, dst *os.File) (written int64, 
 	for err == nil {
 		select {
 		case <-ctx.Done():
-			glog.Debug("Console forwarding stopped by context")
+			if glog.GetLevel() >= glog.DebugLevel {
+				glog.Debug("Console forwarding stopped by context")
+			}
 			return written, nil
 		default:
 			if changed, console, err = c.syslogChanged(console); changed {
@@ -145,7 +158,9 @@ func (c *Console) copyBuffer(ctx context.Context, dst *os.File) (written int64, 
 				readfd.Zero()
 				readfd.Set(int(console.Fd()))
 
-				glog.Debugf("Waiting for data on console syslog file %s", c.SyslogFile)
+				if glog.GetLevel() >= glog.DebugLevel {
+					glog.Debugf("Waiting for data on console syslog file %s", c.SyslogFile)
+				}
 
 				if _, err = unix.Select(int(console.Fd())+1, &readfd, nil, nil, &timeout); err != nil {
 					if utils.IsEINTR(err) {
@@ -157,13 +172,21 @@ func (c *Console) copyBuffer(ctx context.Context, dst *os.File) (written int64, 
 				}
 
 				if readfd.IsSet(int(console.Fd())) {
-					glog.Debugf("Reading from console syslog file %s", c.SyslogFile)
+					if glog.GetLevel() >= glog.DebugLevel {
+						glog.Debugf("Reading from console syslog file %s", c.SyslogFile)
+					}
 
 					var available int
 
 					for {
-						if available, err = console.Read(buf); available > 0 {
-							glog.Debugf("Read %d bytes from console syslog file %s", available, c.SyslogFile)
+						if available, err = console.Read(buf); err == nil {
+							if available == 0 {
+								break
+							}
+
+							if glog.GetLevel() >= glog.DebugLevel {
+								glog.Debugf("Read %d bytes from console syslog file %s", available, c.SyslogFile)
+							}
 
 							c.lastSizeSeen, _ = console.Seek(0, io.SeekCurrent)
 
@@ -188,8 +211,13 @@ func (c *Console) copyBuffer(ctx context.Context, dst *os.File) (written int64, 
 								break
 							}
 						} else if err == io.EOF {
-							glog.Debugf("No more data to read from console syslog file %s", c.SyslogFile)
+							if glog.GetLevel() >= glog.DebugLevel {
+								glog.Debugf("No more data to read from console syslog file %s", c.SyslogFile)
+							}
 							err = nil
+							break
+						} else {
+							glog.Errorf("Unexpected error: %v", err)
 							break
 						}
 					}
@@ -200,7 +228,9 @@ func (c *Console) copyBuffer(ctx context.Context, dst *os.File) (written int64, 
 		}
 	}
 
-	glog.Debugf("Console forwarding stopped: %v, total bytes written: %d", err, written)
+	if glog.GetLevel() >= glog.DebugLevel {
+		glog.Debugf("Console forwarding stopped: %v, total bytes written: %d", err, written)
+	}
 
 	return written, err
 }
