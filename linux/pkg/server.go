@@ -249,6 +249,10 @@ func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pse
 		}
 
 		if tty.ptx, tty.pty, err = pty.Open(); err == nil {
+			if err = tty.SetupTrueTTY(); err != nil {
+				return nil, fmt.Errorf("failed to setup true tty: %v", err)
+			}
+
 			/*if err = tty.EnableRawMode(); err != nil {
 				return nil, fmt.Errorf("failed to setup true tty: %v", err)
 			}*/
@@ -774,6 +778,17 @@ func (s *server) Run(ctx context.Context, req *cakeagent.CakeAgent_RunCommand) (
 func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteCommand, termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize, stream cakeagent.CakeAgentService_ExecuteServer) (err error) {
 	if tty, e := newTTY(termSize); e != nil {
 		err = fmt.Errorf("failed to open pty: %v", e)
+
+		message := cakeagent.CakeAgent_ExecuteResponse{
+			Response: &cakeagent.CakeAgent_ExecuteResponse_Established{
+				Established: &cakeagent.CakeAgent_ExecuteResponse_EstablishedResponse{
+					Success: false,
+					Reason:  e.Error(),
+				},
+			},
+		}
+
+		stream.Send(&message)
 	} else {
 		ctx, cancel := context.WithCancel(context.Background())
 		home, _ := os.UserHomeDir()
@@ -1017,7 +1032,10 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 
 				message = cakeagent.CakeAgent_ExecuteResponse{
 					Response: &cakeagent.CakeAgent_ExecuteResponse_Established{
-						Established: true,
+						Established: &cakeagent.CakeAgent_ExecuteResponse_EstablishedResponse{
+							Success: true,
+							Reason:  "Success",
+						},
 					},
 				}
 

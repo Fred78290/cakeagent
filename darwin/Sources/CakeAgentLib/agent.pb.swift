@@ -713,10 +713,10 @@ public struct Cakeagent_CakeAgent: Sendable {
       set {response = .stderr(newValue)}
     }
 
-    public var established: Bool {
+    public var established: Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse {
       get {
         if case .established(let v)? = response {return v}
-        return false
+        return Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse()
       }
       set {response = .established(newValue)}
     }
@@ -727,8 +727,22 @@ public struct Cakeagent_CakeAgent: Sendable {
       case exitCode(Int32)
       case stdout(Data)
       case stderr(Data)
-      case established(Bool)
+      case established(Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse)
 
+    }
+
+    public struct EstablishedResponse: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var success: Bool = false
+
+      public var reason: String = String()
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
     }
 
     public init() {}
@@ -2135,10 +2149,15 @@ extension Cakeagent_CakeAgent.ExecuteResponse: SwiftProtobuf.Message, SwiftProto
         }
       }()
       case 4: try {
-        var v: Bool?
-        try decoder.decodeSingularBoolField(value: &v)
+        var v: Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse?
+        var hadOneofValue = false
+        if let current = self.response {
+          hadOneofValue = true
+          if case .established(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
         if let v = v {
-          if self.response != nil {try decoder.handleConflictingOneOf()}
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.response = .established(v)
         }
       }()
@@ -2167,7 +2186,7 @@ extension Cakeagent_CakeAgent.ExecuteResponse: SwiftProtobuf.Message, SwiftProto
     }()
     case .established?: try {
       guard case .established(let v)? = self.response else { preconditionFailure() }
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     }()
     case nil: break
     }
@@ -2176,6 +2195,41 @@ extension Cakeagent_CakeAgent.ExecuteResponse: SwiftProtobuf.Message, SwiftProto
 
   public static func ==(lhs: Cakeagent_CakeAgent.ExecuteResponse, rhs: Cakeagent_CakeAgent.ExecuteResponse) -> Bool {
     if lhs.response != rhs.response {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteResponse.protoMessageName + ".EstablishedResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}reason\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.reason) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
+    }
+    if !self.reason.isEmpty {
+      try visitor.visitSingularStringField(value: self.reason, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse, rhs: Cakeagent_CakeAgent.ExecuteResponse.EstablishedResponse) -> Bool {
+    if lhs.success != rhs.success {return false}
+    if lhs.reason != rhs.reason {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

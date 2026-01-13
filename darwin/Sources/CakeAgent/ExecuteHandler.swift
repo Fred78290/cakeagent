@@ -196,93 +196,115 @@ public class ExecuteHandleStream {
 		var iterator = requestStream.makeAsyncIterator()
 		let logger = Logger(self)
 
-		// Read terminal size
-		if let request = try await iterator.next() {
-			if case let .size(size) = request.request {
-				tty = try self.createTTY(size: size)
+		do {
+			// Read terminal size
+			if let request = try await iterator.next() {
+				if case let .size(size) = request.request {
+					tty = try self.createTTY(size: size)
+				} else {
+					throw ServiceError("empty terminal size")
+				}
 			} else {
-				throw ServiceError("empty terminal size")
+				throw ServiceError("Failed to receive terminal size message")
 			}
-		} else {
-			throw ServiceError("Failed to receive terminal size message")
-		}
 
-		// Read request command
-		if let request = try await iterator.next() {
-			if case let .command(command) = request.request {
-				process = try await self.createProcess(command: command, tty: tty)
+			// Read request command
+			if let request = try await iterator.next() {
+				if case let .command(command) = request.request {
+					process = try await self.createProcess(command: command, tty: tty)
+				} else {
+					throw ServiceError("empty command")
+				}
 			} else {
-				throw ServiceError("empty command")
+				throw ServiceError("Failed to receive command message")
 			}
-		} else {
-			throw ServiceError("Failed to receive command message")
-		}
-
-		defer {
-			logger.debug("leave stream")
-			tty.close()
-		}
-
-		_ = try await self.responseStream.send(CakeAgent.ExecuteResponse.with {
-			$0.established = true
-		})
-
-		let inputStreamTask = Task {
-			logger.debug("enter inboundStream")
 
 			defer {
-				logger.debug("leave inboundStream")
+				logger.debug("leave stream")
+				tty.close()
 			}
 
-			// Handle all messages
-			do {
-				while let request = try await iterator.next(), process.isRunning {
-					if case let .input(datas) = request.request {
-						tty.writeToStdin(datas)
-					} else if case let .size(size) = request.request {
-						try tty.setTermSize(rows: size.rows, cols: size.cols)
-					} else if case .eof = request.request {
-						tty.eof()
-						break
+			_ = try await self.responseStream.send(CakeAgent.ExecuteResponse.with {
+				$0.established = .with {
+					$0.success = true
+					$0.reason = "success"
+				}
+			})
+
+			let inputStreamTask = Task {
+				logger.debug("enter inboundStream")
+
+				defer {
+					logger.debug("leave inboundStream")
+				}
+
+				// Handle all messages
+				do {
+					while let request = try await iterator.next(), process.isRunning {
+						if case let .input(datas) = request.request {
+							tty.writeToStdin(datas)
+						} else if case let .size(size) = request.request {
+							try tty.setTermSize(rows: size.rows, cols: size.cols)
+						} else if case .eof = request.request {
+							tty.eof()
+							break
+						}
+					}
+				} catch {
+					if error is CancellationError == false {
+						guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
+							logger.error("Error reading from shell, \(error)")
+							return
+						}
 					}
 				}
-			} catch {
-				if error is CancellationError == false {
-					guard let err = error as? ChannelError, err == ChannelError.ioOnClosedChannel else {
-						logger.error("Error reading from shell, \(error)")
-						return
+			}
+
+			await withTaskGroup{ group in
+				let outputs = [
+					OuputStream(fileHandle: tty.fileHandleForStdoutReading, channel: STDOUT_FILENO, name: "stdout"),
+					OuputStream(fileHandle: tty.fileHandleForStderrReading, channel: STDERR_FILENO, name: "stderr")
+				]
+
+				outputs.forEach { (output: OuputStream) in
+					group.addTask {
+						await self.forwardOutput(output: output, process: process, logger: logger)
 					}
 				}
+
+				await group.waitForAll()
+
+				inputStreamTask.cancel()
 			}
-		}
 
-		await withTaskGroup{ group in
-			let outputs = [
-				OuputStream(fileHandle: tty.fileHandleForStdoutReading, channel: STDOUT_FILENO, name: "stdout"),
-				OuputStream(fileHandle: tty.fileHandleForStderrReading, channel: STDERR_FILENO, name: "stderr")
-			]
+			if process.isRunning {
+				logger.debug("process.waitUntilExit")
+				process.waitUntilExit()
+			}
 
-			outputs.forEach { (output: OuputStream) in
-				group.addTask {
-					await self.forwardOutput(output: output, process: process, logger: logger)
+			exitCode = process.terminationStatus
+
+			logger.debug("exitCode: \(exitCode)")
+
+			try await responseStream.send(CakeAgent.ExecuteResponse.with { $0.exitCode = exitCode })
+		} catch {
+			let description: String
+
+			if let e = error as? ServiceError {
+				description = e.description
+			} else {
+				description = error.localizedDescription
+			}
+
+			_ = try await self.responseStream.send(CakeAgent.ExecuteResponse.with {
+				$0.established = .with {
+					$0.success = false
+					$0.reason = description
 				}
-			}
+			})
 
-			await group.waitForAll()
-
-			inputStreamTask.cancel()
+			throw error
 		}
-
-		if process.isRunning {
-			logger.debug("process.waitUntilExit")
-			process.waitUntilExit()
-		}
-
-		exitCode = process.terminationStatus
-
-		logger.debug("exitCode: \(exitCode)")
-
-		try await responseStream.send(CakeAgent.ExecuteResponse.with { $0.exitCode = exitCode })
 	}
 }
 

@@ -623,9 +623,16 @@ final class CakeChannelStreamer: @unchecked Sendable {
 				#endif
 			} else if case let .stderr(datas) = response.response {
 				try self.errorHandle.write(contentsOf: datas)
-			} else if case .established = response.response {
-				if self.inputHandle.isTTY() {
-					self.term = try self.inputHandle.makeRaw()
+			} else if case .established(let value) = response.response {
+				if value.success {
+					if self.inputHandle.isTTY() {
+						self.term = try self.inputHandle.makeRaw()
+					}
+				} else {
+					self.exitCode = -1
+					try self.errorHandle.write(contentsOf: "\(value)\n".data(using: .utf8) ?? Data())
+					_ = pipeChannel.channel.close()
+					self.semaphore.signal()
 				}
 			}
 		} catch {

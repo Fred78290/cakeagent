@@ -183,7 +183,7 @@ final class CakeAgentProvider: Sendable, CakeAgentServiceAsyncProvider {
 		}
 		
 		try process.run()
-		
+			
 		process.waitUntilExit()
 		
 		return CakeAgent.RunReply.with { reply in
