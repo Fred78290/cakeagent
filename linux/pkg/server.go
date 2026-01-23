@@ -249,9 +249,9 @@ func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pse
 		}
 
 		if tty.ptx, tty.pty, err = pty.Open(); err == nil {
-			if err = tty.SetupTrueTTY(); err != nil {
+			/*if err = tty.SetupTrueTTY(); err != nil {
 				return nil, fmt.Errorf("failed to setup true tty: %v", err)
-			}
+			}*/
 
 			/*if err = tty.EnableRawMode(); err != nil {
 				return nil, fmt.Errorf("failed to setup true tty: %v", err)
