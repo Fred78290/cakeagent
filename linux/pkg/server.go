@@ -248,15 +248,8 @@ func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pse
 			glog.Tracef("Opening pty with size %dx%d", termSize.Rows, termSize.Cols)
 		}
 
-		if tty.ptx, tty.pty, err = pty.Open(); err == nil {
-			/*if err = tty.SetupTrueTTY(); err != nil {
-				return nil, fmt.Errorf("failed to setup true tty: %v", err)
-			}*/
-
-			/*if err = tty.EnableRawMode(); err != nil {
-				return nil, fmt.Errorf("failed to setup true tty: %v", err)
-			}*/
-			tty.SetTermSize(termSize.Rows, termSize.Cols)
+		if err = tty.setupPty(termSize.Rows, termSize.Cols); err != nil {
+			return nil, err
 		}
 	} else {
 		if glog.GetLevel() >= glog.TraceLevel {
@@ -271,6 +264,51 @@ func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pse
 			tty.stdin.Close()
 			return nil, fmt.Errorf("failed to stdout pipe: %v", err)
 		}
+	}
+
+	return
+}
+
+func (t *pseudoTTY) setupPty(row, cols int32) (err error) {
+	if t.ptx, t.pty, err = pty.Open(); err == nil {
+		defer func() {
+			if err != nil {
+				if t.ptx != nil {
+					t.ptx.Close()
+				}
+				if t.pty != nil {
+					t.pty.Close()
+				}
+			}
+		}()
+
+		for _, entry := range []*os.File{t.ptx, t.pty} {
+			// Get termios.
+			var t unix.Termios
+
+			if err = termios.Tcgetattr(entry.Fd(), &t); err != nil {
+				return err
+			}
+
+			// Set flags.
+			t.Cflag |= unix.IMAXBEL
+			t.Cflag |= unix.IUTF8
+			t.Cflag |= unix.BRKINT
+			t.Cflag |= unix.IXANY
+			t.Cflag |= unix.HUPCL
+
+			// Set termios.
+			if err = termios.Tcsetattr(entry.Fd(), termios.TCSANOW, &t); err != nil {
+				return err
+			}
+
+			// Set CLOEXEC.
+			if _, err = unix.FcntlInt(entry.Fd(), unix.F_SETFD, unix.FD_CLOEXEC); err != nil {
+				return err
+			}
+		}
+
+		t.SetTermSize(row, cols)
 	}
 
 	return
