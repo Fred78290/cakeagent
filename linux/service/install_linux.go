@@ -39,6 +39,8 @@ func getService(cfg *types.Config) (svc.Service, error) {
 		args = append(args, fmt.Sprintf("--tls-key=%s", cfg.TlsKey))
 	}
 
+	args = append(args, "$EXTRA_FLAGS")
+
 	svcConfig := &svc.Config{
 		Name:        "cakeagent",
 		DisplayName: "CakeAgent",
