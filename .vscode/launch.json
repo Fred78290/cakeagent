@@ -98,7 +98,7 @@
 				"--ca-cert=${env:HOME}/.cake/agent/ca.pem",
 				"--tls-cert=${env:HOME}/.cake/agent/client.pem",
 				"--tls-key=${env:HOME}/.cake/agent/client.key",
-				"current",
+				"current"
 			],
 			"cwd": "${workspaceFolder:cakeagent}",
 			"name": "testagent current",
@@ -135,7 +135,9 @@
 		{
 			"type": "swift",
 			"request": "launch",
-			"args": ["infos"],
+			"args": [
+				"infos"
+			],
 			"cwd": "${workspaceFolder:cakeagent}",
 			"name": "cakeagent infos",
 			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
