@@ -784,6 +784,7 @@ func (s *server) Run(ctx context.Context, req *cakeagent.CakeAgent_RunCommand) (
 	cmd.Stderr = &stderr
 	cmd.Dir = home
 	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
 	if len(req.Input) > 0 {
 		cmd.Stdin = bytes.NewReader(req.Input)
@@ -1049,6 +1050,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			cmd.Stdout = tty.StdoutWriter()
 			cmd.Stderr = tty.StderrWriter()
 			cmd.Env = os.Environ()
+			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 			cmd.Dir = home
 			cmd.SysProcAttr = &syscall.SysProcAttr{
 				Setsid:  isTTY,
