@@ -29,7 +29,8 @@
 			"program": "${workspaceFolder}/linux",
 			"args": [
 				"serve",
-				"--listen=tcp://127.0.0.1:5010"
+				"--listen=tcp://127.0.0.1:5010",
+				"--log-level=trace",
 			]
 		},
 		{
