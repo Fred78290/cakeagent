@@ -541,13 +541,8 @@ func CurrentUsage() (usage *utils.CPUUsage, err error) {
 
 // GetSystemInfo returns system information using the same logic as the gRPC Info method
 func GetSystemInfo() (*cakeagent.CakeAgent_InfoReply, error) {
-	agent, err := event.NewAgent(time.Second)
-	if err != nil {
-		return nil, err
-	}
-
 	s := &server{
-		agent: agent,
+		agent: nil,
 	}
 
 	ctx := context.Background()
@@ -558,13 +553,8 @@ func GetSystemInfo() (*cakeagent.CakeAgent_InfoReply, error) {
 
 // PingService sends a ping request to the server and returns the response
 func PingService(message string) (*cakeagent.CakeAgent_PingReply, error) {
-	agent, err := event.NewAgent(time.Second)
-	if err != nil {
-		return nil, err
-	}
-
 	s := &server{
-		agent: agent,
+		agent: nil,
 	}
 
 	ctx := context.Background()
@@ -578,13 +568,8 @@ func PingService(message string) (*cakeagent.CakeAgent_PingReply, error) {
 
 // MountService performs mount operations and returns the response
 func MountService(mounts []MountVirtioFSRequest) (*cakeagent.CakeAgent_MountReply, error) {
-	agent, err := event.NewAgent(time.Second)
-	if err != nil {
-		return nil, err
-	}
-
 	s := &server{
-		agent: agent,
+		agent: nil,
 	}
 
 	ctx := context.Background()
@@ -1419,11 +1404,13 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 
 	if listener, err = createListener(cfg.Address); err != nil {
 		err = fmt.Errorf("failed to parse address: %s", err)
-	} else if agent, err = event.NewAgent(cfg.TickEvent); err != nil {
-		err = fmt.Errorf("failed to create agent: %s", err)
 	} else {
-		if cfg.TlsCert != "" && cfg.TlsKey != "" && cfg.CaCert != "" {
+		if agent, err = event.NewAgent(cfg.TickEvent); err != nil {
+			glog.Errorf("Failed to create event agent: %v, event disabled", err)
+			err = nil
+		}
 
+		if cfg.TlsCert != "" && cfg.TlsKey != "" && cfg.CaCert != "" {
 			certPool := x509.NewCertPool()
 
 			if certificate, e := tls.LoadX509KeyPair(cfg.TlsCert, cfg.TlsKey); e != nil {
