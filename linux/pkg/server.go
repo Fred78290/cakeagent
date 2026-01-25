@@ -136,85 +136,12 @@ func (p *pipe) Close() {
 }
 
 type pseudoTTY struct {
-	pty    *os.File
-	ptx    *os.File
-	stdin  *pipe
-	stdout *pipe
-	stderr *pipe
-}
-
-func (t *pseudoTTY) SetupTrueTTY() (err error) {
-	if t.pty == nil {
-		return fmt.Errorf("no pty available")
-	}
-
-	// Make this a controlling terminal
-	if err := unix.IoctlSetInt(int(t.pty.Fd()), unix.TIOCSCTTY, 0); err != nil {
-		return fmt.Errorf("failed to set controlling terminal: %v", err)
-	}
-
-	// Set terminal attributes for proper terminal behavior
-	var terminalSettings unix.Termios
-	if err = termios.Tcgetattr(t.pty.Fd(), &terminalSettings); err != nil {
-		return fmt.Errorf("failed to get terminal attributes: %v", err)
-	}
-
-	// Enable canonical mode and echo
-	terminalSettings.Lflag |= unix.ICANON | unix.ECHO | unix.ECHOE | unix.ECHOK | unix.ISIG
-
-	// Set input flags
-	terminalSettings.Iflag |= unix.ICRNL | unix.IXON
-	terminalSettings.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.IXOFF
-
-	// Set output flags
-	terminalSettings.Oflag |= unix.OPOST | unix.ONLCR
-
-	// Set control flags
-	terminalSettings.Cflag |= unix.CREAD | unix.CLOCAL
-	terminalSettings.Cflag &^= unix.CSTOPB | unix.PARENB
-
-	// Set control characters
-	terminalSettings.Cc[unix.VINTR] = 0x03  // Ctrl-C
-	terminalSettings.Cc[unix.VQUIT] = 0x1C  // Ctrl-\
-	terminalSettings.Cc[unix.VERASE] = 0x7F // DEL
-	terminalSettings.Cc[unix.VKILL] = 0x15  // Ctrl-U
-	terminalSettings.Cc[unix.VEOF] = 0x04   // Ctrl-D
-	terminalSettings.Cc[unix.VSTART] = 0x11 // Ctrl-Q
-	terminalSettings.Cc[unix.VSTOP] = 0x13  // Ctrl-S
-	terminalSettings.Cc[unix.VSUSP] = 0x1A  // Ctrl-Z
-
-	if err = termios.Tcsetattr(t.pty.Fd(), termios.TCSANOW, &terminalSettings); err != nil {
-		return fmt.Errorf("failed to set terminal attributes: %v", err)
-	}
-
-	return nil
-}
-
-func (t *pseudoTTY) EnableRawMode() (err error) {
-	if t.pty == nil {
-		return fmt.Errorf("no pty available")
-	}
-
-	var terminalSettings unix.Termios
-	if err = termios.Tcgetattr(t.pty.Fd(), &terminalSettings); err != nil {
-		return fmt.Errorf("failed to get terminal attributes: %v", err)
-	}
-
-	termios.Cfmakeraw(&terminalSettings)
-	// Disable canonical mode and echo for raw mode
-	//terminalSettings.Lflag &^= unix.ICANON | unix.ECHO | unix.ECHOE | unix.ECHOK | unix.ECHONL | unix.ISIG | unix.IEXTEN
-	//terminalSettings.Iflag &^= unix.ICRNL | unix.INLCR | unix.IGNCR | unix.IXON | unix.IXOFF
-	//terminalSettings.Oflag &^= unix.OPOST
-
-	// Set minimum characters and timeout for non-blocking read
-	terminalSettings.Cc[unix.VMIN] = 1
-	terminalSettings.Cc[unix.VTIME] = 0
-
-	if err = termios.Tcsetattr(t.pty.Fd(), termios.TCSANOW, &terminalSettings); err != nil {
-		return fmt.Errorf("failed to set terminal attributes: %v", err)
-	}
-
-	return nil
+	pty     *os.File
+	ptx     *os.File
+	stdin   *pipe
+	stdout  *pipe
+	stderr  *pipe
+	control *pipe
 }
 
 func newPipe(name string, nonblocking bool) (p *pipe, err error) {
@@ -241,6 +168,10 @@ func newTTY(termSize *cakeagent.CakeAgent_ExecuteRequest_TerminalSize) (tty *pse
 
 	if tty.stderr, err = newPipe("stderr", true); err != nil {
 		return nil, fmt.Errorf("failed to stderr pipe: %v", err)
+	}
+
+	if tty.control, err = newPipe("control", true); err != nil {
+		return nil, fmt.Errorf("failed to control pipe: %v", err)
 	}
 
 	if termSize.Cols > 0 && termSize.Rows > 0 {
@@ -332,7 +263,7 @@ func (t *pseudoTTY) EOF() {
 }
 
 func (t *pseudoTTY) Close() {
-	if t.pty != nil || t.stdin != nil {
+	if t.pty != nil {
 		if glog.GetLevel() >= glog.TraceLevel {
 			glog.Trace("Closing pty")
 		}
@@ -344,20 +275,30 @@ func (t *pseudoTTY) Close() {
 		if t.ptx != nil {
 			t.ptx.Close()
 		}
+	}
 
-		if t.stdin != nil {
-			t.stdin.Close()
-		}
+	if t.stdin != nil {
+		t.stdin.Close()
+	}
 
-		if t.stdout != nil {
-			t.stdout.Close()
-		}
+	if t.stdout != nil {
+		t.stdout.Close()
+	}
+
+	if t.stderr != nil {
+		t.stderr.Close()
+	}
+
+	if t.control != nil {
+		t.control.Close()
 	}
 
 	t.ptx = nil
 	t.pty = nil
 	t.stdin = nil
 	t.stdout = nil
+	t.stderr = nil
+	t.control = nil
 }
 
 func (t *pseudoTTY) StdinReader() *os.File {
@@ -376,10 +317,6 @@ func (t *pseudoTTY) StdoutWriter() *os.File {
 	return t.stdout.output
 }
 
-func (t *pseudoTTY) StderrWriter() *os.File {
-	return t.stderr.output
-}
-
 func (t *pseudoTTY) StdoutReader() *os.File {
 	if t.ptx != nil {
 		return t.ptx
@@ -388,12 +325,20 @@ func (t *pseudoTTY) StdoutReader() *os.File {
 	return t.stdout.input
 }
 
+func (t *pseudoTTY) StderrWriter() *os.File {
+	return t.stderr.output
+}
+
 func (t *pseudoTTY) StderrReader() *os.File {
 	return t.stderr.input
 }
 
-func (t *pseudoTTY) Input() *os.File {
-	return t.stderr.input
+func (t *pseudoTTY) ControlWriter() *os.File {
+	return t.control.output
+}
+
+func (t *pseudoTTY) ControlReader() *os.File {
+	return t.control.input
 }
 
 func (t *pseudoTTY) SetTermSize(rows int32, cols int32) (err error) {
@@ -835,52 +780,59 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			tty.Close()
 		}
 
-		fowardOutput := func(ctx context.Context, channel int, input *os.File) {
-			var name string
+		fowardOutput := func() {
+			stdout := tty.StdoutReader()
+			stderr := tty.StderrReader()
+			control := tty.ControlReader()
+			names := []string{"stdout", "stderr", "control"}
 			buffer := make([]byte, 1024)
-			var totalSent uint64 = 0
-
-			if channel == 0 {
-				name = "stdout"
-			} else {
-				name = "stderr"
-			}
+			totalSent := []uint64{0, 0, 0}
+			input := []*os.File{stdout, stderr, control}
+			maxfd := max(int(stdout.Fd()), int(stderr.Fd()), int(control.Fd())) + 1
 
 			wg.Add(1)
-			defer wg.Done()
 
-			for {
+			defer func() {
+				glog.Tracef("EOF stdout, totalSent=%d, process exited", totalSent[0])
+				glog.Tracef("EOF stderr, totalSent=%d, process exited", totalSent[1])
+
+				wg.Done()
+			}()
+
+			for cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
 				var readfd unix.FdSet
-				var timeout = unix.Timeval{
+				/*var timeout = unix.Timeval{
 					Sec:  0,
-					Usec: 100,
-				}
+					Usec: 500,
+				}*/
+
+				readfd.Zero()
+				readfd.Set(int(stdout.Fd()))
+				readfd.Set(int(stderr.Fd()))
+				readfd.Set(int(control.Fd()))
 
 				select {
 				case <-ctx.Done():
-					if glog.GetLevel() >= glog.TraceLevel {
-						glog.Tracef("Closing output %s, totalSent=%d", name, totalSent)
-					}
 					return
 				default:
-					readfd.Zero()
-					readfd.Set(int(input.Fd()))
-
-					if _, err := unix.Select(int(input.Fd())+1, &readfd, nil, nil, &timeout); err != nil {
+					if _, err := unix.Select(maxfd, &readfd, nil, nil, nil); err != nil {
 						if utils.IsEINTR(err) {
 							continue
 						} else {
-							glog.Errorf("Error selecting %s: %v", name, err)
+							glog.Errorf("Error selecting: %v", err)
 							return
 						}
 					}
+				}
+
+				for channel, input := range input {
+					name := names[channel]
 
 					if readfd.IsSet(int(input.Fd())) {
 						if available, err := input.Read(buffer); err != nil {
 							if utils.IsEAGAIN(err) {
 								if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
-									glog.Tracef("EOF %s, totalSent=%d, process exited", name, totalSent)
-									return
+									continue
 								}
 								// Sleep a bit to avoid busy waiting
 								time.Sleep(10 * time.Nanosecond)
@@ -892,61 +844,55 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 								if glog.GetLevel() >= glog.TraceLevel {
 									glog.Tracef("EOF %s, totalSent=%d", name, totalSent)
 								}
-								return
 							}
 						} else if available > 0 {
 							if glog.GetLevel() >= glog.TraceLevel {
 								glog.Tracef("reading %s: %d", name, len(buffer[:available]))
 							}
 
-							totalSent += uint64(len(buffer[:available]))
+							totalSent[channel] += uint64(len(buffer[:available]))
 
 							var message *cakeagent.CakeAgent_ExecuteResponse
 
-							if channel == 0 {
-								message = &cakeagent.CakeAgent_ExecuteResponse{
-									Response: &cakeagent.CakeAgent_ExecuteResponse_Stdout{
-										Stdout: buffer[:available],
-									},
+							if channel < 2 {
+								if channel == 0 {
+									message = &cakeagent.CakeAgent_ExecuteResponse{
+										Response: &cakeagent.CakeAgent_ExecuteResponse_Stdout{
+											Stdout: buffer[:available],
+										},
+									}
+								} else {
+									message = &cakeagent.CakeAgent_ExecuteResponse{
+										Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
+											Stderr: buffer[:available],
+										},
+									}
 								}
-							} else {
-								message = &cakeagent.CakeAgent_ExecuteResponse{
-									Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
-										Stderr: buffer[:available],
-									},
+
+								if err = stream.Send(message); err != nil {
+									doCancel(fmt.Sprintf("Failed to send %s: %v", name, err))
 								}
-							}
 
-							if err = stream.Send(message); err != nil {
-								doCancel(fmt.Sprintf("Failed to send %s: %v", name, err))
-							}
-
-							if glog.GetLevel() >= glog.TraceLevel {
-								glog.Tracef("Sent %s: %d", name, len(buffer[:available]))
+								if glog.GetLevel() >= glog.TraceLevel {
+									glog.Tracef("Sent %s: %d", name, len(buffer[:available]))
+								}
 							}
 						} else {
 							if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
 								if glog.GetLevel() >= glog.TraceLevel {
 									glog.Trace("Command is still running, no data to read")
 								}
-							} else {
-								if glog.GetLevel() >= glog.TraceLevel {
-									glog.Tracef("EOF reading output %d, totalSent=%d, %v", channel, totalSent, err)
-								}
-
-								return
+							} else if glog.GetLevel() >= glog.TraceLevel {
+								glog.Tracef("EOF reading output %d, totalSent=%d, %v", channel, totalSent, err)
 							}
 						}
-					} else if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
-						glog.Tracef("EOF %s, totalSent=%d, process exited", name, totalSent)
-						return
 					}
 				}
 			}
 		}
 
 		fowardStdin := func() {
-			for {
+			for cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
 				select {
 				case <-ctx.Done():
 					if glog.GetLevel() >= glog.TraceLevel {
@@ -1051,8 +997,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 					glog.Trace("Command started")
 				}
 
-				go fowardOutput(ctx, 0, tty.StdoutReader())
-				go fowardOutput(ctx, 1, tty.StderrReader())
+				go fowardOutput()
 				go fowardStdin()
 
 				message = cakeagent.CakeAgent_ExecuteResponse{
@@ -1076,6 +1021,8 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 				if glog.GetLevel() >= glog.TraceLevel {
 					glog.Trace("Command exited")
 				}
+
+				tty.ControlWriter().WriteString("eof")
 			} else {
 				glog.Errorf("Failed to start command: %v", err)
 			}
