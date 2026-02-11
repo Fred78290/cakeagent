@@ -39,6 +39,8 @@ func getService(cfg *types.Config) (svc.Service, error) {
 		args = append(args, fmt.Sprintf("--tls-key=%s", cfg.TlsKey))
 	}
 
+	args = append(args, "$EXTRA_FLAGS")
+
 	svcConfig := &svc.Config{
 		Name:        "cakeagent",
 		DisplayName: "CakeAgent",
@@ -48,6 +50,10 @@ func getService(cfg *types.Config) (svc.Service, error) {
 		Arguments:   args,
 		Dependencies: []string{
 			"After=network.target",
+		},
+		Option: map[string]interface{}{
+			"LogDirectory": "/var/log",
+			"LogOutput":    true,
 		},
 		EnvVars: map[string]string{
 			"PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin/:/sbin",
