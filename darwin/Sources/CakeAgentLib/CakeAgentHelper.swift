@@ -942,8 +942,8 @@ public struct CakeAgentHelper: Sendable {
 		return InfoReply(info: try response.response.wait())
 	}
 	
-	public func ping(message: String, timestamp: TimeInterval = Date().timeIntervalSince1970, callOptions: CallOptions? = nil) throws -> PingReply {
-		let response = client.ping(.with { $0.timestamp = Int64(timestamp * 1_000_000_000); $0.message = message }, callOptions: callOptions)
+	public func ping(message: String, timestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1_000_000_000), callOptions: CallOptions? = nil) throws -> PingReply {
+		let response = client.ping(.with { $0.timestamp = timestamp; $0.message = message }, callOptions: callOptions)
 		
 		return PingReply(info: try response.response.wait())
 	}
