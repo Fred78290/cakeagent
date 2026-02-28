@@ -30,7 +30,7 @@
 			"args": [
 				"serve",
 				"--listen=tcp://127.0.0.1:5010",
-				"--log-level=trace",
+				"--log-level=trace"
 			]
 		},
 		{
@@ -149,8 +149,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
 			"name": "Release testagent",
-			"program": "${workspaceFolder:cakeagent}/.build/release/testagent",
-			"preLaunchTask": "swift: Build Release testagent"
+			"preLaunchTask": "swift: Build Release testagent",
+			"target": "testagent",
+			"configuration": "release"
 		},
 		{
 			"type": "swift",
@@ -158,8 +159,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
 			"name": "Debug cakeagent",
-			"program": "${workspaceFolder:cakeagent}/.build/debug/cakeagent",
-			"preLaunchTask": "swift: Build Debug cakeagent"
+			"preLaunchTask": "swift: Build Debug cakeagent",
+			"target": "cakeagent",
+			"configuration": "debug"
 		},
 		{
 			"type": "swift",
@@ -167,8 +169,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
 			"name": "Release cakeagent",
-			"program": "${workspaceFolder:cakeagent}/.build/release/cakeagent",
-			"preLaunchTask": "swift: Build Release cakeagent"
+			"preLaunchTask": "swift: Build Release cakeagent",
+			"target": "cakeagent",
+			"configuration": "release"
 		},
 		{
 			"type": "swift",
@@ -176,8 +179,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:cakeagent}",
 			"name": "Debug testagent",
-			"program": "${workspaceFolder:cakeagent}/.build/debug/testagent",
-			"preLaunchTask": "swift: Build Debug testagent"
+			"preLaunchTask": "swift: Build Debug testagent",
+			"target": "testagent",
+			"configuration": "debug"
 		}
 	]
 }
