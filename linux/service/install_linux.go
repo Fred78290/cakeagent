@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	glog "github.com/sirupsen/logrus"
 
@@ -93,15 +94,33 @@ func StartService(cfg *types.Config) (err error) {
 	return
 }
 
+func installService(service svc.Service) (err error) {
+	// Uninstall any existing service to ensure a clean installation
+	service.Uninstall()
+
+	// Install the service
+	if err = service.Install(); err != nil {
+		// Check if the error is due to the service already being installed, must not be a fatal error in this case
+		if strings.Contains(err.Error(), "Init already exists") {
+			glog.Infof("Service already installed")
+			err = nil
+		} else {
+			glog.Errorf("Failed to install service: %v", err)
+		}
+	} else {
+		glog.Info("Service installed successfully")
+	}
+
+	return
+}
+
 func InstallService(cfg *types.Config) (err error) {
 	var service svc.Service
 
 	if service, err = getService(cfg); err == nil {
-		if err = service.Install(); err != nil {
-			glog.Errorf("Failed to install service: %v", err)
-		} else {
-			glog.Info("Service installed successfully")
-
+		// Install the service and start it if installation was successful or if the service is already installed
+		if err = installService(service); err == nil {
+			// Configure mounts if specified in the configuration
 			if len(cfg.Mounts) > 0 {
 				var mounts []pkg.MountVirtioFSRequest
 
@@ -114,10 +133,15 @@ func InstallService(cfg *types.Config) (err error) {
 				}
 			}
 
-			if err = service.Start(); err != nil {
-				glog.Errorf("Failed to start service: %v", err)
+			// Start the service if it's not already running
+			if status, _ := service.Status(); status != svc.StatusRunning {
+				if err = service.Start(); err != nil {
+					glog.Errorf("Failed to start service: %v", err)
+				} else {
+					glog.Infof("Service started successfully")
+				}
 			} else {
-				glog.Infof("Service started successfully")
+				glog.Infof("Service is already running")
 			}
 		}
 	}
