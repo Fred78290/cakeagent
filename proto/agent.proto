@@ -152,12 +152,18 @@ message CakeAgent {
 			repeated CpuCoreInfo cores = 11;
 		}
 
+		message NetworkInfo {
+			string interface = 1;
+			string mac_address = 2;
+			repeated string addresses = 3;
+		}
+
 		string version = 1;
 		uint64 uptime = 2;
 		MemoryInfo memory = 3;
 		int32 cpuCount = 4;
 		repeated DiskInfo diskInfos = 5;
-		repeated string ipaddresses = 6;
+		repeated NetworkInfo networkInfos = 6;
 		string osname = 7;
 		string hostname = 8;
 		string release = 9;

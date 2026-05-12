@@ -63,9 +63,10 @@ type pipe struct {
 }
 
 type networkInterface struct {
-	Name      string
-	Index     int
-	Addresses []string
+	Name       string
+	Index      int
+	MacAddress string
+	Addresses  []string
 }
 
 func collectDiskInfos() (diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo, err error) {
@@ -369,8 +370,8 @@ func (t *pseudoTTY) WriteToStdin(data []byte) (n int, err error) {
 	return
 }
 
-func (s *server) IpAddresses() ([]networkInterface, error) {
-	var result []networkInterface
+func (s *server) IpAddresses() ([]*cakeagent.CakeAgent_InfoReply_NetworkInfo, error) {
+	var result []*cakeagent.CakeAgent_InfoReply_NetworkInfo
 
 	if interfaces, err := net.Interfaces(); err != nil {
 		return nil, err
@@ -382,11 +383,11 @@ func (s *server) IpAddresses() ([]networkInterface, error) {
 		// and that is not a broadcast address
 		// and that is not a point to point address
 		for _, iface := range interfaces {
-			if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagLoopback == 0 {
-				inf := networkInterface{
-					Name:      iface.Name,
-					Index:     iface.Index,
-					Addresses: []string{},
+			if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagRunning != 0 && iface.Flags&(net.FlagLoopback|net.FlagPointToPoint) == 0 {
+				inf := &cakeagent.CakeAgent_InfoReply_NetworkInfo{
+					Interface:  iface.Name,
+					MacAddress: iface.HardwareAddr.String(),
+					Addresses:  []string{},
 				}
 
 				if addrs, err := iface.Addrs(); err == nil {
@@ -431,7 +432,7 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 	}
 
 	reply = &cakeagent.CakeAgent_InfoReply{
-		Ipaddresses:  []string{},
+		NetworkInfos: []*cakeagent.CakeAgent_InfoReply_NetworkInfo{},
 		CpuCount:     int32(runtime.NumCPU()),
 		DiskInfos:    diskInfos,
 		Cpu:          cpuInfo,
@@ -459,7 +460,7 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 		return nil, err
 	} else {
 		for _, address := range addresses {
-			reply.Ipaddresses = append(reply.Ipaddresses, address.Addresses...)
+			reply.NetworkInfos = append(reply.NetworkInfos, address)
 		}
 	}
 

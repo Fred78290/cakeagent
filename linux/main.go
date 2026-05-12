@@ -305,8 +305,12 @@ func displaySystemInfoText(info *cakeagent.CakeAgent_InfoReply) {
 	}
 
 	fmt.Println("=== Network Information ===")
-	for i, ip := range info.Ipaddresses {
-		fmt.Printf("IP Address %d: %s\n", i+1, ip)
+	for i, network := range info.NetworkInfos {
+		fmt.Printf("Network %d: %s\n", i+1, network.Interface)
+		fmt.Printf("  MAC Address: %s\n", network.MacAddress)
+		for i, ip := range network.Addresses {
+			fmt.Printf("  IP Address %d: %s\n", i+1, ip)
+		}
 	}
 }
 

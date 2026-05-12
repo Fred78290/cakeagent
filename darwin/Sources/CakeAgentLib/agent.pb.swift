@@ -8,7 +8,11 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -301,20 +305,20 @@ public struct Cakeagent_CakeAgent: Sendable {
     public var cpuCount: Int32 = 0
 
     public var cpuInfos: Cakeagent_CakeAgent.InfoReply.CpuInfo {
-      get {return _cpuInfos ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
+      get {_cpuInfos ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
       set {_cpuInfos = newValue}
     }
     /// Returns true if `cpuInfos` has been explicitly set.
-    public var hasCpuInfos: Bool {return self._cpuInfos != nil}
+    public var hasCpuInfos: Bool {self._cpuInfos != nil}
     /// Clears the value of `cpuInfos`. Subsequent reads from it will return its default value.
     public mutating func clearCpuInfos() {self._cpuInfos = nil}
 
     public var memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo {
-      get {return _memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
+      get {_memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
       set {_memory = newValue}
     }
     /// Returns true if `memory` has been explicitly set.
-    public var hasMemory: Bool {return self._memory != nil}
+    public var hasMemory: Bool {self._memory != nil}
     /// Clears the value of `memory`. Subsequent reads from it will return its default value.
     public mutating func clearMemory() {self._memory = nil}
 
@@ -332,65 +336,65 @@ public struct Cakeagent_CakeAgent: Sendable {
     // methods supported on all messages.
 
     public var version: String {
-      get {return _storage._version}
+      get {_storage._version}
       set {_uniqueStorage()._version = newValue}
     }
 
     public var uptime: UInt64 {
-      get {return _storage._uptime}
+      get {_storage._uptime}
       set {_uniqueStorage()._uptime = newValue}
     }
 
     public var memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo {
-      get {return _storage._memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
+      get {_storage._memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
       set {_uniqueStorage()._memory = newValue}
     }
     /// Returns true if `memory` has been explicitly set.
-    public var hasMemory: Bool {return _storage._memory != nil}
+    public var hasMemory: Bool {_storage._memory != nil}
     /// Clears the value of `memory`. Subsequent reads from it will return its default value.
     public mutating func clearMemory() {_uniqueStorage()._memory = nil}
 
     public var cpuCount: Int32 {
-      get {return _storage._cpuCount}
+      get {_storage._cpuCount}
       set {_uniqueStorage()._cpuCount = newValue}
     }
 
     public var diskInfos: [Cakeagent_CakeAgent.InfoReply.DiskInfo] {
-      get {return _storage._diskInfos}
+      get {_storage._diskInfos}
       set {_uniqueStorage()._diskInfos = newValue}
     }
 
-    public var ipaddresses: [String] {
-      get {return _storage._ipaddresses}
-      set {_uniqueStorage()._ipaddresses = newValue}
+    public var networkInfos: [Cakeagent_CakeAgent.InfoReply.NetworkInfo] {
+      get {_storage._networkInfos}
+      set {_uniqueStorage()._networkInfos = newValue}
     }
 
     public var osname: String {
-      get {return _storage._osname}
+      get {_storage._osname}
       set {_uniqueStorage()._osname = newValue}
     }
 
     public var hostname: String {
-      get {return _storage._hostname}
+      get {_storage._hostname}
       set {_uniqueStorage()._hostname = newValue}
     }
 
     public var release: String {
-      get {return _storage._release}
+      get {_storage._release}
       set {_uniqueStorage()._release = newValue}
     }
 
     public var cpu: Cakeagent_CakeAgent.InfoReply.CpuInfo {
-      get {return _storage._cpu ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
+      get {_storage._cpu ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
       set {_uniqueStorage()._cpu = newValue}
     }
     /// Returns true if `cpu` has been explicitly set.
-    public var hasCpu: Bool {return _storage._cpu != nil}
+    public var hasCpu: Bool {_storage._cpu != nil}
     /// Clears the value of `cpu`. Subsequent reads from it will return its default value.
     public mutating func clearCpu() {_uniqueStorage()._cpu = nil}
 
     public var agentVersion: String {
-      get {return _storage._agentVersion}
+      get {_storage._agentVersion}
       set {_uniqueStorage()._agentVersion = newValue}
     }
 
@@ -502,6 +506,22 @@ public struct Cakeagent_CakeAgent: Sendable {
       public init() {}
     }
 
+    public struct NetworkInfo: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var interface: String = String()
+
+      public var macAddress: String = String()
+
+      public var addresses: [String] = []
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
     public init() {}
 
     fileprivate var _storage = _StorageClass.defaultInstance
@@ -513,20 +533,20 @@ public struct Cakeagent_CakeAgent: Sendable {
     // methods supported on all messages.
 
     public var command: Cakeagent_CakeAgent.RunCommand.Command {
-      get {return _command ?? Cakeagent_CakeAgent.RunCommand.Command()}
+      get {_command ?? Cakeagent_CakeAgent.RunCommand.Command()}
       set {_command = newValue}
     }
     /// Returns true if `command` has been explicitly set.
-    public var hasCommand: Bool {return self._command != nil}
+    public var hasCommand: Bool {self._command != nil}
     /// Clears the value of `command`. Subsequent reads from it will return its default value.
     public mutating func clearCommand() {self._command = nil}
 
     public var input: Data {
-      get {return _input ?? Data()}
+      get {_input ?? Data()}
       set {_input = newValue}
     }
     /// Returns true if `input` has been explicitly set.
-    public var hasInput: Bool {return self._input != nil}
+    public var hasInput: Bool {self._input != nil}
     /// Clears the value of `input`. Subsequent reads from it will return its default value.
     public mutating func clearInput() {self._input = nil}
 
@@ -1374,7 +1394,7 @@ extension Cakeagent_CakeAgent.CurrentUsageReply: SwiftProtobuf.Message, SwiftPro
 
 extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".InfoReply"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}ipaddresses\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0\u{1}agentVersion\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}networkInfos\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0\u{1}agentVersion\0")
 
   fileprivate class _StorageClass {
     var _version: String = String()
@@ -1382,7 +1402,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
     var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
     var _cpuCount: Int32 = 0
     var _diskInfos: [Cakeagent_CakeAgent.InfoReply.DiskInfo] = []
-    var _ipaddresses: [String] = []
+    var _networkInfos: [Cakeagent_CakeAgent.InfoReply.NetworkInfo] = []
     var _osname: String = String()
     var _hostname: String = String()
     var _release: String = String()
@@ -1403,7 +1423,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
       _memory = source._memory
       _cpuCount = source._cpuCount
       _diskInfos = source._diskInfos
-      _ipaddresses = source._ipaddresses
+      _networkInfos = source._networkInfos
       _osname = source._osname
       _hostname = source._hostname
       _release = source._release
@@ -1432,7 +1452,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._memory) }()
         case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._cpuCount) }()
         case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._diskInfos) }()
-        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._ipaddresses) }()
+        case 6: try { try decoder.decodeRepeatedMessageField(value: &_storage._networkInfos) }()
         case 7: try { try decoder.decodeSingularStringField(value: &_storage._osname) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._hostname) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._release) }()
@@ -1465,8 +1485,8 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
       if !_storage._diskInfos.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._diskInfos, fieldNumber: 5)
       }
-      if !_storage._ipaddresses.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._ipaddresses, fieldNumber: 6)
+      if !_storage._networkInfos.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._networkInfos, fieldNumber: 6)
       }
       if !_storage._osname.isEmpty {
         try visitor.visitSingularStringField(value: _storage._osname, fieldNumber: 7)
@@ -1497,7 +1517,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._memory != rhs_storage._memory {return false}
         if _storage._cpuCount != rhs_storage._cpuCount {return false}
         if _storage._diskInfos != rhs_storage._diskInfos {return false}
-        if _storage._ipaddresses != rhs_storage._ipaddresses {return false}
+        if _storage._networkInfos != rhs_storage._networkInfos {return false}
         if _storage._osname != rhs_storage._osname {return false}
         if _storage._hostname != rhs_storage._hostname {return false}
         if _storage._release != rhs_storage._release {return false}
@@ -1772,6 +1792,46 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftPro
     if lhs.guestNice != rhs.guestNice {return false}
     if lhs.nice != rhs.nice {return false}
     if lhs.cores != rhs.cores {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.InfoReply.NetworkInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".NetworkInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}interface\0\u{3}mac_address\0\u{1}addresses\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.interface) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.macAddress) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.addresses) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.interface.isEmpty {
+      try visitor.visitSingularStringField(value: self.interface, fieldNumber: 1)
+    }
+    if !self.macAddress.isEmpty {
+      try visitor.visitSingularStringField(value: self.macAddress, fieldNumber: 2)
+    }
+    if !self.addresses.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.addresses, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.InfoReply.NetworkInfo, rhs: Cakeagent_CakeAgent.InfoReply.NetworkInfo) -> Bool {
+    if lhs.interface != rhs.interface {return false}
+    if lhs.macAddress != rhs.macAddress {return false}
+    if lhs.addresses != rhs.addresses {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

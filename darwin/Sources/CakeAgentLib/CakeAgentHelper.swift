@@ -177,17 +177,27 @@ public struct AttachedNetwork: Sendable, Codable {
 	public var network: String
 	public var mode: String?
 	public var macAddress: String?
+	public var ipAddresses: [String]?
 
 	public init() {
 		self.network = ""
 		self.mode = nil
 		self.macAddress = nil
+		self.ipAddresses = nil
 	}
 
-	public init(network: String, mode: String?, macAddress: String?) {
+	public init(_ from: CakeAgent.InfoReply.NetworkInfo) {
+		self.network = from.interface
+		self.mode = nil
+		self.macAddress = from.macAddress
+		self.ipAddresses = from.addresses
+	}
+
+	public init(network: String, mode: String?, macAddress: String?, ipAddresses: [String]?) {
 		self.network = network
 		self.mode = mode
 		self.macAddress = macAddress
+		self.ipAddresses = ipAddresses
 	}
 }
 
@@ -517,7 +527,8 @@ public struct InfoReply: Sendable, Codable {
 		self.version = info.version
 		self.uptime = info.uptime
 		self.cpuCount = info.cpuCount
-		self.ipaddresses = info.ipaddresses
+		self.attachedNetworks = info.networkInfos.map { AttachedNetwork($0) }
+		self.ipaddresses = info.networkInfos.flatMap { $0.addresses }
 		self.osname = info.osname
 		self.hostname = info.hostname
 		self.release = info.release

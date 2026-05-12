@@ -68,7 +68,7 @@ struct InfosHandler {
 		reply.version = processInfo.operatingSystemVersionString
 		reply.hostname = processInfo.hostName
 		
-		var ipAddresses: [String] = []
+		var networkInfos: [String:CakeAgent.InfoReply.NetworkInfo] = [:]
 		var ifaddr: UnsafeMutablePointer<ifaddrs>? = nil
 		
 		if getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr {
@@ -78,7 +78,29 @@ struct InfosHandler {
 				let interface = ptr.pointee
 				let addrFamily = interface.ifa_addr.pointee.sa_family
 				let name = String(validatingUTF8: interface.ifa_name)!
+				var networkInfo: CakeAgent.InfoReply.NetworkInfo
 				
+				if let infos = networkInfos[name] {
+					networkInfo = infos
+				} else {
+					networkInfo = CakeAgent.InfoReply.NetworkInfo.with {
+						$0.interface = name
+					}
+
+					if addrFamily == UInt8(AF_LINK) && name != "lo0" {
+						networkInfo.macAddress = withUnsafeBytes(of: interface.ifa_addr.pointee) { ptr in
+							var macAddress = [CChar](repeating: 0, count: 128)
+							var sockaddr_dl = ptr.load(as: sockaddr_dl.self)
+
+							link_addr(&macAddress, &sockaddr_dl)
+
+							return String(cString: macAddress)
+						}
+					}
+
+					networkInfos[name] = networkInfo
+				}
+
 				if (addrFamily == UInt8(AF_INET) || addrFamily == UInt8(AF_INET6)) && name != "lo0" {
 					var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
 		
@@ -90,7 +112,9 @@ struct InfosHandler {
 					let address = String(cString: hostname)
 					
 					if address.contains("%") == false {
-						ipAddresses.append(address)
+						networkInfo.addresses.append(address)
+
+						networkInfos[name] = networkInfo
 					}
 				}
 				
@@ -100,7 +124,7 @@ struct InfosHandler {
 			freeifaddrs(ifaddr)
 		}
 		
-		reply.ipaddresses = ipAddresses.sorted()
+		reply.networkInfos = networkInfos.values.sorted { $0.interface < $1.interface }
 		
 		// Collecter les informations CPU
 		(reply.cpuCount, reply.cpu) = cpuWatcher.collect()
