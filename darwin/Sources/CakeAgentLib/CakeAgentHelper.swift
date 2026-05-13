@@ -528,7 +528,7 @@ public struct InfoReply: Sendable, Codable {
 		self.uptime = info.uptime
 		self.cpuCount = info.cpuCount
 		self.attachedNetworks = info.networkInfos.map { AttachedNetwork($0) }
-		self.ipaddresses = info.networkInfos.flatMap { $0.addresses }
+		self.ipaddresses = info.networkInfos.flatMap { $0.addresses.map { $0.split(separator: "/").first.map(String.init) ?? $0 } }
 		self.osname = info.osname
 		self.hostname = info.hostname
 		self.release = info.release
