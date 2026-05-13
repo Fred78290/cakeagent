@@ -155,12 +155,12 @@ message CakeAgent {
 		message NetworkInfo {
 			string interface = 1;
 			string mac_address = 2;
-			int32 mtu = 3;
+			repeated string addresses = 3;
 			int64 bytesReceived = 4;
 			int64 bytesSent = 5;
 			int64 packetsReceived = 6;
 			int64 packetsSent = 7;
-			repeated string addresses = 8;
+			int32 mtu = 8;
 		}
 
 		string version = 1;
