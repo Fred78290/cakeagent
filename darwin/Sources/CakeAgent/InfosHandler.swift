@@ -86,27 +86,28 @@ struct InfosHandler {
 					networkInfo = CakeAgent.InfoReply.NetworkInfo.with {
 						$0.interface = name
 					}
-
-					if addrFamily == UInt8(AF_LINK) && name != "lo0" {
-						if let sdlPtr = UnsafePointer<sockaddr_dl>(OpaquePointer(interface.ifa_addr)) {
-							let sdl = sdlPtr.pointee
-							let nameLen = Int(sdl.sdl_nlen)
-							let addrLen = Int(sdl.sdl_alen)
-							
-							let macAddress: String = withUnsafeBytes(of: sdl) { rawBuffer in
-								// sdl_data starts after the fixed header fields; compute its base offset
-								let sdlDataOffset = MemoryLayout.offset(of: \sockaddr_dl.sdl_data) ?? 0
-								let macStart = sdlDataOffset + nameLen
-								guard macStart + addrLen <= rawBuffer.count else { return "" }
-								let macBytes = rawBuffer[macStart..<(macStart + addrLen)]
-								return macBytes.map { String(format: "%02x", $0) }.joined(separator: ":")
-							}
-							networkInfo.macAddress = macAddress
-						}
-					}
-
-					networkInfos[name] = networkInfo
 				}
+
+				if addrFamily == UInt8(AF_LINK) && name != "lo0" {
+					if let sdlPtr = UnsafePointer<sockaddr_dl>(OpaquePointer(interface.ifa_addr)) {
+						let sdl = sdlPtr.pointee
+						let nameLen = Int(sdl.sdl_nlen)
+						let addrLen = Int(sdl.sdl_alen)
+						
+						let macAddress: String = withUnsafeBytes(of: sdl) { rawBuffer in
+							// sdl_data starts after the fixed header fields; compute its base offset
+							let sdlDataOffset = MemoryLayout.offset(of: \sockaddr_dl.sdl_data) ?? 0
+							let macStart = sdlDataOffset + nameLen
+							guard macStart + addrLen <= rawBuffer.count else { return "" }
+							let macBytes = rawBuffer[macStart..<(macStart + addrLen)]
+							return macBytes.map { String(format: "%02x", $0) }.joined(separator: ":")
+						}
+
+						networkInfo.macAddress = macAddress
+						networkInfos[name] = networkInfo
+					}
+				}
+
 
 				if (addrFamily == UInt8(AF_INET) || addrFamily == UInt8(AF_INET6)) && name != "lo0" {
 					var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
