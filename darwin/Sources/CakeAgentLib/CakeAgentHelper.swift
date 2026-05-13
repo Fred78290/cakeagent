@@ -204,7 +204,7 @@ public struct AttachedNetwork: Sendable, Codable {
 		self.packetsSent = from.packetsSent
 	}
 
-	public init(network: String, mode: String?, macAddress: String?, mtu: Int32?, ipAddresses: [String]?, bytesSent: UInt64, bytesReceived: UInt64, packetsSent: UInt64, packetsReceived: UInt64) {
+	public init(network: String, mode: String?, macAddress: String?, mtu: Int32? = nil, ipAddresses: [String]? = nil, bytesSent: UInt64 = 0, bytesReceived: UInt64 = 0, packetsSent: UInt64 = 0, packetsReceived: UInt64 = 0) {
 		self.network = network
 		self.mode = mode
 		self.macAddress = macAddress
