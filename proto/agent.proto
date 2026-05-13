@@ -156,6 +156,11 @@ message CakeAgent {
 			string interface = 1;
 			string mac_address = 2;
 			repeated string addresses = 3;
+			uint64 bytesReceived = 4;
+			uint64 bytesSent = 5;
+			uint64 packetsReceived = 6;
+			uint64 packetsSent = 7;
+			int32 mtu = 8;
 		}
 
 		string version = 1;
