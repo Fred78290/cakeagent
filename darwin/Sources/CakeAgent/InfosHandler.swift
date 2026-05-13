@@ -116,51 +116,51 @@ struct InfosHandler {
 								&hostname, socklen_t(hostname.count),
 								nil, socklen_t(0), NI_NUMERICHOST)
 					
-                    // Build numeric address string
-                    let baseAddress = String(cString: hostname)
+					// Build numeric address string
+					let baseAddress = String(cString: hostname)
 
-                    // Compute CIDR prefix length from netmask
-                    var prefixLength: Int = -1
-                    if let netmaskPtr = interface.ifa_netmask {
-                        let family = interface.ifa_addr.pointee.sa_family
-                        if family == UInt8(AF_INET) {
-                            // IPv4 netmask
-                            let nm = UnsafeRawPointer(netmaskPtr).assumingMemoryBound(to: sockaddr_in.self).pointee
-                            let mask = nm.sin_addr.s_addr
-                            // Count bits set to 1 in network byte order
-                            var m = UInt32(bigEndian: mask)
-                            var count = 0
-                            while m != 0 {
-                                count += Int(m & 1)
-                                m >>= 1
-                            }
-                            prefixLength = count
-                        } else if family == UInt8(AF_INET6) {
-                            // IPv6 netmask
-                            let nm6 = UnsafeRawPointer(netmaskPtr).assumingMemoryBound(to: sockaddr_in6.self).pointee
-                            let addr = nm6.sin6_addr
-                            // Count bits in 16 bytes
-                            withUnsafeBytes(of: addr) { bytes in
-                                var cnt = 0
-                                for b in bytes {
-                                    var v = b
-                                    while v != 0 {
-                                        cnt += Int(v & 1)
-                                        v >>= 1
-                                    }
-                                }
-                                prefixLength = cnt
-                            }
-                        }
-                    }
+					// Compute CIDR prefix length from netmask
+					var prefixLength: Int = -1
+					if let netmaskPtr = interface.ifa_netmask {
+						let family = interface.ifa_addr.pointee.sa_family
+						if family == UInt8(AF_INET) {
+							// IPv4 netmask
+							let nm = UnsafeRawPointer(netmaskPtr).assumingMemoryBound(to: sockaddr_in.self).pointee
+							let mask = nm.sin_addr.s_addr
+							// Count bits set to 1 in network byte order
+							var m = UInt32(bigEndian: mask)
+							var count = 0
+							while m != 0 {
+								count += Int(m & 1)
+								m >>= 1
+							}
+							prefixLength = count
+						} else if family == UInt8(AF_INET6) {
+							// IPv6 netmask
+							let nm6 = UnsafeRawPointer(netmaskPtr).assumingMemoryBound(to: sockaddr_in6.self).pointee
+							let addr = nm6.sin6_addr
+							// Count bits in 16 bytes
+							withUnsafeBytes(of: addr) { bytes in
+								var cnt = 0
+								for b in bytes {
+									var v = b
+									while v != 0 {
+										cnt += Int(v & 1)
+										v >>= 1
+									}
+								}
+								prefixLength = cnt
+							}
+						}
+					}
 
-                    // Append CIDR if computed; otherwise keep base address
-                    let address: String
-                    if prefixLength >= 0 {
-                        address = "\(baseAddress)/\(prefixLength)"
-                    } else {
-                        address = baseAddress
-                    }
+					// Append CIDR if computed; otherwise keep base address
+					let address: String
+					if prefixLength >= 0 {
+						address = "\(baseAddress)/\(prefixLength)"
+					} else {
+						address = baseAddress
+					}
 					
 					if address.contains("%") == false {
 						networkInfo.addresses.append(address)
