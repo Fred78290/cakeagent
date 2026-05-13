@@ -403,10 +403,10 @@ func (s *server) IpAddresses() ([]*cakeagent.CakeAgent_InfoReply_NetworkInfo, er
 					MacAddress:      iface.HardwareAddr.String(),
 					Addresses:       []string{},
 					Mtu:             int32(iface.MTU),
-					BytesReceived:   int64(c.BytesRecv),
-					BytesSent:       int64(c.BytesSent),
-					PacketsReceived: int64(c.PacketsRecv),
-					PacketsSent:     int64(c.PacketsSent),
+					BytesReceived:   uint64(c.BytesRecv),
+					BytesSent:       uint64(c.BytesSent),
+					PacketsReceived: uint64(c.PacketsRecv),
+					PacketsSent:     uint64(c.PacketsSent),
 				}
 
 				if addrs, err := iface.Addrs(); err == nil {

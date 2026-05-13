@@ -107,10 +107,11 @@ struct InfosHandler {
 
 						if let dataPtr = interface.ifa_data {
 							let ifData = dataPtr.assumingMemoryBound(to: if_data.self).pointee
-							networkInfo.bytesReceived = Int64(ifData.ifi_ibytes)
-							networkInfo.bytesSent = Int64(ifData.ifi_obytes)
-							networkInfo.packetsReceived = Int64(ifData.ifi_ipackets)
-							networkInfo.packetsSent = Int64(ifData.ifi_opackets)
+							networkInfo.mtu = Int32(ifData.ifi_mtu)
+							networkInfo.bytesReceived = UInt64(ifData.ifi_ibytes)
+							networkInfo.bytesSent = UInt64(ifData.ifi_obytes)
+							networkInfo.packetsReceived = UInt64(ifData.ifi_ipackets)
+							networkInfo.packetsSent = UInt64(ifData.ifi_opackets)
 						}
 
 						networkInfos[name] = networkInfo

@@ -177,16 +177,18 @@ public struct AttachedNetwork: Sendable, Codable {
 	public var network: String
 	public var mode: String?
 	public var macAddress: String?
+	public var mtu: Int32?
 	public var ipAddresses: [String]?
-	public var bytesReceived: Int64 = 0
-	public var bytesSent: Int64 = 0
-	public var packetsReceived: Int64 = 0
-	public var packetsSent: Int64 = 0
+	public var bytesReceived: UInt64 = 0
+	public var bytesSent: UInt64 = 0
+	public var packetsReceived: UInt64 = 0
+	public var packetsSent: UInt64 = 0
 
 	public init() {
 		self.network = ""
 		self.mode = nil
 		self.macAddress = nil
+		self.mtu = nil
 		self.ipAddresses = nil
 	}
 
@@ -194,6 +196,7 @@ public struct AttachedNetwork: Sendable, Codable {
 		self.network = from.interface
 		self.mode = nil
 		self.macAddress = from.macAddress
+		self.mtu = from.mtu
 		self.ipAddresses = from.addresses
 		self.bytesReceived = from.bytesReceived
 		self.bytesSent = from.bytesSent
@@ -201,10 +204,11 @@ public struct AttachedNetwork: Sendable, Codable {
 		self.packetsSent = from.packetsSent
 	}
 
-	public init(network: String, mode: String?, macAddress: String?, ipAddresses: [String]?, bytesSent: Int64, bytesReceived: Int64, packetsSent: Int64, packetsReceived: Int64) {
+	public init(network: String, mode: String?, macAddress: String?, mtu: Int32?, ipAddresses: [String]?, bytesSent: UInt64, bytesReceived: UInt64, packetsSent: UInt64, packetsReceived: UInt64) {
 		self.network = network
 		self.mode = mode
 		self.macAddress = macAddress
+		self.mtu = mtu
 		self.ipAddresses = ipAddresses
 		self.bytesSent = bytesSent
 		self.bytesReceived = bytesReceived
