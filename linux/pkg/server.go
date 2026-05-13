@@ -396,12 +396,14 @@ func (s *server) IpAddresses() ([]*cakeagent.CakeAgent_InfoReply_NetworkInfo, er
 						switch v := addr.(type) {
 						case *net.IPNet:
 							ip = v.IP
+							if ip != nil && !ip.IsLoopback() && ip.IsGlobalUnicast() {
+								inf.Addresses = append(inf.Addresses, v.String())
+							}
 						case *net.IPAddr:
 							ip = v.IP
-						}
-
-						if ip != nil && !ip.IsLoopback() && ip.IsGlobalUnicast() {
-							inf.Addresses = append(inf.Addresses, ip.String())
+							if ip != nil && !ip.IsLoopback() && ip.IsGlobalUnicast() {
+								inf.Addresses = append(inf.Addresses, ip.String())
+							}
 						}
 					}
 

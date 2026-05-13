@@ -88,13 +88,20 @@ struct InfosHandler {
 					}
 
 					if addrFamily == UInt8(AF_LINK) && name != "lo0" {
-						networkInfo.macAddress = withUnsafeBytes(of: interface.ifa_addr.pointee) { ptr in
-							var macAddress = [CChar](repeating: 0, count: 128)
-							var sockaddr_dl = ptr.load(as: sockaddr_dl.self)
-
-							link_addr(&macAddress, &sockaddr_dl)
-
-							return String(cString: macAddress)
+						if let sdlPtr = UnsafePointer<sockaddr_dl>(OpaquePointer(interface.ifa_addr)) {
+							let sdl = sdlPtr.pointee
+							let nameLen = Int(sdl.sdl_nlen)
+							let addrLen = Int(sdl.sdl_alen)
+							
+							let macAddress: String = withUnsafeBytes(of: sdl) { rawBuffer in
+								// sdl_data starts after the fixed header fields; compute its base offset
+								let sdlDataOffset = MemoryLayout.offset(of: \sockaddr_dl.sdl_data) ?? 0
+								let macStart = sdlDataOffset + nameLen
+								guard macStart + addrLen <= rawBuffer.count else { return "" }
+								let macBytes = rawBuffer[macStart..<(macStart + addrLen)]
+								return macBytes.map { String(format: "%02x", $0) }.joined(separator: ":")
+							}
+							networkInfo.macAddress = macAddress
 						}
 					}
 
@@ -109,7 +116,51 @@ struct InfosHandler {
 								&hostname, socklen_t(hostname.count),
 								nil, socklen_t(0), NI_NUMERICHOST)
 					
-					let address = String(cString: hostname)
+                    // Build numeric address string
+                    let baseAddress = String(cString: hostname)
+
+                    // Compute CIDR prefix length from netmask
+                    var prefixLength: Int = -1
+                    if let netmaskPtr = interface.ifa_netmask {
+                        let family = interface.ifa_addr.pointee.sa_family
+                        if family == UInt8(AF_INET) {
+                            // IPv4 netmask
+                            let nm = UnsafeRawPointer(netmaskPtr).assumingMemoryBound(to: sockaddr_in.self).pointee
+                            let mask = nm.sin_addr.s_addr
+                            // Count bits set to 1 in network byte order
+                            var m = UInt32(bigEndian: mask)
+                            var count = 0
+                            while m != 0 {
+                                count += Int(m & 1)
+                                m >>= 1
+                            }
+                            prefixLength = count
+                        } else if family == UInt8(AF_INET6) {
+                            // IPv6 netmask
+                            let nm6 = UnsafeRawPointer(netmaskPtr).assumingMemoryBound(to: sockaddr_in6.self).pointee
+                            let addr = nm6.sin6_addr
+                            // Count bits in 16 bytes
+                            withUnsafeBytes(of: addr) { bytes in
+                                var cnt = 0
+                                for b in bytes {
+                                    var v = b
+                                    while v != 0 {
+                                        cnt += Int(v & 1)
+                                        v >>= 1
+                                    }
+                                }
+                                prefixLength = cnt
+                            }
+                        }
+                    }
+
+                    // Append CIDR if computed; otherwise keep base address
+                    let address: String
+                    if prefixLength >= 0 {
+                        address = "\(baseAddress)/\(prefixLength)"
+                    } else {
+                        address = baseAddress
+                    }
 					
 					if address.contains("%") == false {
 						networkInfo.addresses.append(address)
