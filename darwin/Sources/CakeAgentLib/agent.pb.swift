@@ -515,6 +515,16 @@ public struct Cakeagent_CakeAgent: Sendable {
 
       public var macAddress: String = String()
 
+      public var mtu: Int32 = 0
+
+      public var bytesReceived: Int64 = 0
+
+      public var bytesSent: Int64 = 0
+
+      public var packetsReceived: Int64 = 0
+
+      public var packetsSent: Int64 = 0
+
       public var addresses: [String] = []
 
       public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -1799,7 +1809,7 @@ extension Cakeagent_CakeAgent.InfoReply.CpuInfo: SwiftProtobuf.Message, SwiftPro
 
 extension Cakeagent_CakeAgent.InfoReply.NetworkInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".NetworkInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}interface\0\u{3}mac_address\0\u{1}addresses\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}interface\0\u{3}mac_address\0\u{1}mtu\0\u{1}bytesReceived\0\u{1}bytesSent\0\u{1}packetsReceived\0\u{1}packetsSent\0\u{1}addresses\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1809,7 +1819,12 @@ extension Cakeagent_CakeAgent.InfoReply.NetworkInfo: SwiftProtobuf.Message, Swif
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.interface) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.macAddress) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.addresses) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.mtu) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.bytesReceived) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.bytesSent) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.packetsReceived) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.packetsSent) }()
+      case 8: try { try decoder.decodeRepeatedStringField(value: &self.addresses) }()
       default: break
       }
     }
@@ -1822,8 +1837,23 @@ extension Cakeagent_CakeAgent.InfoReply.NetworkInfo: SwiftProtobuf.Message, Swif
     if !self.macAddress.isEmpty {
       try visitor.visitSingularStringField(value: self.macAddress, fieldNumber: 2)
     }
+    if self.mtu != 0 {
+      try visitor.visitSingularInt32Field(value: self.mtu, fieldNumber: 3)
+    }
+    if self.bytesReceived != 0 {
+      try visitor.visitSingularInt64Field(value: self.bytesReceived, fieldNumber: 4)
+    }
+    if self.bytesSent != 0 {
+      try visitor.visitSingularInt64Field(value: self.bytesSent, fieldNumber: 5)
+    }
+    if self.packetsReceived != 0 {
+      try visitor.visitSingularInt64Field(value: self.packetsReceived, fieldNumber: 6)
+    }
+    if self.packetsSent != 0 {
+      try visitor.visitSingularInt64Field(value: self.packetsSent, fieldNumber: 7)
+    }
     if !self.addresses.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.addresses, fieldNumber: 3)
+      try visitor.visitRepeatedStringField(value: self.addresses, fieldNumber: 8)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1831,6 +1861,11 @@ extension Cakeagent_CakeAgent.InfoReply.NetworkInfo: SwiftProtobuf.Message, Swif
   public static func ==(lhs: Cakeagent_CakeAgent.InfoReply.NetworkInfo, rhs: Cakeagent_CakeAgent.InfoReply.NetworkInfo) -> Bool {
     if lhs.interface != rhs.interface {return false}
     if lhs.macAddress != rhs.macAddress {return false}
+    if lhs.mtu != rhs.mtu {return false}
+    if lhs.bytesReceived != rhs.bytesReceived {return false}
+    if lhs.bytesSent != rhs.bytesSent {return false}
+    if lhs.packetsReceived != rhs.packetsReceived {return false}
+    if lhs.packetsSent != rhs.packetsSent {return false}
     if lhs.addresses != rhs.addresses {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

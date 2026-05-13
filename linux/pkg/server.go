@@ -38,6 +38,7 @@ import (
 	"github.com/pbnjay/memory"
 	"github.com/pkg/term/termios"
 	"github.com/shirou/gopsutil/v4/disk"
+	psnet "github.com/shirou/gopsutil/v4/net"
 	glog "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"golang.org/x/sys/unix"
@@ -63,10 +64,14 @@ type pipe struct {
 }
 
 type networkInterface struct {
-	Name       string
-	Index      int
-	MacAddress string
-	Addresses  []string
+	Name            string
+	Index           int
+	MacAddress      string
+	Addresses       []string
+	BytesReceived   int64
+	BytesSent       int64
+	PacketsReceived int64
+	PacketsSent     int64
 }
 
 func collectDiskInfos() (diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo, err error) {
@@ -373,6 +378,14 @@ func (t *pseudoTTY) WriteToStdin(data []byte) (n int, err error) {
 func (s *server) IpAddresses() ([]*cakeagent.CakeAgent_InfoReply_NetworkInfo, error) {
 	var result []*cakeagent.CakeAgent_InfoReply_NetworkInfo
 
+	// Collect per-interface IO counters
+	ioCounters := make(map[string]psnet.IOCountersStat)
+	if counters, err := psnet.IOCounters(true); err == nil {
+		for _, c := range counters {
+			ioCounters[c.Name] = c
+		}
+	}
+
 	if interfaces, err := net.Interfaces(); err != nil {
 		return nil, err
 	} else {
@@ -384,10 +397,16 @@ func (s *server) IpAddresses() ([]*cakeagent.CakeAgent_InfoReply_NetworkInfo, er
 		// and that is not a point to point address
 		for _, iface := range interfaces {
 			if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagRunning != 0 && iface.Flags&(net.FlagLoopback|net.FlagPointToPoint) == 0 {
+				c := ioCounters[iface.Name]
 				inf := &cakeagent.CakeAgent_InfoReply_NetworkInfo{
-					Interface:  iface.Name,
-					MacAddress: iface.HardwareAddr.String(),
-					Addresses:  []string{},
+					Interface:       iface.Name,
+					MacAddress:      iface.HardwareAddr.String(),
+					Addresses:       []string{},
+					Mtu:             int32(iface.MTU),
+					BytesReceived:   int64(c.BytesRecv),
+					BytesSent:       int64(c.BytesSent),
+					PacketsReceived: int64(c.PacketsRecv),
+					PacketsSent:     int64(c.PacketsSent),
 				}
 
 				if addrs, err := iface.Addrs(); err == nil {

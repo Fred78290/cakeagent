@@ -178,6 +178,10 @@ public struct AttachedNetwork: Sendable, Codable {
 	public var mode: String?
 	public var macAddress: String?
 	public var ipAddresses: [String]?
+	public var bytesReceived: Int64 = 0
+	public var bytesSent: Int64 = 0
+	public var packetsReceived: Int64 = 0
+	public var packetsSent: Int64 = 0
 
 	public init() {
 		self.network = ""
@@ -191,13 +195,21 @@ public struct AttachedNetwork: Sendable, Codable {
 		self.mode = nil
 		self.macAddress = from.macAddress
 		self.ipAddresses = from.addresses
+		self.bytesReceived = from.bytesReceived
+		self.bytesSent = from.bytesSent
+		self.packetsReceived = from.packetsReceived
+		self.packetsSent = from.packetsSent
 	}
 
-	public init(network: String, mode: String?, macAddress: String?, ipAddresses: [String]?) {
+	public init(network: String, mode: String?, macAddress: String?, ipAddresses: [String]?, bytesSent: Int64, bytesReceived: Int64, packetsSent: Int64, packetsReceived: Int64) {
 		self.network = network
 		self.mode = mode
 		self.macAddress = macAddress
 		self.ipAddresses = ipAddresses
+		self.bytesSent = bytesSent
+		self.bytesReceived = bytesReceived
+		self.packetsSent = packetsSent
+		self.packetsReceived = packetsReceived
 	}
 }
 
