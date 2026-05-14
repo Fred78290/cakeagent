@@ -28,10 +28,10 @@ mkdir -p _artifacts
 pushd linux
 LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE=${BUILD_DATE}"
 
-CGO_ENABLED=1 GOARCH=amd64 GOOS=linux go build  -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
-CGO_ENABLED=1 GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
-CGO_ENABLED=1 GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
-CGO_ENABLED=1 GOARCH=arm64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-arm64
+GOARCH=amd64 GOOS=linux go build  -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
+GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
+GOARCH=arm64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-arm64
+GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
 popd
 
 if [ ${VERSION} != "$(git rev-parse --short=8 HEAD)" ]; then
