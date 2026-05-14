@@ -18,12 +18,26 @@ func getMemoryUsage() MemoryUsage {
 		unit = 1
 	}
 
+	total := uint64(in.Totalram)
+	free := uint64(in.Freeram)
+	used := uint64(0)
+	if total >= free {
+		used = total - free
+	}
+
+	swapTotal := uint64(in.Totalswap)
+	swapFree := uint64(in.Freeswap)
+	swapUsed := uint64(0)
+	if swapTotal >= swapFree {
+		swapUsed = swapTotal - swapFree
+	}
+
 	return MemoryUsage{
-		Total:     uint64(in.Totalram) * unit,
-		Free:      uint64(in.Freeram) * unit,
-		Used:      uint64(in.Totalram-in.Freeram) * unit,
-		SwapTotal: uint64(in.Totalswap) * unit,
-		SwapFree:  uint64(in.Freeswap) * unit,
-		SwapUsed:  uint64(in.Totalswap-in.Freeswap) * unit,
+		Total:     total * unit,
+		Free:      free * unit,
+		Used:      used * unit,
+		SwapTotal: swapTotal * unit,
+		SwapFree:  swapFree * unit,
+		SwapUsed:  swapUsed * unit,
 	}
 }
