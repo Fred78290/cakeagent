@@ -259,6 +259,7 @@ func displaySystemInfoText(info *cakeagent.CakeAgent_InfoReply) {
 	fmt.Printf("OS Name: %s\n", info.Osname)
 	fmt.Printf("OS Release: %s\n", info.Release)
 	fmt.Printf("OS Version: %s\n", info.Version)
+	fmt.Printf("Number of Processes: %d\n", info.NumOfProcesses)
 	fmt.Printf("Uptime: %d nanoseconds\n", info.Uptime)
 
 	fmt.Println("\n=== CPU Information ===")
@@ -290,6 +291,10 @@ func displaySystemInfoText(info *cakeagent.CakeAgent_InfoReply) {
 		fmt.Printf("Free Memory: %d bytes (%.2f GB)\n", info.Memory.Free, float64(info.Memory.Free)/1024/1024/1024)
 		fmt.Printf("Used Memory: %d bytes (%.2f GB)\n", info.Memory.Used, float64(info.Memory.Used)/1024/1024/1024)
 		fmt.Printf("Memory Usage: %.2f%%\n", float64(info.Memory.Used)/float64(info.Memory.Total)*100)
+		fmt.Printf("Total Swap: %d bytes (%.2f GB)\n", info.Memory.SwapTotal, float64(info.Memory.SwapTotal)/1024/1024/1024)
+		fmt.Printf("Used Swap: %d bytes (%.2f GB)\n", info.Memory.SwapUsed, float64(info.Memory.SwapUsed)/1024/1024/1024)
+		fmt.Printf("Free Swap: %d bytes (%.2f GB)\n", info.Memory.SwapFree, float64(info.Memory.SwapFree)/1024/1024/1024)
+		fmt.Printf("Swap Usage: %.2f%%\n", float64(info.Memory.SwapUsed)/float64(info.Memory.SwapTotal)*100)
 	}
 
 	fmt.Println("\n=== Disk Information ===")

@@ -35,7 +35,6 @@ import (
 	"github.com/lima-vm/lima/pkg/guestagent"
 	"github.com/lima-vm/lima/pkg/guestagent/api"
 	"github.com/mdlayher/vsock"
-	"github.com/pbnjay/memory"
 	"github.com/pkg/term/termios"
 	"github.com/shirou/gopsutil/v4/disk"
 	psnet "github.com/shirou/gopsutil/v4/net"
@@ -104,13 +103,15 @@ func collectDiskInfos() (diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo, er
 }
 
 func collectMemoryUsage() *cakeagent.CakeAgent_InfoReply_MemoryInfo {
-	memoryTotal := memory.TotalMemory()
-	memoryFree := memory.FreeMemory()
+	memUsage := utils.GetMemoryUsage()
 
 	return &cakeagent.CakeAgent_InfoReply_MemoryInfo{
-		Total: memoryTotal,
-		Free:  memoryFree,
-		Used:  memoryTotal - memoryFree,
+		Total:     memUsage.Total,
+		Free:      memUsage.Free,
+		Used:      memUsage.Used,
+		SwapTotal: memUsage.SwapTotal,
+		SwapFree:  memUsage.SwapFree,
+		SwapUsed:  memUsage.SwapUsed,
 	}
 }
 
@@ -442,6 +443,7 @@ func (s *server) IpAddresses() ([]*cakeagent.CakeAgent_InfoReply_NetworkInfo, er
 func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_InfoReply, err error) {
 	var cpuInfo *cakeagent.CakeAgent_InfoReply_CpuInfo
 	var diskInfos []*cakeagent.CakeAgent_InfoReply_DiskInfo
+	var numOfProcesses int32
 
 	// Prepare CPU info
 	if cpuInfo, err = collectCpuUsage(); err != nil {
@@ -452,13 +454,18 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 		return nil, err
 	}
 
+	if process, err := sysinfo.Processes(); err == nil {
+		numOfProcesses = int32(len(process))
+	}
+
 	reply = &cakeagent.CakeAgent_InfoReply{
-		NetworkInfos: []*cakeagent.CakeAgent_InfoReply_NetworkInfo{},
-		CpuCount:     int32(runtime.NumCPU()),
-		DiskInfos:    diskInfos,
-		Cpu:          cpuInfo,
-		AgentVersion: version.VERSION,
-		Memory:       collectMemoryUsage(),
+		NetworkInfos:   []*cakeagent.CakeAgent_InfoReply_NetworkInfo{},
+		CpuCount:       int32(runtime.NumCPU()),
+		DiskInfos:      diskInfos,
+		Cpu:            cpuInfo,
+		AgentVersion:   version.VERSION,
+		Memory:         collectMemoryUsage(),
+		NumOfProcesses: numOfProcesses,
 	}
 
 	// Retrieve system information

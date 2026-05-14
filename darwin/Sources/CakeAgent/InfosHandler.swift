@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import CakeAgentLib
 
 struct InfosHandler {
@@ -58,16 +59,24 @@ struct InfosHandler {
 			size = MemoryLayout<UInt64>.size
 			sysctlbyname("vm.page_free_count", &freeMemory, &size, nil, 0)
 
+			var swapUsage: xsw_usage = xsw_usage()
+			size = MemoryLayout<xsw_usage>.size
+			sysctlbyname("vm.swapusage", &swapUsage, &size, nil, 0)
+
 			$0.free = freeMemory * UInt64(vm_page_size)
 			$0.total = ProcessInfo.processInfo.physicalMemory
 			$0.used = $0.total - $0.free
+			$0.swapUsed = swapUsage.xsu_used
+			$0.swapTotal = swapUsage.xsu_total
+			$0.swapFree = swapUsage.xsu_avail
 		}
 		
 		reply.osname = "darwin"
 		reply.release = "\(processInfo.operatingSystemVersion.majorVersion).\(processInfo.operatingSystemVersion.minorVersion).\(processInfo.operatingSystemVersion.patchVersion)"
 		reply.version = processInfo.operatingSystemVersionString
 		reply.hostname = processInfo.hostName
-		
+		reply.numOfProcesses = max(proc_listallpids(nil, 0), 0)
+
 		var networkInfos: [String:CakeAgent.InfoReply.NetworkInfo] = [:]
 		var ifaddr: UnsafeMutablePointer<ifaddrs>? = nil
 		
