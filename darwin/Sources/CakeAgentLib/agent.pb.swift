@@ -297,37 +297,39 @@ public struct Cakeagent_CakeAgent: Sendable {
     public init() {}
   }
 
-  public struct CurrentUsageReply: Sendable {
+  public struct CurrentUsageReply: @unchecked Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    public var cpuCount: Int32 = 0
+    public var cpuCount: Int32 {
+      get {_storage._cpuCount}
+      set {_uniqueStorage()._cpuCount = newValue}
+    }
 
     public var cpuInfos: Cakeagent_CakeAgent.InfoReply.CpuInfo {
-      get {_cpuInfos ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
-      set {_cpuInfos = newValue}
+      get {_storage._cpuInfos ?? Cakeagent_CakeAgent.InfoReply.CpuInfo()}
+      set {_uniqueStorage()._cpuInfos = newValue}
     }
     /// Returns true if `cpuInfos` has been explicitly set.
-    public var hasCpuInfos: Bool {self._cpuInfos != nil}
+    public var hasCpuInfos: Bool {_storage._cpuInfos != nil}
     /// Clears the value of `cpuInfos`. Subsequent reads from it will return its default value.
-    public mutating func clearCpuInfos() {self._cpuInfos = nil}
+    public mutating func clearCpuInfos() {_uniqueStorage()._cpuInfos = nil}
 
     public var memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo {
-      get {_memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
-      set {_memory = newValue}
+      get {_storage._memory ?? Cakeagent_CakeAgent.InfoReply.MemoryInfo()}
+      set {_uniqueStorage()._memory = newValue}
     }
     /// Returns true if `memory` has been explicitly set.
-    public var hasMemory: Bool {self._memory != nil}
+    public var hasMemory: Bool {_storage._memory != nil}
     /// Clears the value of `memory`. Subsequent reads from it will return its default value.
-    public mutating func clearMemory() {self._memory = nil}
+    public mutating func clearMemory() {_uniqueStorage()._memory = nil}
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
 
-    fileprivate var _cpuInfos: Cakeagent_CakeAgent.InfoReply.CpuInfo? = nil
-    fileprivate var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
+    fileprivate var _storage = _StorageClass.defaultInstance
   }
 
   public struct InfoReply: @unchecked Sendable {
@@ -398,6 +400,11 @@ public struct Cakeagent_CakeAgent: Sendable {
       set {_uniqueStorage()._agentVersion = newValue}
     }
 
+    public var numOfProcesses: Int32 {
+      get {_storage._numOfProcesses}
+      set {_uniqueStorage()._numOfProcesses = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public struct MemoryInfo: Sendable {
@@ -410,6 +417,12 @@ public struct Cakeagent_CakeAgent: Sendable {
       public var free: UInt64 = 0
 
       public var used: UInt64 = 0
+
+      public var swapTotal: UInt64 = 0
+
+      public var swapFree: UInt64 = 0
+
+      public var swapUsed: UInt64 = 0
 
       public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1362,41 +1375,81 @@ extension Cakeagent_CakeAgent.CurrentUsageReply: SwiftProtobuf.Message, SwiftPro
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".CurrentUsageReply"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cpuCount\0\u{1}cpuInfos\0\u{1}memory\0")
 
+  fileprivate class _StorageClass {
+    var _cpuCount: Int32 = 0
+    var _cpuInfos: Cakeagent_CakeAgent.InfoReply.CpuInfo? = nil
+    var _memory: Cakeagent_CakeAgent.InfoReply.MemoryInfo? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _cpuCount = source._cpuCount
+      _cpuInfos = source._cpuInfos
+      _memory = source._memory
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.cpuCount) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._cpuInfos) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._memory) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularInt32Field(value: &_storage._cpuCount) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._cpuInfos) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._memory) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.cpuCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.cpuCount, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._cpuCount != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._cpuCount, fieldNumber: 1)
+      }
+      try { if let v = _storage._cpuInfos {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._memory {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
     }
-    try { if let v = self._cpuInfos {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._memory {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Cakeagent_CakeAgent.CurrentUsageReply, rhs: Cakeagent_CakeAgent.CurrentUsageReply) -> Bool {
-    if lhs.cpuCount != rhs.cpuCount {return false}
-    if lhs._cpuInfos != rhs._cpuInfos {return false}
-    if lhs._memory != rhs._memory {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._cpuCount != rhs_storage._cpuCount {return false}
+        if _storage._cpuInfos != rhs_storage._cpuInfos {return false}
+        if _storage._memory != rhs_storage._memory {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1404,7 +1457,7 @@ extension Cakeagent_CakeAgent.CurrentUsageReply: SwiftProtobuf.Message, SwiftPro
 
 extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.protoMessageName + ".InfoReply"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}networkInfos\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0\u{1}agentVersion\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}version\0\u{1}uptime\0\u{1}memory\0\u{1}cpuCount\0\u{1}diskInfos\0\u{1}networkInfos\0\u{1}osname\0\u{1}hostname\0\u{1}release\0\u{1}cpu\0\u{1}agentVersion\0\u{1}numOfProcesses\0")
 
   fileprivate class _StorageClass {
     var _version: String = String()
@@ -1418,6 +1471,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
     var _release: String = String()
     var _cpu: Cakeagent_CakeAgent.InfoReply.CpuInfo? = nil
     var _agentVersion: String = String()
+    var _numOfProcesses: Int32 = 0
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1439,6 +1493,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
       _release = source._release
       _cpu = source._cpu
       _agentVersion = source._agentVersion
+      _numOfProcesses = source._numOfProcesses
     }
   }
 
@@ -1468,6 +1523,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._release) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._cpu) }()
         case 11: try { try decoder.decodeSingularStringField(value: &_storage._agentVersion) }()
+        case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._numOfProcesses) }()
         default: break
         }
       }
@@ -1513,6 +1569,9 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
       if !_storage._agentVersion.isEmpty {
         try visitor.visitSingularStringField(value: _storage._agentVersion, fieldNumber: 11)
       }
+      if _storage._numOfProcesses != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._numOfProcesses, fieldNumber: 12)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1533,6 +1592,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._release != rhs_storage._release {return false}
         if _storage._cpu != rhs_storage._cpu {return false}
         if _storage._agentVersion != rhs_storage._agentVersion {return false}
+        if _storage._numOfProcesses != rhs_storage._numOfProcesses {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1544,7 +1604,7 @@ extension Cakeagent_CakeAgent.InfoReply: SwiftProtobuf.Message, SwiftProtobuf._M
 
 extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.InfoReply.protoMessageName + ".MemoryInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}total\0\u{1}free\0\u{1}used\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}total\0\u{1}free\0\u{1}used\0\u{1}swapTotal\0\u{1}swapFree\0\u{1}swapUsed\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1555,6 +1615,9 @@ extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, Swift
       case 1: try { try decoder.decodeSingularUInt64Field(value: &self.total) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.free) }()
       case 3: try { try decoder.decodeSingularUInt64Field(value: &self.used) }()
+      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.swapTotal) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.swapFree) }()
+      case 6: try { try decoder.decodeSingularUInt64Field(value: &self.swapUsed) }()
       default: break
       }
     }
@@ -1570,6 +1633,15 @@ extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, Swift
     if self.used != 0 {
       try visitor.visitSingularUInt64Field(value: self.used, fieldNumber: 3)
     }
+    if self.swapTotal != 0 {
+      try visitor.visitSingularUInt64Field(value: self.swapTotal, fieldNumber: 4)
+    }
+    if self.swapFree != 0 {
+      try visitor.visitSingularUInt64Field(value: self.swapFree, fieldNumber: 5)
+    }
+    if self.swapUsed != 0 {
+      try visitor.visitSingularUInt64Field(value: self.swapUsed, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1577,6 +1649,9 @@ extension Cakeagent_CakeAgent.InfoReply.MemoryInfo: SwiftProtobuf.Message, Swift
     if lhs.total != rhs.total {return false}
     if lhs.free != rhs.free {return false}
     if lhs.used != rhs.used {return false}
+    if lhs.swapTotal != rhs.swapTotal {return false}
+    if lhs.swapFree != rhs.swapFree {return false}
+    if lhs.swapUsed != rhs.swapUsed {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

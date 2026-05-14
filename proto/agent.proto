@@ -111,6 +111,9 @@ message CakeAgent {
 			uint64 total = 1;
 			uint64 free = 2;
 			uint64 used = 3;
+			uint64 swapTotal = 4;
+			uint64 swapFree = 5;
+			uint64 swapUsed = 6;
 		}
 
 		message DiskInfo {
@@ -174,6 +177,7 @@ message CakeAgent {
 		string release = 9;
 		CpuInfo cpu = 10;
 		string agentVersion = 11;
+		int32 numOfProcesses = 12;
 	}
 
 	message RunCommand {

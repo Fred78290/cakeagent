@@ -484,6 +484,7 @@ public struct ShortInfoReply: Sendable, Codable {
 	public var hostname: String
 	public var release: String
 	public var status: Status
+	public var numOfProcesses: Int32
 	public var agentVersion: String
 
 	public init(from info: InfoReply) {
@@ -496,6 +497,7 @@ public struct ShortInfoReply: Sendable, Codable {
 		self.release = info.release ?? ""
 		self.status = info.status
 		self.agentVersion = info.agentVersion
+		self.numOfProcesses = info.numOfProcesses
 	}
 }
 
@@ -517,6 +519,7 @@ public struct InfoReply: Sendable, Codable {
 	public var attachedNetworks: [AttachedNetwork]?
 	public var tunnelInfos: [TunnelInfo]?
 	public var socketInfos: [SocketInfo]?
+	public var numOfProcesses: Int32
 
 	init() {
 		self.name = ""
@@ -536,6 +539,7 @@ public struct InfoReply: Sendable, Codable {
 		self.socketInfos = nil
 		self.cpuInfo = nil
 		self.agentVersion = ""
+		self.numOfProcesses = 0
 	}
 
 	public init(info: CakeAgent.InfoReply) {
@@ -559,23 +563,34 @@ public struct InfoReply: Sendable, Codable {
 				$0.total = info.memory.total
 				$0.free = info.memory.free
 				$0.used = info.memory.used
+				$0.swapTotal = info.memory.swapTotal
+				$0.swapUsed = info.memory.swapUsed
+				$0.swapFree = info.memory.swapFree
 			}
 		}
 		
 		if info.hasCpu {
 			self.cpuInfo = info.cpu.agent
 		}
+
+		self.numOfProcesses = info.numOfProcesses
 	}
 
 	public struct MemoryInfo: Sendable, Codable {
 		public var total: UInt64?
 		public var free: UInt64?
 		public var used: UInt64?
+		public var swapTotal: UInt64?
+		public var swapUsed: UInt64?
+		public var swapFree: UInt64?
 
 		init() {
 			self.total = nil
 			self.free = nil
 			self.used = nil
+			self.swapTotal = nil
+			self.swapUsed = nil
+			self.swapFree = nil
 		}
 
 		public static func with(
