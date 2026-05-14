@@ -294,7 +294,11 @@ func displaySystemInfoText(info *cakeagent.CakeAgent_InfoReply) {
 		fmt.Printf("Total Swap: %d bytes (%.2f GB)\n", info.Memory.SwapTotal, float64(info.Memory.SwapTotal)/1024/1024/1024)
 		fmt.Printf("Used Swap: %d bytes (%.2f GB)\n", info.Memory.SwapUsed, float64(info.Memory.SwapUsed)/1024/1024/1024)
 		fmt.Printf("Free Swap: %d bytes (%.2f GB)\n", info.Memory.SwapFree, float64(info.Memory.SwapFree)/1024/1024/1024)
-		fmt.Printf("Swap Usage: %.2f%%\n", float64(info.Memory.SwapUsed)/float64(info.Memory.SwapTotal)*100)
+		if info.Memory.SwapTotal > 0 {
+			fmt.Printf("Swap Usage: %.2f%%\n", float64(info.Memory.SwapUsed)/float64(info.Memory.SwapTotal)*100)
+		} else {
+			fmt.Printf("Swap Usage: %.2f%%\n", 0.0)
+		}
 	}
 
 	fmt.Println("\n=== Disk Information ===")
