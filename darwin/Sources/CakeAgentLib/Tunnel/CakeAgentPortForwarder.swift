@@ -136,13 +136,16 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 
 	public func handleEvent(event: CakeAgent.TunnelPortForwardEvent.ForwardEvent) {
 		let discardedPort: [Int32] = [22, 53, 68]
+
 		let addedPorts = event.addedPorts.reduce(into: [ForwardedSocketAddress]()) { addedPorts, port in
-			if let remoteAddress = try? SocketAddress(ipAddress: port.ip, port: Int(port.port)) {
-				let forward = ForwardedSocketAddress(proto: port.protocol, addr: port.ip, port: Int(port.port))
+			let portIP = (port.ip.isEmpty || port.ip == "0.0.0.0") ? self.remoteHost : port.ip
+
+			if let remoteAddress = try? SocketAddress(ipAddress: portIP, port: Int(port.port)) {
+				let forward = ForwardedSocketAddress(proto: port.protocol, addr: portIP, port: Int(port.port))
 
 				if discardedPort.contains(port.port) {
 					self.logger.info("Discard dynamic port forwarding: \(forward.description) (discarded port)")
-				} else if addedPorts.first(where: { $0.port == port.port && $0.addr == port.ip }) != nil {
+				} else if addedPorts.first(where: { $0.port == port.port && $0.addr == portIP }) != nil {
 					self.logger.info("Already binded dynamic port forwarding: \(forward.description)")
 				} else {
 					if remoteAddress.isLoopback || remoteAddress.isLinkLocal {
@@ -154,7 +157,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 					}
 				}
 			} else {
-				self.logger.warn("Invalid dynamic port forwarding: \(port.ip):\(port.port)")
+				self.logger.warn("Invalid dynamic port forwarding: \(portIP):\(port.port)")
 			}
 		}
 
