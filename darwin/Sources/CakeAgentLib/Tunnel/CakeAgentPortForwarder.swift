@@ -156,7 +156,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 		let discardedPort = self.discardedPort
 
 		let addedPorts = event.addedPorts.reduce(into: [ForwardedSocketAddress]()) { addedPorts, port in
-			let portIP = (port.ip.isEmpty || port.ip == "0.0.0.0") ? self.remoteHost : port.ip
+			let portIP = (port.ip.isEmpty || port.ip == "0.0.0.0" || port.ip == "::") ? self.remoteHost : port.ip
 
 			if let remoteAddress = try? SocketAddress(ipAddress: portIP, port: Int(port.port)) {
 				let forward = ForwardedSocketAddress(proto: port.protocol, addr: portIP, port: Int(port.port))
@@ -203,7 +203,8 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 
 		let removedPorts = event.removedPorts.compactMap { port in
 			if !discardedPort.contains(where: { $0.contains(port.port) }) {
-				let forward: ForwardedSocketAddress = ForwardedSocketAddress(proto: port.protocol, addr: port.ip, port: Int(port.port))
+				let portIP = (port.ip.isEmpty || port.ip == "0.0.0.0" || port.ip == "::") ? self.remoteHost : port.ip
+				let forward: ForwardedSocketAddress = ForwardedSocketAddress(proto: port.protocol, addr: portIP, port: Int(port.port))
 
 				if self.dynamicPorts.contains(forward) {
 					self.logger.info("Will remove dynamic port forwarding: \(forward.description)")
