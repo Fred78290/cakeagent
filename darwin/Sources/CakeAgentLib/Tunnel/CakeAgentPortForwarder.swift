@@ -77,6 +77,20 @@ extension SocketAddress {
 
 }
 
+public enum PortFilter: Sendable, Hashable {
+	case individual(Int32)
+	case range(Int32, Int32)
+
+	public func contains(_ port: Int32) -> Bool {
+		switch self {
+		case .individual(let p):
+			return port == p
+		case .range(let start, let end):
+			return port >= start && port <= end
+		}
+	}
+}
+
 struct ForwardedSocketAddress: Sendable, Equatable, CustomStringConvertible {
 	var description: String {
 		"\(proto.rawValue)://\(addr):\(port)"
@@ -107,6 +121,9 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 	internal var eventChannel: Channel? = nil
 	internal let queue = DispatchQueue(label: "CakeAgentPortForwarder")
 	internal var status: Status = .idle
+	internal let remoteHost: String
+
+	public var discardedPort: Set<PortFilter> = [.individual(22), .individual(53), .individual(68)]
 
 	public enum Status: Int {
 		case idle = 0
@@ -120,6 +137,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 		let mappedPorts = forwardedPorts.filter { $0.unixDomain == nil }.compactMap { $0.mappedPort }
 
 		self.bindAddress = bindAddress
+		self.remoteHost = remoteHost
 		self.ttl = ttl
 		self.cakeAgentClient = cakeAgentClient
 		self.logger = Logger("CakedPortForwarder")
@@ -135,7 +153,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 	}
 
 	public func handleEvent(event: CakeAgent.TunnelPortForwardEvent.ForwardEvent) {
-		let discardedPort: [Int32] = [22, 53, 68]
+		let discardedPort = self.discardedPort
 
 		let addedPorts = event.addedPorts.reduce(into: [ForwardedSocketAddress]()) { addedPorts, port in
 			let portIP = (port.ip.isEmpty || port.ip == "0.0.0.0") ? self.remoteHost : port.ip
@@ -143,7 +161,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 			if let remoteAddress = try? SocketAddress(ipAddress: portIP, port: Int(port.port)) {
 				let forward = ForwardedSocketAddress(proto: port.protocol, addr: portIP, port: Int(port.port))
 
-				if discardedPort.contains(port.port) {
+				if discardedPort.contains(where: { $0.contains(port.port) }) {
 					self.logger.info("Discard dynamic port forwarding: \(forward.description) (discarded port)")
 				} else if addedPorts.first(where: { $0.port == port.port && $0.addr == portIP }) != nil {
 					self.logger.info("Already binded dynamic port forwarding: \(forward.description)")
@@ -164,7 +182,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 		addedPorts.forEach { forward in
 			self.bindAddress.forEach { bindAddress in
 				let bindAddress: SocketAddress = try! SocketAddress.makeAddress("tcp://\(bindAddress):\(forward.port)")
-				let remoteAddress = try! SocketAddress(ipAddress: forward.addr, port: forward.port)
+				let remoteAddress =  try! SocketAddress(ipAddress: forward.addr, port: forward.port)
 
 				if bindAddress.protocol == remoteAddress.protocol {
 					self.logger.info("Add dynamic port forwarding: \(bindAddress) -> \(remoteAddress)")
@@ -184,7 +202,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 		}
 
 		let removedPorts = event.removedPorts.compactMap { port in
-			if discardedPort.contains(port.port) == false {
+			if !discardedPort.contains(where: { $0.contains(port.port) }) {
 				let forward: ForwardedSocketAddress = ForwardedSocketAddress(proto: port.protocol, addr: port.ip, port: Int(port.port))
 
 				if self.dynamicPorts.contains(forward) {
