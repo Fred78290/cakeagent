@@ -164,7 +164,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 				if discardedPort.contains(where: { $0.contains(port.port) }) {
 					self.logger.info("Discard dynamic port forwarding: \(forward.description) (discarded port)")
 				} else if addedPorts.first(where: { $0.port == port.port && $0.addr == portIP }) != nil {
-					self.logger.info("Already binded dynamic port forwarding: \(forward.description)")
+					self.logger.info("Already bound dynamic port forwarding: \(forward.description)")
 				} else {
 					if remoteAddress.isLoopback || remoteAddress.isLinkLocal {
 						self.logger.info("Discard dynamic port forwarding: \(forward.description) (loopback/link local)")
