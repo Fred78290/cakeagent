@@ -79,14 +79,14 @@ extension SocketAddress {
 
 public enum PortFilter: Sendable, Hashable {
 	case individual(Int32)
-	case range(Int32, Int32)
+	case range(Range<Int32>)
 
 	public func contains(_ port: Int32) -> Bool {
 		switch self {
 		case .individual(let p):
 			return port == p
-		case .range(let start, let end):
-			return port >= start && port <= end
+		case .range(let range):
+			return range.contains(port)
 		}
 	}
 }
