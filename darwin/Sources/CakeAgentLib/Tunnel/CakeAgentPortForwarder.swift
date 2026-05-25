@@ -122,8 +122,7 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 	internal let queue = DispatchQueue(label: "CakeAgentPortForwarder")
 	internal var status: Status = .idle
 	internal let remoteHost: String
-
-	public var discardedPort: Set<PortFilter> = [.individual(22), .individual(53), .individual(68)]
+	internal let discardedPort: Set<PortFilter>
 
 	public enum Status: Int {
 		case idle = 0
@@ -133,13 +132,14 @@ public class CakeAgentPortForwarder: PortForwarder, @unchecked Sendable {
 		case stopped = 4
 	}
 
-	public init(group: EventLoopGroup, cakeAgentClient: CakeAgentClient, bindAddress: [String], remoteHost: String, forwardedPorts: [TunnelAttachement], ttl: Int = 5) throws {
+	public init(group: EventLoopGroup, cakeAgentClient: CakeAgentClient, bindAddress: [String], remoteHost: String, forwardedPorts: [TunnelAttachement], discardedPort: Set<PortFilter> = [.individual(22), .individual(53), .individual(68)], ttl: Int = 5) throws {
 		let mappedPorts = forwardedPorts.filter { $0.unixDomain == nil }.compactMap { $0.mappedPort }
 
 		self.bindAddress = bindAddress
 		self.remoteHost = remoteHost
 		self.ttl = ttl
 		self.cakeAgentClient = cakeAgentClient
+		self.discardedPort = discardedPort
 		self.logger = Logger("CakedPortForwarder")
 
 		try super.init(group: group, remoteHost: remoteHost, mappedPorts: mappedPorts, bindAddresses: bindAddress, udpConnectionTTL: ttl)
