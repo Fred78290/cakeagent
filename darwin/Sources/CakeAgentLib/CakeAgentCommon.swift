@@ -26,7 +26,7 @@ extension String {
 		}
 
 		if self.hasPrefix("~/") {
-			return currentHome + String(self.dropFirst())
+			return currentHome + String(self.dropFirst(2))
 		}
 
 		// "~user" or "~user/..."
