@@ -14,18 +14,33 @@ extension FileManager {
 
 extension String {
 	var expandingTildeInPath: String {
-		if self.hasPrefix("~") {
-			let home = FileManager.realHomeDirectoryForCurrentUser.path(percentEncoded: false)
-			let name = self.dropFirst(1)
-
-			if name.isEmpty {
-				return home
-			}
-
-			return home + name
+		guard self.hasPrefix("~") else {
+			return self
 		}
-		
-		return self
+
+		let currentHome = FileManager.realHomeDirectoryForCurrentUser.path(percentEncoded: false)
+
+		// "~" or "~/..."
+		if self == "~" {
+			return currentHome
+		}
+
+		if self.hasPrefix("~/") {
+			return currentHome + String(self.dropFirst())
+		}
+
+		// "~user" or "~user/..."
+		let afterTilde = self.index(after: self.startIndex)
+		let slashIndex = self[afterTilde...].firstIndex(of: "/")
+		let userEnd = slashIndex ?? self.endIndex
+		let user = String(self[afterTilde..<userEnd])
+		let rest = slashIndex.map { String(self[$0...]) } ?? ""
+
+		guard let pw = getpwnam(user), let dir = pw.pointee.pw_dir else {
+			return self
+		}
+
+		return String(cString: dir) + rest
 	}
 
 	public func toSocketAddress() throws -> SocketAddress {
