@@ -10,6 +10,16 @@ public typealias CakeAgentClient = Cakeagent_CakeAgentServiceNIOClient
 public typealias CakeAgentServiceClientInterceptorFactoryProtocol = Cakeagent_CakeAgentServiceClientInterceptorFactoryProtocol
 public typealias CakeAgentServiceClientMetadata = Cakeagent_CakeAgentServiceClientMetadata
 
+extension String {
+	var expandingTildeInPath: String {
+		if self.hasPrefix("~") {
+			return (self as NSString).expandingTildeInPath
+		}
+		
+		return self
+	}
+}
+
 public struct CakeAgentClientOptions: ParsableArguments {
 
 	@Option(help: "Connection timeout in seconds")
