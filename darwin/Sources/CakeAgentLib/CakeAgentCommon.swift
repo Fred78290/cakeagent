@@ -11,7 +11,7 @@ extension String {
 		}
 
 		if u.scheme == "unix" || u.isFileURL {
-			socketAddress = try .init(unixDomainSocketPath: u.path)
+			socketAddress = try .init(unixDomainSocketPath: u.path(percentEncoded: false))
 		} else {
 			socketAddress = try .init(ipAddress: u.host ?? "127.0.0.1", port: Int(u.port ?? 0))
 		}

@@ -15,13 +15,13 @@ let package = Package(
 		.library(name: "CakeAgentLib", targets: ["CakeAgentLib"]),
 	],
 	dependencies: [
-		.package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
+		.package(url: "https://github.com/Fred78290/swift-argument-parser", revision: "d554955e8c280aa4c4a05a039a968f0205656e77"),
 		.package(url: "https://github.com/grpc/grpc-swift.git", revision: "5770e231585cb68388a6ae37ce36c4d8dbd46d90"),
 		.package(url: "https://github.com/apple/swift-nio.git", from: "2.92.1"),
 		.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.33.3"),
 		.package(url: "https://github.com/apple/swift-log.git", from: "1.8.0"),
 		.package(url: "https://github.com/groue/Semaphore", from: "0.0.8"),
-		.package(url: "https://github.com/Fred78290/swift-nio-portforwarding.git", .upToNextMajor(from: "0.2.9")),
+		.package(url: "https://github.com/Fred78290/swift-nio-portforwarding.git", .upToNextMajor(from: "0.2.11")),
 		.package(url: "https://github.com/cfilipov/TextTable", branch: "master"),
 	],
 	targets: [
