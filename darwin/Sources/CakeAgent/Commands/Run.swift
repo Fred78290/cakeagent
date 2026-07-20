@@ -85,7 +85,7 @@ struct Run: ParsableCommand {
 
 				target = ConnectionTarget.vsockAddress(VsockAddress(cid: cid, port: .init(listeningAddress.port ?? 5000)))
 			} else if listeningAddress.scheme == "unix" {
-				target = ConnectionTarget.unixDomainSocket(listeningAddress.path())
+				target = ConnectionTarget.unixDomainSocket(listeningAddress.path(percentEncoded: false))
 			} else if listeningAddress.scheme == "tcp" {
 				target = ConnectionTarget.hostAndPort(listeningAddress.host ?? "127.0.0.1", listeningAddress.port ?? 5000)
 			} else {

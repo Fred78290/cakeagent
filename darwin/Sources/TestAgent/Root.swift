@@ -119,7 +119,7 @@ struct Root: AsyncParsableCommand {
 
 			cakeHomeDir.append(path: ".cakeagent.sock")
 
-			return "unix://\(cakeHomeDir.absoluteURL.path())"
+			return "unix://\(cakeHomeDir.absoluteURL.path(percentEncoded: false))"
 		}
 	}
 

@@ -109,7 +109,7 @@ struct Service: ParsableCommand {
 
 				let serviceURL = URL(fileURLWithPath: "/etc/systemd/system/\(cakerSignature).service")
 
-				if FileManager.default.fileExists(atPath: serviceURL.path) {
+				if FileManager.default.fileExists(atPath: serviceURL.path(percentEncoded: false)) {
 					throw InstallError.failedToWriteLaunchAgentPlist("File already exists")
 				}
 
@@ -127,7 +127,7 @@ struct Service: ParsableCommand {
 			func install(arguments: [String]) throws {
 				let agentURL = URL(fileURLWithPath: "/Library/LaunchDaemons/\(cakerSignature).plist")
 
-				if FileManager.default.fileExists(atPath: agentURL.path) {
+				if FileManager.default.fileExists(atPath: agentURL.path(percentEncoded: false)) {
 					throw InstallError.failedToWriteLaunchAgentPlist("File already exists")
 				}
 
