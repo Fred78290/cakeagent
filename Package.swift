@@ -32,6 +32,7 @@ let package = Package(
 				.product(name: "Semaphore", package: "Semaphore"),
 				.product(name: "NIOPortForwarding", package: "swift-nio-portforwarding"),
 				.product(name: "Logging", package: "swift-log"),
+				.product(name: "ArgumentParser", package: "swift-argument-parser"),
 			],
 			path: "darwin/Sources/CakeAgentLib",
 			swiftSettings: [
