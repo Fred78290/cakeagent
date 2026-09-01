@@ -63,6 +63,18 @@ var serviceInstallCmd = &cobra.Command{
 	},
 }
 
+var removeServiceCmd = &cobra.Command{
+	Use:   "remove",
+	Short: "Remove cakeagent system service",
+	Run: func(cmd *cobra.Command, args []string) {
+		setupLogging()
+		if err := service.RemoveService(cfg); err != nil {
+			glog.Fatalf("failed to remove service: %v", err)
+		}
+		glog.Info("Service removed successfully")
+	},
+}
+
 var serviceStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the cakeagent service",

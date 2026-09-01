@@ -114,6 +114,20 @@ func installService(service svc.Service) (err error) {
 	return
 }
 
+func RemoveService(cfg *types.Config) (err error) {
+	var service svc.Service
+
+	if service, err = getService(cfg); err == nil {
+		if err = service.Uninstall(); err != nil {
+			glog.Errorf("Failed to remove service: %v", err)
+		} else {
+			glog.Info("Service removed successfully")
+		}
+	}
+
+	return
+}
+
 func InstallService(cfg *types.Config) (err error) {
 	var service svc.Service
 
