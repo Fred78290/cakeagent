@@ -699,11 +699,11 @@ func (s *server) Shutdown(ctx context.Context, req *cakeagent.CakeAgent_Empty) (
 				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 					reply.ExitCode = int32(status.ExitStatus())
 				} else {
-					reply.Stderr = []byte(fmt.Sprintf(strErrFailedToGetExitStatus, err))
+					reply.Stderr = fmt.Appendf(nil, strErrFailedToGetExitStatus, err)
 					reply.ExitCode = 1
 				}
 			} else {
-				reply.Stderr = []byte(fmt.Sprintf(strErrFailedToRunCommand, err))
+				reply.Stderr = fmt.Appendf(nil, strErrFailedToRunCommand, err)
 				reply.ExitCode = 1
 			}
 
