@@ -667,6 +667,23 @@ func ParseMountStrings(mountStrings []string, early bool) ([]MountVirtioFSReques
 	return mounts, nil
 }
 
+// isAlpineLinux reports whether the host is running Alpine Linux, which
+// ships busybox's shutdown without support for the "now" argument.
+func isAlpineLinux() bool {
+	b, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return false
+	}
+
+	for _, line := range strings.Split(string(b), "\n") {
+		if id, ok := strings.CutPrefix(line, "ID="); ok {
+			return strings.Trim(id, "\"") == "alpine"
+		}
+	}
+
+	return false
+}
+
 func (s *server) Shutdown(ctx context.Context, req *cakeagent.CakeAgent_Empty) (reply *cakeagent.CakeAgent_RunReply, err error) {
 	home, _ := os.UserHomeDir()
 	reply = &cakeagent.CakeAgent_RunReply{}
@@ -695,8 +712,13 @@ func (s *server) Shutdown(ctx context.Context, req *cakeagent.CakeAgent_Empty) (
 	} else {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
+		var cmd *exec.Cmd
 
-		cmd := exec.Command("shutdown", "now")
+		if isAlpineLinux() {
+			cmd = exec.Command("poweroff")
+		} else {
+			cmd = exec.Command("shutdown", "now")
+		}
 
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
