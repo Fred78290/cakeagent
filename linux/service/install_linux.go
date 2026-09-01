@@ -147,10 +147,14 @@ func InstallService(cfg *types.Config) (err error) {
 				}
 			}
 
-			// Start the service if it's not already running
+			// Start the service if it's not already running. A failure to start here is
+			// not fatal for the install: the service is already registered (rc-update/systemctl
+			// enable succeeded) and will come up on the next real boot even if it can't be
+			// started right now, e.g. when installing inside a chroot or VM image that hasn't
+			// been booted through its init system yet.
 			if status, _ := service.Status(); status != svc.StatusRunning {
-				if err = service.Start(); err != nil {
-					glog.Errorf("Failed to start service: %v", err)
+				if startErr := service.Start(); startErr != nil {
+					glog.Warnf("Service installed but could not be started now: %v", startErr)
 				} else {
 					glog.Infof("Service started successfully")
 				}
