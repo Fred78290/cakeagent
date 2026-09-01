@@ -517,6 +517,7 @@ func init() {
 	serviceInstallCmd.Flags().StringSliceVar(&cfg.Mounts, "mount", cfg.Mounts, "Mount endpoint")
 
 	serviceCmd.AddCommand(serviceInstallCmd)
+	serviceCmd.AddCommand(removeServiceCmd)
 	serviceCmd.AddCommand(serviceStartCmd)
 	serviceCmd.AddCommand(serviceStopCmd)
 
