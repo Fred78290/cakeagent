@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	glog "github.com/sirupsen/logrus"
@@ -127,6 +128,27 @@ func restoreSELinuxContext(path string) {
 	}
 }
 
+// suggestSELinuxTroubleshooting logs the commands an operator can run to inspect and,
+// after review, resolve SELinux AVC denials that prevented the service from starting.
+// This is intentionally advisory only: audit2allow generates a policy that grants
+// whatever was denied, so loading it should always be a reviewed, human decision
+// rather than something the installer does unattended as root.
+func suggestSELinuxTroubleshooting() {
+	if !isSELinuxEnabled() {
+		return
+	}
+
+	execPath, err := os.Executable()
+	if err != nil {
+		execPath = "/usr/local/bin/cakeagent"
+	}
+
+	glog.Warnf("SELinux is enabled and may be denying the service; inspect denials with "+
+		"'ausearch -m avc -c cakeagent', and if they're expected, review and load a policy "+
+		"for them with: ausearch -c 'cakeagent' --raw | audit2allow -M my-cakeagent && "+
+		"semodule -i my-cakeagent.pp && restorecon -v %s", execPath)
+}
+
 func installService(service svc.Service) (err error) {
 	// Uninstall any existing service to ensure a clean installation
 	service.Uninstall()
@@ -194,6 +216,7 @@ func InstallService(cfg *types.Config) (err error) {
 			if status, _ := service.Status(); status != svc.StatusRunning {
 				if startErr := service.Start(); startErr != nil {
 					glog.Warnf("Service installed but could not be started now: %v", startErr)
+					suggestSELinuxTroubleshooting()
 				} else {
 					glog.Infof("Service started successfully")
 				}
