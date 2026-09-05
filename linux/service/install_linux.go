@@ -113,7 +113,8 @@ func restoreSELinuxContext(path string) {
 		return
 	}
 
-	if out, err := exec.Command("semanage", "fcontext", "-a", "-t", "bin_t", path).CombinedOutput(); err != nil {
+	escapedSpec := regexp.QuoteMeta(path) + "$"
+	if out, err := exec.Command("semanage", "fcontext", "-a", "-t", "bin_t", escapedSpec).CombinedOutput(); err != nil {
 		if strings.Contains(string(out), "already defined") {
 			glog.Infof("SELinux fcontext already set for %s", path)
 		} else {
