@@ -235,6 +235,23 @@ This orchestrates Go generation (`proto/linux.sh`) and Swift generation (`proto/
 - [`.github/workflows/release.yaml`](.github/workflows/release.yaml): on push to `master` or a `v*`/`ci-build` tag, builds the Swift agent (universal binary), the Go agent for `linux`/`darwin` × `amd64`/`arm64`, and — for tagged releases — code-signs, notarizes and packages the macOS binary into a `.pkg` via [`.ci/build.sh`](.ci/build.sh) / [`.ci/create-pkg.sh`](.ci/create-pkg.sh).
 - [`.github/workflows/linux.yaml`](.github/workflows/linux.yaml) and [`.cirrus.yml`](.cirrus.yml) provide additional Linux and macOS build coverage.
 
+## Troubleshooting
+
+### SELinux (RHEL/Fedora/CentOS and derivatives)
+
+`cakeagent service install` detects SELinux automatically and labels the installed binary `bin_t` via `semanage fcontext` + `restorecon`, so the service manager is normally allowed to run it. If the service still fails to start on an enforcing host, `install` logs a warning with the commands below — run them yourself rather than scripting them, since `audit2allow` generates a policy that grants *everything* it finds denied and should be reviewed before being loaded:
+
+```bash
+# See what was actually denied
+ausearch -m avc -c cakeagent
+
+# If the denials are expected, generate, review, then load a policy for them
+ausearch -c 'cakeagent' --raw | audit2allow -M my-cakeagent
+cat my-cakeagent.te   # review before loading
+semodule -i my-cakeagent.pp
+restorecon -v /usr/local/bin/cakeagent
+```
+
 ## License
 
 This project is licensed under **GNU AGPL v3**. See [`LICENSE`](LICENSE).
