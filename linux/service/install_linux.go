@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	glog "github.com/sirupsen/logrus"
@@ -94,6 +95,38 @@ func StartService(cfg *types.Config) (err error) {
 	return
 }
 
+// isSELinuxEnabled reports whether SELinux is enabled on the host, regardless of
+// enforcing/permissive mode: selinuxfs exposes an "enforce" file when mounted.
+func isSELinuxEnabled() bool {
+	if _, err := os.Stat("/sys/fs/selinux/enforce"); err == nil {
+		return true
+	}
+	_, err := os.Stat("/selinux/enforce")
+	return err == nil
+}
+
+// restoreSELinuxContext labels path as bin_t so SELinux-enforcing distributions
+// (RHEL/Fedora/CentOS and derivatives) allow the service manager to execute it.
+// A missing semanage/restorecon or a context that is already set is not fatal.
+func restoreSELinuxContext(path string) {
+	if !isSELinuxEnabled() {
+		return
+	}
+
+	escapedSpec := regexp.QuoteMeta(path) + "$"
+	if out, err := exec.Command("semanage", "fcontext", "-a", "-t", "bin_t", escapedSpec).CombinedOutput(); err != nil {
+		if strings.Contains(string(out), "already defined") {
+			glog.Infof("SELinux fcontext already set for %s", path)
+		} else {
+			glog.Warnf("Failed to set SELinux fcontext for %s: %v (%s)", path, err, strings.TrimSpace(string(out)))
+		}
+	}
+
+	if out, err := exec.Command("restorecon", "-v", path).CombinedOutput(); err != nil {
+		glog.Warnf("Failed to restore SELinux context for %s: %v (%s)", path, err, strings.TrimSpace(string(out)))
+	}
+}
+
 func installService(service svc.Service) (err error) {
 	// Uninstall any existing service to ensure a clean installation
 	service.Uninstall()
@@ -109,6 +142,12 @@ func installService(service svc.Service) (err error) {
 		}
 	} else {
 		glog.Info("Service installed successfully")
+	}
+
+	if err == nil {
+		if execPath, pathErr := os.Executable(); pathErr == nil {
+			restoreSELinuxContext(execPath)
+		}
 	}
 
 	return
