@@ -96,10 +96,12 @@ func StartService(cfg *types.Config) (err error) {
 }
 
 // isSELinuxEnabled reports whether SELinux is enabled on the host, regardless of
-// enforcing/permissive mode: selinuxfs is only mounted when the kernel has SELinux
-// support turned on.
+// enforcing/permissive mode: selinuxfs exposes an "enforce" file when mounted.
 func isSELinuxEnabled() bool {
-	_, err := os.Stat("/sys/fs/selinux")
+	if _, err := os.Stat("/sys/fs/selinux/enforce"); err == nil {
+		return true
+	}
+	_, err := os.Stat("/selinux/enforce")
 	return err == nil
 }
 
