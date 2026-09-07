@@ -145,8 +145,8 @@ func suggestSELinuxTroubleshooting() {
 
 	glog.Warnf("SELinux is enabled and may be denying the service; inspect denials with "+
 		"'ausearch -m avc -c cakeagent', and if they're expected, review and load a policy "+
-		"for them with: ausearch -c 'cakeagent' --raw | audit2allow -M my-cakeagent && "+
-		"semodule -i my-cakeagent.pp && restorecon -v %s", execPath)
+		"for them with: ausearch -m avc -c 'cakeagent' --raw | audit2allow -M my-cakeagent && "+
+		"semodule -i my-cakeagent.pp && restorecon -v %q", execPath)
 }
 
 func installService(service svc.Service) (err error) {
