@@ -83,4 +83,4 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/mdlayher/vsock v1.2.1 => github.com/Fred78290/vsock v0.0.1
+replace github.com/mdlayher/vsock v1.3.0 => github.com/Fred78290/vsock v0.0.1
