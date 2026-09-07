@@ -246,7 +246,7 @@ This orchestrates Go generation (`proto/linux.sh`) and Swift generation (`proto/
 ausearch -m avc -c cakeagent
 
 # If the denials are expected, generate, review, then load a policy for them
-ausearch -c 'cakeagent' --raw | audit2allow -M my-cakeagent
+ausearch -m avc -c 'cakeagent' --raw | audit2allow -M my-cakeagent
 cat my-cakeagent.te   # review before loading
 semodule -i my-cakeagent.pp
 restorecon -v /usr/local/bin/cakeagent
