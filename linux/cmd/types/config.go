@@ -26,7 +26,7 @@ type Config struct {
 
 func NewConfig() *Config {
 	return &Config{
-		Address:   "vsock://any:5000",
+		Address:   defaultListenAddress(),
 		LogFormat: "text",
 		LogLevel:  glog.InfoLevel.String(),
 		Timeout:   DefaultMaxRequestTimeout,
