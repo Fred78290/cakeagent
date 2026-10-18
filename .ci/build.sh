@@ -32,6 +32,8 @@ GOARCH=amd64 GOOS=linux go build  -ldflags="${LDFLAGS}" -o ../_artifacts/cakeage
 GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
 GOARCH=arm64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-arm64
 GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
+GOARCH=amd64 GOOS=windows go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-windows-amd64.exe
+GOARCH=arm64 GOOS=windows go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-windows-arm64.exe
 popd
 
 if [ ${VERSION} != "$(git rev-parse --short=8 HEAD)" ]; then

@@ -58,8 +58,10 @@ The `--listen` / `--connect` address is a URL whose scheme selects the transport
 |---|---|---|
 | `vsock` | `vsock://any:5000`, `vsock://host:5000`, `vsock://<cid>:5000` | Default. `any`/`host`/`hypervisor` are well-known context IDs; otherwise a numeric CID |
 | `virtio` | `virtio://<port-name>` | Listens on `/dev/virtio-ports/<port-name>` (virtio-serial), used when vsock isn't available |
-| `tcp` | `tcp://127.0.0.1:5010` | Plain TCP, mainly for local development |
+| `tcp` | `tcp://127.0.0.1:5010` | Plain TCP, mainly for local development (default on Windows builds) |
 | `unix` | `unix:///path/to/agent.sock` | Unix domain socket |
+
+On Windows, only `tcp://` listening is supported by the Go agent build.
 
 Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; omit them (or pass `--insecure` on the Swift client) to run without transport security — intended for local/dev use only.
 
@@ -70,7 +72,7 @@ Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; 
 - [`darwin/Sources/CakeAgentLib`](darwin/Sources/CakeAgentLib) — shared gRPC client library
 - [`darwin/Sources/TestAgent`](darwin/Sources/TestAgent) — `testagent` gRPC test CLI
 - [`darwin/Tests`](darwin/Tests) — Swift unit tests
-- [`linux/main.go`](linux/main.go) — Go CLI and agent server (Linux)
+- [`linux/main.go`](linux/main.go) — Go CLI and agent server (Linux/Windows)
 - [`linux/pkg`](linux/pkg) — server implementation: `cakeagent` gRPC service, `mount`, `tunnel`, `resize`, `serialport`, `event`, `utils`
 - [`linux/service`](linux/service) — OS service installation (systemd/OpenRC on Linux, launchd on Darwin)
 - [`linux/console`](linux/console) — PTY/console handling for `Execute`
@@ -83,7 +85,7 @@ Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; 
 ## Prerequisites
 
 - macOS 13+ for Darwin builds (Swift 5.10+, via Xcode/Swift toolchain)
-- Go 1.26+ for Linux builds (see [`linux/go.mod`](linux/go.mod))
+- Go 1.26+ for Linux and Windows builds (see [`linux/go.mod`](linux/go.mod))
 - `protoc` for gRPC stub regeneration
 
 ## Build
@@ -101,7 +103,7 @@ Generated binaries:
 - `./.build/debug/cakeagent`
 - `./.build/debug/testagent`
 
-### Linux (Go)
+### Linux / Windows (Go)
 
 ```bash
 cd linux
@@ -112,7 +114,7 @@ Generated binary:
 
 - `linux/cakeagent`
 
-The Go module also cross-compiles for `darwin/amd64` and `darwin/arm64` (see [`.ci/build.sh`](.ci/build.sh)), but the code-signed, notarized macOS binary shipped in releases is the Swift build.
+The Go module cross-compiles for `linux/{amd64,arm64}`, `darwin/{amd64,arm64}`, and `windows/{amd64,arm64}` (see [`.ci/build.sh`](.ci/build.sh)), but the code-signed, notarized macOS binary shipped in releases is the Swift build.
 
 ## Quick start
 
@@ -127,7 +129,7 @@ The Go module also cross-compiles for `darwin/amd64` and `darwin/arm64` (see [`.
 
 These scripts expect certificates under `~/.cake/agent/` (`ca.pem`, `server.pem`/`server.key`, `client.pem`/`client.key`) — adjust paths as needed.
 
-## `cakeagent` CLI (Linux / Go)
+## `cakeagent` CLI (Linux / Windows / Go)
 
 ```
 cakeagent
@@ -150,7 +152,7 @@ Global flags: `--log-level` (`panic|debug|info|warning|error|fatal`), `--log-for
 
 | Flag | Default | Description |
 |---|---|---|
-| `--listen` | `vsock://any:5000` | Listen address (see [Transports](#transports--addressing)) |
+| `--listen` | Linux/macOS: `vsock://any:5000`<br>Windows: `tcp://127.0.0.1:5000` | Listen address (see [Transports](#transports--addressing)) |
 | `--ca-cert` | — | CA certificate for mTLS |
 | `--tls-cert` | — | Server TLS certificate |
 | `--tls-key` | — | Server private key |
@@ -165,6 +167,8 @@ cakeagent mount share:/mnt/share
 cakeagent mount data:/data,uid=1000,gid=1000
 cakeagent mount config:/etc/config,ro,early share:/mnt/share,uid=1000
 ```
+
+`mount`/`umount` operations are not supported on Windows builds.
 
 Example:
 
