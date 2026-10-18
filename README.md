@@ -152,7 +152,7 @@ Global flags: `--log-level` (`panic|debug|info|warning|error|fatal`), `--log-for
 
 | Flag | Default | Description |
 |---|---|---|
-| `--listen` | Linux/macOS: `vsock://any:5000`<br>Windows: `tcp://0.0.0.0:5000` | Listen address (see [Transports](#transports--addressing)) |
+| `--listen` | Linux/macOS: `vsock://any:5000`<br>Windows: `tcp://127.0.0.1:5000` | Listen address (see [Transports](#transports--addressing)) |
 | `--ca-cert` | — | CA certificate for mTLS |
 | `--tls-cert` | — | Server TLS certificate |
 | `--tls-key` | — | Server private key |

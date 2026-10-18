@@ -192,7 +192,7 @@ func (s *server) Info(ctx context.Context, req *cakeagent.CakeAgent_Empty) (repl
 		reply.Osname = info.OS.Platform
 		reply.Release = info.OS.Codename
 		reply.Version = info.OS.Version
-		reply.Uptime = uint64(time.Now().Nanosecond() - info.BootTime.Nanosecond())
+		reply.Uptime = uint64(time.Since(info.BootTime).Nanoseconds())
 	}
 
 	if addresses, addrErr := s.IpAddresses(); addrErr != nil {

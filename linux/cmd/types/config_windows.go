@@ -4,5 +4,5 @@
 package types
 
 func defaultListenAddress() string {
-	return "tcp://0.0.0.0:5000"
+	return "tcp://127.0.0.1:5000"
 }
