@@ -42,6 +42,15 @@ var serveCmd = &cobra.Command{
 	Long:  "Start the cakeagent server and listen for incoming connections",
 	Run: func(cmd *cobra.Command, args []string) {
 		setupLogging()
+
+		if handled, err := service.RunAsService(cfg, startServer); handled {
+			if err != nil {
+				glog.Fatalf("service failed: %v", err)
+			}
+
+			return
+		}
+
 		startServer()
 	},
 }

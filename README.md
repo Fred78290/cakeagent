@@ -61,7 +61,9 @@ The `--listen` / `--connect` address is a URL whose scheme selects the transport
 | `tcp` | `tcp://127.0.0.1:5010` | Plain TCP, mainly for local development (default on Windows builds) |
 | `unix` | `unix:///path/to/agent.sock` | Unix domain socket |
 
-On Windows, only `tcp://` listening is supported by the Go agent build.
+On Windows, `tcp://` and `vsock://` listening are supported by the Go agent build (`virtio://` and `unix://` are not). `vsock://` needs the virtio-win `viosock` driver in the guest, whose Winsock provider the agent talks to (the address family is read from the driver, 40 by default), and a vsock device on the VM.
+
+On Windows, `cakeagent service install` registers a service that the Service Control Manager starts as `cakeagent serve …`; `serve` answers the SCM when it is started that way, and runs in front when started from a console.
 
 Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; omit them (or pass `--insecure` on the Swift client) to run without transport security — intended for local/dev use only.
 
@@ -152,7 +154,7 @@ Global flags: `--log-level` (`panic|debug|info|warning|error|fatal`), `--log-for
 
 | Flag | Default | Description |
 |---|---|---|
-| `--listen` | Linux/macOS: `vsock://any:5000`<br>Windows: `tcp://127.0.0.1:5000` | Listen address (see [Transports](#transports--addressing)) |
+| `--listen` | Linux/macOS: `vsock://any:5000`<br>Windows: `tcp://127.0.0.1:5000` (use `vsock://any:5000` to be reachable from the host) | Listen address (see [Transports](#transports--addressing)) |
 | `--ca-cert` | — | CA certificate for mTLS |
 | `--tls-cert` | — | Server TLS certificate |
 | `--tls-key` | — | Server private key |
