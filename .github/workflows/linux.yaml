@@ -44,6 +44,8 @@ jobs:
           GOARCH=arm64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-arm64
           GOARCH=amd64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-amd64
           GOARCH=arm64 GOOS=darwin go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-darwin-arm64
+          GOARCH=amd64 GOOS=windows go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-windows-amd64.exe
+          GOARCH=arm64 GOOS=windows go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-windows-arm64.exe
           popd
     
       - name: "Create linux prerelease"
@@ -54,4 +56,6 @@ jobs:
             ./_artifacts/cakeagent-linux-amd64 \
             ./_artifacts/cakeagent-linux-arm64 \
             ./_artifacts/cakeagent-darwin-amd64 \
-            ./_artifacts/cakeagent-darwin-arm64
+            ./_artifacts/cakeagent-darwin-arm64 \
+            ./_artifacts/cakeagent-windows-amd64.exe \
+            ./_artifacts/cakeagent-windows-arm64.exe
