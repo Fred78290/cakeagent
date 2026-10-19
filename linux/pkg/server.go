@@ -1351,33 +1351,26 @@ func createListener(listen string) (listener net.Listener, err error) {
 				err = fmt.Errorf("failed to listen on virtio: %v", err)
 			}
 		case "vsock":
-			var port int
 			const vsockFailed = "failed to listen on vsock: %v"
+			var cid uint32
+			var port uint32
 
-			if u.Port() == "" {
-				port = 5000
-			} else if port, err = strconv.Atoi(u.Port()); err != nil {
-				err = fmt.Errorf("invalid port: %v", err)
-			} else if hostname == "any" {
-				if listener, err = vsock.Listen(uint32(port), nil); err != nil {
+			if cid, port, err = parseVsockAddress(u); err != nil {
+				err = fmt.Errorf(vsockFailed, err)
+			} else if cid == vsockCIDAny {
+				if listener, err = vsock.Listen(port, nil); err != nil {
 					err = fmt.Errorf(vsockFailed, err)
 				}
-			} else if hostname == "host" {
-				if listener, err = vsock.ListenContextID(vsock.Host, uint32(port), nil); err != nil {
+			} else if cid == vsockCIDHost {
+				if listener, err = vsock.ListenContextID(vsock.Host, port, nil); err != nil {
 					err = fmt.Errorf(vsockFailed, err)
 				}
-			} else if hostname == "hypervisor" {
-				if listener, err = vsock.ListenContextID(vsock.Hypervisor, uint32(port), nil); err != nil {
+			} else if cid == vsockCIDHypervisor {
+				if listener, err = vsock.ListenContextID(vsock.Hypervisor, port, nil); err != nil {
 					err = fmt.Errorf(vsockFailed, err)
 				}
-			} else {
-				var cid int
-
-				if cid, err = strconv.Atoi(hostname); err != nil {
-					err = fmt.Errorf("invalid cid: %v", err)
-				} else if listener, err = vsock.ListenContextID(uint32(cid), uint32(port), nil); err != nil {
-					err = fmt.Errorf(vsockFailed, err)
-				}
+			} else if listener, err = vsock.ListenContextID(cid, port, nil); err != nil {
+				err = fmt.Errorf(vsockFailed, err)
 			}
 		case "tcp":
 			var port int
