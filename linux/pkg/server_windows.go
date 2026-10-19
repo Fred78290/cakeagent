@@ -501,7 +501,19 @@ func createListener(listen string) (listener net.Listener, err error) {
 		}
 
 		return net.Listen("tcp", fmt.Sprintf("%s:%d", hostname, port))
-	case "unix", "virtio", "vsock":
+	case "vsock":
+		cid, port, err := parseVsockAddress(u)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if listener, err = listenVsock(cid, port); err != nil {
+			return nil, fmt.Errorf("failed to listen on vsock: %w", err)
+		}
+
+		return listener, nil
+	case "unix", "virtio":
 		return nil, fmt.Errorf("%s transport is not supported on windows", u.Scheme)
 	default:
 		return nil, fmt.Errorf("unsupported address scheme: %s", u.Scheme)
