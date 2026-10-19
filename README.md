@@ -172,6 +172,8 @@ cakeagent mount config:/etc/config,ro,early share:/mnt/share,uid=1000
 
 `mount`/`umount` operations are not supported on Windows builds.
 
+On Windows, `Execute` (shell and exec) starts PowerShell 7 (`pwsh.exe`) when installed, Windows PowerShell otherwise, and `cmd.exe` as a last resort. With a terminal size the command runs under a pseudo console (ConPTY, Windows 10 1809 or later), so stderr is merged into stdout as on a Unix pty; without one it gets plain pipes.
+
 Example:
 
 ```bash
