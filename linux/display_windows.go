@@ -24,11 +24,15 @@ var displayWatchCmd = &cobra.Command{
 		setupLogging()
 
 		// A process started by the service has no console: log to a file
-		if dir := filepath.Join(os.Getenv("ProgramData"), "caker"); dir != "caker" {
-			if file, err := os.OpenFile(filepath.Join(dir, "display.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
-				defer file.Close()
+		if programData := os.Getenv("ProgramData"); programData != "" {
+			dir := filepath.Join(programData, "caker")
 
-				glog.SetOutput(file)
+			if err := os.MkdirAll(dir, 0o755); err == nil {
+				if file, err := os.OpenFile(filepath.Join(dir, "display.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+					defer file.Close()
+
+					glog.SetOutput(file)
+				}
 			}
 		}
 
