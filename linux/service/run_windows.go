@@ -7,21 +7,28 @@ import (
 	svc "github.com/kardianos/service"
 
 	"github.com/Fred78290/cakeagent/cmd/types"
+	"github.com/Fred78290/cakeagent/pkg/display"
 )
 
 // runner lets the Service Control Manager start and stop the server: Start must return quickly (the SCM gives a
 // service 30 seconds to report it is running), so the blocking server goes on a goroutine.
 type runner struct {
 	start func()
+	stop  chan struct{}
 }
 
 func (r *runner) Start(s svc.Service) error {
 	go r.start()
 
+	// A service can't follow the display itself (it lives in session 0): this keeps a helper running in the user's session
+	go display.Supervise(r.stop)
+
 	return nil
 }
 
 func (r *runner) Stop(s svc.Service) error {
+	close(r.stop)
+
 	return nil
 }
 
@@ -33,7 +40,7 @@ func RunAsService(cfg *types.Config, start func()) (bool, error) {
 		return false, nil
 	}
 
-	s, err := svc.New(&runner{start: start}, &svc.Config{Name: "cakeagent"})
+	s, err := svc.New(&runner{start: start, stop: make(chan struct{})}, &svc.Config{Name: "cakeagent"})
 
 	if err != nil {
 		return true, err
