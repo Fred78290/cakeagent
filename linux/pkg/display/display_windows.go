@@ -11,6 +11,8 @@
 package display
 
 import (
+	"fmt"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -237,24 +239,72 @@ func wantedSize(adapter uint32) (width, height uint32, ok bool) {
 	return uint32(escapeData.x), uint32(escapeData.y), true
 }
 
-// apply changes the display's mode to width x height, unless it already is.
-func apply(name string, width, height uint32) {
-	pname, err := windows.UTF16PtrFromString(name)
+// ChangeDisplaySettingsEx results (DISP_CHANGE_*)
+const (
+	dispChangeSuccessful = 0
+	dispChangeRestart    = 1
+	dispChangeFailed     = -1
+	dispChangeBadMode    = -2
 
-	if err != nil {
-		return
+	// How many one-second tries a size gets before the closest supported one is used instead: the driver learns the
+	// host's size at once but Windows only knows the new mode once it has been told about it, so the first tries may
+	// fail with DISP_CHANGE_BADMODE
+	retriesBeforeFallback = 4
+
+	maxModes = 4096
+)
+
+func changeResultName(r int32) string {
+	switch r {
+	case dispChangeSuccessful:
+		return "ok"
+	case dispChangeRestart:
+		return "restart needed"
+	case dispChangeFailed:
+		return "failed"
+	case dispChangeBadMode:
+		return "bad mode"
+	case -3:
+		return "not updated"
+	case -4:
+		return "bad flags"
+	case -5:
+		return "bad parameter"
+	case -6:
+		return "bad dual view"
 	}
 
+	return "unknown"
+}
+
+// currentMode returns the display's current mode, false when it can't be read.
+func currentMode(pname *uint16) (devMode, bool) {
 	var mode devMode
 
 	mode.size = uint16(unsafe.Sizeof(mode))
 
-	if r, _, _ := procEnumDisplaySettings.Call(uintptr(unsafe.Pointer(pname)), enumCurrentSettings, uintptr(unsafe.Pointer(&mode))); r == 0 {
-		return
+	r, _, _ := procEnumDisplaySettings.Call(uintptr(unsafe.Pointer(pname)), enumCurrentSettings, uintptr(unsafe.Pointer(&mode)))
+
+	return mode, r != 0
+}
+
+// apply changes the display's mode to width x height, unless it already is. done is true when the display now is at
+// that size; result is what ChangeDisplaySettingsEx said (0 when nothing had to change).
+func apply(name string, width, height uint32) (done bool, result int32) {
+	pname, err := windows.UTF16PtrFromString(name)
+
+	if err != nil {
+		return false, dispChangeBadMode
+	}
+
+	mode, ok := currentMode(pname)
+
+	if !ok {
+		return false, dispChangeFailed
 	}
 
 	if mode.pelsWidth == width && mode.pelsHeight == height {
-		return
+		return true, dispChangeSuccessful
 	}
 
 	mode.pelsWidth = width
@@ -263,18 +313,89 @@ func apply(name string, width, height uint32) {
 
 	r, _, _ := procChangeDisplaySettingsEx.Call(uintptr(unsafe.Pointer(pname)), uintptr(unsafe.Pointer(&mode)), 0, 0, 0)
 
-	glog.Infof("display %s: %dx%d, result %d", name, width, height, int32(r))
+	result = int32(r)
+
+	return result == dispChangeSuccessful || result == dispChangeRestart, result
+}
+
+// closestMode returns the largest mode the display supports that fits in width x height (the closest one when none
+// does), false when it lists none.
+func closestMode(name string, width, height uint32) (uint32, uint32, bool) {
+	pname, err := windows.UTF16PtrFromString(name)
+
+	if err != nil {
+		return 0, 0, false
+	}
+
+	current, _ := currentMode(pname)
+
+	var (
+		bestW, bestH uint32
+		found, fits  bool
+		bestScore    uint64
+		listed       []string
+	)
+
+	defer func() {
+		glog.Infof("display %s: current %dx%dx%d, %d modes listed: %s", name, current.pelsWidth, current.pelsHeight, current.bitsPerPel, len(listed), strings.Join(listed, " "))
+	}()
+
+	for i := uintptr(0); i < maxModes; i++ {
+		var mode devMode
+
+		mode.size = uint16(unsafe.Sizeof(mode))
+
+		if r, _, _ := procEnumDisplaySettings.Call(uintptr(unsafe.Pointer(pname)), i, uintptr(unsafe.Pointer(&mode))); r == 0 {
+			break
+		}
+
+		listed = append(listed, fmt.Sprintf("%dx%dx%d", mode.pelsWidth, mode.pelsHeight, mode.bitsPerPel))
+
+		// Keep the colour depth the display runs at
+		if current.bitsPerPel != 0 && mode.bitsPerPel != current.bitsPerPel {
+			continue
+		}
+
+		w, h := mode.pelsWidth, mode.pelsHeight
+
+		if w <= width && h <= height {
+			// Among the modes that fit, the biggest
+			if score := uint64(w) * uint64(h); !fits || score > bestScore {
+				bestW, bestH, bestScore, fits, found = w, h, score, true, true
+			}
+		} else if !fits {
+			// None fits yet: the one that overshoots the least
+			dw, dh := int64(w)-int64(width), int64(h)-int64(height)
+
+			if dw < 0 {
+				dw = -dw
+			}
+
+			if dh < 0 {
+				dh = -dh
+			}
+
+			if score := uint64(dw + dh); !found || score < bestScore {
+				bestW, bestH, bestScore, found = w, h, score, true
+			}
+		}
+	}
+
+	return bestW, bestH, found
 }
 
 // Watch applies the size the host asks for until stop is closed. A change of what the host asks for is applied (and
 // the first value), not whatever differs from the current mode, so a resolution the user picks in Windows' settings
-// isn't undone every second.
+// isn't undone every second. A size Windows refuses is tried again for a few seconds, then the closest supported
+// one is used, so a host window bigger than what the display supports doesn't leave the guest stuck.
 func Watch(stop <-chan struct{}) {
 	var (
 		name    string
 		adapter uint32
-		lastW   uint32
-		lastH   uint32
+		wantW   uint32
+		wantH   uint32
+		pending bool
+		tries   int
 	)
 
 	ticker := time.NewTicker(pollInterval)
@@ -302,10 +423,39 @@ func Watch(stop <-chan struct{}) {
 				// The adapter went away (driver reset): look for it again
 				closeAdapterHandle(adapter)
 				adapter = 0
-			} else if width >= 640 && height >= 480 && (width != lastW || height != lastH) {
-				apply(name, width, height)
+			} else {
+				if width >= 640 && height >= 480 && (width != wantW || height != wantH) {
+					wantW, wantH, pending, tries = width, height, true, 0
+				}
 
-				lastW, lastH = width, height
+				if pending {
+					done, result := apply(name, wantW, wantH)
+
+					if done {
+						if result != dispChangeSuccessful || tries > 0 {
+							glog.Infof("display %s: %dx%d, %s", name, wantW, wantH, changeResultName(result))
+						} else {
+							glog.Infof("display %s: %dx%d", name, wantW, wantH)
+						}
+
+						pending = false
+					} else if tries++; tries > retriesBeforeFallback {
+						glog.Warnf("display %s: %dx%d refused (%s, %d), using the closest supported size", name, wantW, wantH, changeResultName(result), result)
+
+						if w, h, found := closestMode(name, wantW, wantH); found {
+							if done, result = apply(name, w, h); done {
+								glog.Infof("display %s: %dx%d instead of %dx%d", name, w, h, wantW, wantH)
+							} else {
+								glog.Warnf("display %s: %dx%d refused too (%s, %d)", name, w, h, changeResultName(result), result)
+							}
+						} else {
+							glog.Warnf("display %s: no supported mode found", name)
+						}
+
+						// Whatever happened, wait for the host to ask for something else
+						pending = false
+					}
+				}
 			}
 		}
 

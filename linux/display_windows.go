@@ -13,6 +13,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// maxDisplayLogSize is when display.log is rotated (once, at the start of the helper).
+const maxDisplayLogSize = 512 * 1024
+
 // displayWatchCmd is what the service runs in the user's session (see display.Supervise): the display can only be
 // queried and changed from there.
 var displayWatchCmd = &cobra.Command{
@@ -28,7 +31,14 @@ var displayWatchCmd = &cobra.Command{
 			dir := filepath.Join(programData, "caker")
 
 			if err := os.MkdirAll(dir, 0o755); err == nil {
-				if file, err := os.OpenFile(filepath.Join(dir, "display.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+				logPath := filepath.Join(dir, "display.log")
+
+				// Keep the log small: past the limit the previous one is replaced by this one
+				if info, err := os.Stat(logPath); err == nil && info.Size() > maxDisplayLogSize {
+					os.Rename(logPath, logPath+".old")
+				}
+
+				if file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
 					defer file.Close()
 
 					glog.SetOutput(file)
