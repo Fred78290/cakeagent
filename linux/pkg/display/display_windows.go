@@ -17,6 +17,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
 	glog "github.com/sirupsen/logrus"
 )
@@ -384,6 +385,124 @@ func closestMode(name string, width, height uint32) (uint32, uint32, bool) {
 	return bestW, bestH, found
 }
 
+// DISPLAY_DEVICE state flags, DM_POSITION and the CDS_* flags of ChangeDisplaySettingsEx
+const (
+	stateAttachedToDesktop = 0x00000001
+	stateMirroringDriver   = 0x00000008
+
+	dmPosition = 0x00000020
+
+	cdsUpdateRegistry = 0x00000001
+	cdsSetPrimary     = 0x00000010
+	cdsNoReset        = 0x10000000
+
+	// Under SOFTWARE\Caker: a DWORD set to 1 leaves Windows' Basic Display Driver on the desktop next to the GPU
+	keepBasicValue = "KeepBasicDisplay"
+)
+
+func keepBasicDisplay() bool {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Caker`, registry.QUERY_VALUE)
+
+	if err != nil {
+		return false
+	}
+
+	defer key.Close()
+
+	value, _, err := key.GetIntegerValue(keepBasicValue)
+
+	return err == nil && value != 0
+}
+
+// attachedDisplays lists the displays on the desktop: the GPU's one is reported separately, since it is the one that stays
+func attachedDisplays(gpu string) (gpuAttached bool, others []string) {
+	for i := uint32(0); i < 16; i++ {
+		var d displayDevice
+
+		d.cb = uint32(unsafe.Sizeof(d))
+
+		if r, _, _ := procEnumDisplayDevices.Call(0, uintptr(i), uintptr(unsafe.Pointer(&d)), 0); r == 0 {
+			continue
+		}
+
+		if d.stateFlags&stateAttachedToDesktop == 0 || d.stateFlags&stateMirroringDriver != 0 {
+			continue
+		}
+
+		if name := windows.UTF16ToString(d.deviceName[:]); name == gpu {
+			gpuAttached = true
+		} else {
+			others = append(others, name)
+		}
+	}
+
+	return gpuAttached, others
+}
+
+// useOnlyGPU makes the virtio GPU's display the only one on the desktop.
+//
+// The firmware framebuffer the installer relies on to boot Windows is bound to Windows' Basic Display Driver, which
+// stays as a second display next to the virtio GPU. Only the GPU's one is wired to the VM's view, but Windows extends
+// the desktop onto both, so windows and the taskbar can land on the one nobody sees. The Basic Display adapter is not
+// disabled (it is the fallback until the GPU driver loads): it is only taken off the desktop, like "show only on 2" in
+// Windows' display settings. The GPU becomes the primary display first, so nothing is left without one.
+func useOnlyGPU(gpu string) {
+	gpuAttached, others := attachedDisplays(gpu)
+
+	glog.Infof("display: %s on the desktop: %v, other displays on the desktop: %v", gpu, gpuAttached, others)
+
+	if !gpuAttached || len(others) == 0 {
+		return
+	}
+
+	pgpu, err := windows.UTF16PtrFromString(gpu)
+
+	if err != nil {
+		return
+	}
+
+	mode, ok := currentMode(pgpu)
+
+	if !ok {
+		return
+	}
+
+	mode.positionX, mode.positionY = 0, 0
+	mode.fields = dmPosition | dmPelsWidth | dmPelsHeight
+
+	flags := uintptr(cdsSetPrimary | cdsUpdateRegistry | cdsNoReset)
+
+	if r, _, _ := procChangeDisplaySettingsEx.Call(uintptr(unsafe.Pointer(pgpu)), uintptr(unsafe.Pointer(&mode)), 0, flags, 0); int32(r) != dispChangeSuccessful {
+		glog.Warnf("display %s: can't make it the primary display (%s, %d), leaving the other displays", gpu, changeResultName(int32(r)), int32(r))
+
+		return
+	}
+
+	for _, other := range others {
+		pother, err := windows.UTF16PtrFromString(other)
+
+		if err != nil {
+			continue
+		}
+
+		// A display with no size and no position is detached from the desktop
+		detach := devMode{fields: dmPosition | dmPelsWidth | dmPelsHeight}
+
+		detach.size = uint16(unsafe.Sizeof(detach))
+
+		if r, _, _ := procChangeDisplaySettingsEx.Call(uintptr(unsafe.Pointer(pother)), uintptr(unsafe.Pointer(&detach)), 0, uintptr(cdsUpdateRegistry|cdsNoReset), 0); int32(r) != dispChangeSuccessful {
+			glog.Warnf("display %s: can't take it off the desktop (%s, %d)", other, changeResultName(int32(r)), int32(r))
+		} else {
+			glog.Infof("display %s: taken off the desktop, %s is the only display", other, gpu)
+		}
+	}
+
+	// Apply the changes made with CDS_NORESET
+	if r, _, _ := procChangeDisplaySettingsEx.Call(0, 0, 0, 0, 0); int32(r) != dispChangeSuccessful {
+		glog.Warnf("display: applying the display changes failed (%s, %d)", changeResultName(int32(r)), int32(r))
+	}
+}
+
 // Watch applies the size the host asks for until stop is closed. A change of what the host asks for is applied (and
 // the first value), not whatever differs from the current mode, so a resolution the user picks in Windows' settings
 // isn't undone every second. A size Windows refuses is tried again for a few seconds, then the closest supported
@@ -414,6 +533,10 @@ func Watch(stop <-chan struct{}) {
 					name = gpu
 
 					glog.Infof("display: following the host's size on %s", name)
+
+					if !keepBasicDisplay() {
+						useOnlyGPU(name)
+					}
 				}
 			}
 		}
