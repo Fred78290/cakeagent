@@ -401,7 +401,7 @@ const (
 )
 
 func keepBasicDisplay() bool {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Caker`, registry.QUERY_VALUE)
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, settingsKey, registry.QUERY_VALUE)
 
 	if err != nil {
 		return false
