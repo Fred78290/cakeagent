@@ -41,6 +41,8 @@ type Config struct {
 	Binary string
 	// Layout is the XKB layout of the keyboard, which must match the host's (keys are sent by position).
 	Layout string
+	// ProfilePath is where the shell profile snippet is installed. Empty is DefaultProfilePath.
+	ProfilePath string
 }
 
 // WithDefaults fills the empty fields.
@@ -55,6 +57,10 @@ func (c Config) WithDefaults() Config {
 
 	if c.Binary == "" {
 		c.Binary = DefaultBinary
+	}
+
+	if c.ProfilePath == "" {
+		c.ProfilePath = DefaultProfilePath
 	}
 
 	return c
