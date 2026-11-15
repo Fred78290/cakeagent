@@ -183,6 +183,8 @@ func startServer() {
 	}
 
 	if err == nil {
+		startSeamless()
+
 		_, err = pkg.StartServer(cfg)
 	}
 
