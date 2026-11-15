@@ -342,7 +342,9 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 	go logLines("caker-seamlessd", stdout)
 	go logLines("caker-seamlessd", stderr)
 
-	go exportActivationEnv(ctx, cfg, a, runtimeDir)
+	actCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go exportActivationEnv(actCtx, cfg, a, runtimeDir)
 
 	return cmd.Wait()
 }
