@@ -42,7 +42,7 @@ func testConfig(t *testing.T, script string) (Config, string) {
 
 	t.Cleanup(func() { ensureRuntimeDir = previous })
 
-	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111}, out
+	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111, ProfilePath: filepath.Join(dir, "profile.sh")}, out
 }
 
 func waitFor(t *testing.T, what string, timeout time.Duration, condition func() bool) {

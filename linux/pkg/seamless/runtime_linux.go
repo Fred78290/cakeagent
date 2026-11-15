@@ -437,6 +437,11 @@ func Run(ctx context.Context, cfg Config) error {
 	cfg = cfg.WithDefaults()
 	backoff := time.Second
 
+	// A command typed in a guest shell reaches the compositor too, not only what "launch" starts.
+	if _, err := InstallSessionProfile(cfg); err != nil {
+		glog.Warnf("seamless: shell profile not installed: %v", err)
+	}
+
 	for ctx.Err() == nil {
 		a, err := LookupAccount(cfg.User)
 
