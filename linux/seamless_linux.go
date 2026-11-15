@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/Fred78290/cakeagent/pkg/seamless"
 	glog "github.com/sirupsen/logrus"
@@ -27,18 +28,50 @@ func seamlessConfig() seamless.Config {
 }
 
 // startSeamless runs the compositor next to the agent when the service was installed with --seamless.
+//
+// Catching SIGINT/SIGTERM here turns off Go's default (the process dies), and nothing else in the agent handles
+// them: without the forwarding below "systemctl stop cakeagent" waited for systemd's SIGKILL. So once the
+// compositor has been stopped the signal is delivered again with its default action.
 func startSeamless() {
 	if !cfg.Seamless {
 		return
 	}
 
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
 	go func() {
-		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
+		defer close(done)
 
 		if err := seamless.Run(ctx, seamlessConfig()); err != nil {
 			glog.Errorf("seamless: %v", err)
 		}
+	}()
+
+	go func() {
+		received := <-signals
+
+		cancel()
+
+		// The compositor gets SIGTERM and a few seconds to leave, Run returns once it has.
+		select {
+		case <-done:
+		case <-time.After(8 * time.Second):
+		}
+
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+
+		if sig, ok := received.(syscall.Signal); ok {
+			_ = syscall.Kill(syscall.Getpid(), sig)
+		}
+
+		// The signal ends the process by its default action; this is only for it not arriving in time (and a
+		// clean exit status, so that systemd does not mark the unit failed on a stop).
+		time.Sleep(2 * time.Second)
+		os.Exit(0)
 	}()
 }
 
