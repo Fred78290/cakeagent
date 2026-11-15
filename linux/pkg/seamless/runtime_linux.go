@@ -185,7 +185,7 @@ func AppEnv(cfg Config, a Account, runtimeDir string) []string {
 
 	// Applications started outside a login session find no bus address and would try to launch their own with X11
 	// (Firefox's portal and accessibility lookups, GTK settings): point them at the user's bus.
-	if bus := filepath.Join(runtimeDir, "bus"); fileExists(bus) {
+	if bus := filepath.Join(runtimeDirCandidates(a)[0], "bus"); fileExists(bus) {
 		env = append(env, "DBUS_SESSION_BUS_ADDRESS=unix:path="+bus)
 	}
 
