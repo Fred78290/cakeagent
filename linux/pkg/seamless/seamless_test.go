@@ -332,7 +332,7 @@ func TestInstallFallsBackToTheEnvironmentOverride(t *testing.T) {
 func TestConfigDefaults(t *testing.T) {
 	c := Config{}.WithDefaults()
 
-	if c.Port != 5100 || c.SocketName != "caker-seamless" || c.Binary != DefaultBinary || c.Connect() != "vsock:5100" {
+	if c.Port != 5100 || c.SocketName != "wayland-1" || c.Binary != DefaultBinary || c.Connect() != "vsock:5100" {
 		t.Fatalf("unexpected %+v", c)
 	}
 

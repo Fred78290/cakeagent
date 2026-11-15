@@ -19,8 +19,10 @@ import "fmt"
 const (
 	// DefaultVsockPort is where the host listens (SeamlessProtocol.defaultVsockPort in Caker).
 	DefaultVsockPort = 5100
-	// DefaultSocketName is the Wayland socket the compositor creates in the user's runtime directory.
-	DefaultSocketName = "caker-seamless"
+	// DefaultSocketName is the Wayland socket the compositor creates in the user's runtime directory. It has the
+	// standard wayland-N form on purpose: snap's AppArmor profile only lets confined applications (Firefox on
+	// Ubuntu) open sockets named like that. 0 is a desktop session's, so a guest that has one is left alone.
+	DefaultSocketName = "wayland-1"
 	// DefaultBinary is where Install puts the compositor.
 	DefaultBinary = "/usr/libexec/caker/caker-seamlessd"
 	// BinaryName is the compositor's file name, in assets/<arch>/ and on PATH.
