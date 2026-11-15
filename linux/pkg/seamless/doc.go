@@ -19,8 +19,10 @@ import "fmt"
 const (
 	// DefaultVsockPort is where the host listens (SeamlessProtocol.defaultVsockPort in Caker).
 	DefaultVsockPort = 5100
-	// DefaultSocketName is the Wayland socket the compositor creates in the user's runtime directory.
-	DefaultSocketName = "caker-seamless"
+	// DefaultSocketName is the Wayland socket the compositor creates in the user's runtime directory. It has the
+	// standard wayland-N form on purpose: snap's AppArmor profile only lets confined applications (Firefox on
+	// Ubuntu) open sockets named like that. wayland-0 is typically reserved for a desktop session, so a guest that already has one is left alone.
+	DefaultSocketName = "wayland-1"
 	// DefaultBinary is where Install puts the compositor.
 	DefaultBinary = "/usr/libexec/caker/caker-seamlessd"
 	// BinaryName is the compositor's file name, in assets/<arch>/ and on PATH.
@@ -39,6 +41,8 @@ type Config struct {
 	Binary string
 	// Layout is the XKB layout of the keyboard, which must match the host's (keys are sent by position).
 	Layout string
+	// ProfilePath is where the shell profile snippet is installed. Empty is DefaultProfilePath.
+	ProfilePath string
 }
 
 // WithDefaults fills the empty fields.
@@ -53,6 +57,10 @@ func (c Config) WithDefaults() Config {
 
 	if c.Binary == "" {
 		c.Binary = DefaultBinary
+	}
+
+	if c.ProfilePath == "" {
+		c.ProfilePath = DefaultProfilePath
 	}
 
 	return c

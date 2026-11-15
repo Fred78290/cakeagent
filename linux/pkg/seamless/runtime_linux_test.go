@@ -42,7 +42,7 @@ func testConfig(t *testing.T, script string) (Config, string) {
 
 	t.Cleanup(func() { ensureRuntimeDir = previous })
 
-	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111}, out
+	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111, ProfilePath: filepath.Join(dir, "profile.sh")}, out
 }
 
 func waitFor(t *testing.T, what string, timeout time.Duration, condition func() bool) {
@@ -89,7 +89,7 @@ func TestRunStartsTheCompositorWithItsArgumentsAndRestartsIt(t *testing.T) {
 	data, _ := os.ReadFile(out)
 	line := strings.SplitN(string(data), "\n", 2)[0]
 
-	for _, want := range []string{"--connect vsock:5111", "--socket caker-seamless", "layout=fr", "renderer=pixman"} {
+	for _, want := range []string{"--connect vsock:5111", "--socket wayland-1", "layout=fr", "renderer=pixman"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("%q is missing from %q", want, line)
 		}
@@ -146,7 +146,7 @@ func TestLaunchGivesTheApplicationTheCompositorEnvironment(t *testing.T) {
 
 	data, _ := os.ReadFile(out)
 
-	for _, want := range []string{"WAYLAND_DISPLAY=caker-seamless", "XDG_RUNTIME_DIR=", "GDK_BACKEND=wayland", "QT_QPA_PLATFORM=wayland", "MOZ_ENABLE_WAYLAND=1"} {
+	for _, want := range []string{"WAYLAND_DISPLAY=wayland-1", "XDG_RUNTIME_DIR=", "GDK_BACKEND=wayland", "QT_QPA_PLATFORM=wayland", "MOZ_ENABLE_WAYLAND=1"} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("%q is missing from the environment", want)
 		}
@@ -167,6 +167,9 @@ func TestLaunchDesktopIsUnknownWhenTheApplicationDoesNotExist(t *testing.T) {
 
 func TestStatusWithoutACompositor(t *testing.T) {
 	cfg, _ := testConfig(t, "")
+
+	// Not the default name: the machine running the tests may have a real compositor on it.
+	cfg.SocketName = "caker-seamless-test-nothing-here"
 
 	if st := CurrentStatus(cfg); st.Running || !st.Installed {
 		t.Fatalf("unexpected %+v", st)
@@ -242,5 +245,34 @@ func TestXKBConfigRootOnlyServesGuestsWithoutXKBData(t *testing.T) {
 
 	if got := xkbConfigRoot(binary); got != "" {
 		t.Fatalf("the guest's own data comes first: %q", got)
+	}
+}
+
+func TestActivationCommands(t *testing.T) {
+	vars := activationVars(Config{})
+
+	if len(vars) == 0 || vars[0] != "WAYLAND_DISPLAY=wayland-1" {
+		t.Fatalf("activation vars should start with the default display, got %v", vars)
+	}
+
+	cmds := activationCommands(vars)
+
+	if len(cmds) != 2 {
+		t.Fatalf("expected a primary command and a fallback, got %v", cmds)
+	}
+
+	if cmds[0][0] != "dbus-update-activation-environment" || cmds[0][1] != "--systemd" || cmds[0][2] != vars[0] {
+		t.Fatalf("primary command should pass NAME=VALUE pairs to dbus-update-activation-environment --systemd: %v", cmds[0])
+	}
+
+	// systemctl import-environment takes names only: the values come from its environment.
+	if cmds[1][0] != "systemctl" || cmds[1][3] != "WAYLAND_DISPLAY" {
+		t.Fatalf("fallback should import names through systemctl --user: %v", cmds[1])
+	}
+
+	for _, a := range cmds[1][3:] {
+		if strings.Contains(a, "=") {
+			t.Fatalf("import-environment must not get values on its command line: %q", a)
+		}
 	}
 }

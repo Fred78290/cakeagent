@@ -181,7 +181,15 @@ func baseEnv(a Account, runtimeDir string) []string {
 func AppEnv(cfg Config, a Account, runtimeDir string) []string {
 	cfg = cfg.WithDefaults()
 
-	return append(baseEnv(a, runtimeDir),
+	env := baseEnv(a, runtimeDir)
+
+	// Applications started outside a login session find no bus address and would try to launch their own with X11
+	// (Firefox's portal and accessibility lookups, GTK settings): point them at the user's bus.
+	if bus := filepath.Join(runtimeDirCandidates(a)[0], "bus"); fileExists(bus) {
+		env = append(env, "DBUS_SESSION_BUS_ADDRESS=unix:path="+bus)
+	}
+
+	return append(env,
 		"WAYLAND_DISPLAY="+cfg.SocketName,
 		"XDG_SESSION_TYPE=wayland",
 		"GDK_BACKEND=wayland",
@@ -334,7 +342,95 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 	go logLines("caker-seamlessd", stdout)
 	go logLines("caker-seamlessd", stderr)
 
+	actCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go exportActivationEnv(actCtx, cfg, a, runtimeDir)
+
 	return cmd.Wait()
+}
+
+// activationVars is what a service that D-Bus or systemd starts on the user's behalf (gnome-terminal-server, the
+// portals, Nautilus' and Files' services...) needs to reach the compositor. An application started by "launch" gets it
+// from its own environment, but those services are children of the user's systemd and D-Bus, which have none.
+func activationVars(cfg Config) []string {
+	cfg = cfg.WithDefaults()
+
+	return []string{
+		"WAYLAND_DISPLAY=" + cfg.SocketName,
+		"XDG_SESSION_TYPE=wayland",
+		"GDK_BACKEND=wayland",
+		"QT_QPA_PLATFORM=wayland",
+		"SDL_VIDEODRIVER=wayland",
+		"MOZ_ENABLE_WAYLAND=1",
+		"ELECTRON_OZONE_PLATFORM_HINT=wayland",
+	}
+}
+
+// activationCommands returns the commands that put vars into the user's D-Bus activation environment and systemd user
+// manager, the first one that works is enough: dbus-update-activation-environment --systemd does both, the second
+// is the systemd half alone.
+func activationCommands(vars []string) [][]string {
+	names := make([]string, 0, len(vars))
+
+	for _, kv := range vars {
+		if name, _, ok := strings.Cut(kv, "="); ok {
+			names = append(names, name)
+		}
+	}
+
+	return [][]string{
+		append([]string{"dbus-update-activation-environment", "--systemd"}, vars...),
+		append([]string{"systemctl", "--user", "import-environment"}, names...),
+	}
+}
+
+// exportActivationEnv publishes the compositor's address to the user's session bus and systemd, so that services
+// started by activation open their windows on it. The user manager can start after the agent (the account is lingering
+// at boot), hence the retries.
+func exportActivationEnv(ctx context.Context, cfg Config, a Account, runtimeDir string) {
+	cfg = cfg.WithDefaults()
+
+	vars := activationVars(cfg)
+	bus := filepath.Join(runtimeDir, "bus")
+	socket := filepath.Join(runtimeDir, cfg.SocketName)
+
+	for attempt := 0; attempt < 30 && ctx.Err() == nil; attempt++ {
+		// The services only matter once the compositor listens and the user's bus exists.
+		if _, err := os.Stat(socket); err == nil {
+			if _, err = os.Stat(bus); err == nil && runActivationCommands(ctx, a, runtimeDir, bus, vars) {
+				glog.Infof("seamless: Wayland display exported to %s's session services", a.Name)
+				return
+			}
+		}
+
+		sleep(ctx, 2*time.Second)
+	}
+
+	if ctx.Err() == nil {
+		glog.Warnf("seamless: could not export the Wayland display to %s's session services, applications that D-Bus starts (gnome-terminal, Files...) won't find the compositor", a.Name)
+	}
+}
+
+func runActivationCommands(ctx context.Context, a Account, runtimeDir, bus string, vars []string) bool {
+	for _, args := range activationCommands(vars) {
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+
+		cmd.Env = append(baseEnv(a, runtimeDir), "DBUS_SESSION_BUS_ADDRESS=unix:path="+bus)
+
+		// systemctl --user import-environment reads the values from its own environment.
+		cmd.Env = append(cmd.Env, vars...)
+		cmd.Dir = "/"
+		cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential(a), Setpgid: true}
+
+		if out, err := cmd.CombinedOutput(); err != nil {
+			glog.Debugf("seamless: %s: %v: %s", args[0], err, strings.TrimSpace(string(out)))
+			continue
+		}
+
+		return true
+	}
+
+	return false
 }
 
 // Run keeps the compositor running for the guest's user until ctx is cancelled: it waits for the user to exist,
@@ -342,6 +438,11 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 func Run(ctx context.Context, cfg Config) error {
 	cfg = cfg.WithDefaults()
 	backoff := time.Second
+
+	// A command typed in a guest shell reaches the compositor too, not only what "launch" starts.
+	if _, err := InstallSessionProfile(cfg); err != nil {
+		glog.Warnf("seamless: shell profile not installed: %v", err)
+	}
 
 	for ctx.Err() == nil {
 		a, err := LookupAccount(cfg.User)
@@ -538,4 +639,10 @@ func Env(cfg Config) ([]string, error) {
 	}
 
 	return out, nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+
+	return err == nil
 }

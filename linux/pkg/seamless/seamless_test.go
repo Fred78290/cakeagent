@@ -332,7 +332,7 @@ func TestInstallFallsBackToTheEnvironmentOverride(t *testing.T) {
 func TestConfigDefaults(t *testing.T) {
 	c := Config{}.WithDefaults()
 
-	if c.Port != 5100 || c.SocketName != "caker-seamless" || c.Binary != DefaultBinary || c.Connect() != "vsock:5100" {
+	if c.Port != 5100 || c.SocketName != "wayland-1" || c.Binary != DefaultBinary || c.Connect() != "vsock:5100" {
 		t.Fatalf("unexpected %+v", c)
 	}
 
@@ -442,5 +442,46 @@ func hasXKBDataForTest(dir string) bool {
 func TestXKBDirIsBesideTheBinary(t *testing.T) {
 	if got := XKBDir("/usr/libexec/caker/caker-seamlessd"); got != "/usr/libexec/caker/xkb" {
 		t.Fatalf("XKBDir: %s", got)
+	}
+}
+
+func TestSessionProfileIsConditionalAndQuotesTheSocketName(t *testing.T) {
+	p := SessionProfile(Config{})
+
+	for _, want := range []string{
+		`[ -z "${WAYLAND_DISPLAY:-}" ]`,
+		`[ -S "$_caker_rt/"'wayland-1' ]`,
+		"export WAYLAND_DISPLAY='wayland-1'",
+		`GDK_BACKEND="wayland,x11"`,
+		`QT_QPA_PLATFORM="wayland;xcb"`,
+		"DBUS_SESSION_BUS_ADDRESS",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("%q is missing from the profile:\n%s", want, p)
+		}
+	}
+
+	odd := SessionProfile(Config{SocketName: "a'b; rm -rf /"})
+
+	if !strings.Contains(odd, `'a'\''b; rm -rf /'`) {
+		t.Errorf("the socket name was not quoted as one word:\n%s", odd)
+	}
+}
+
+func TestInstallSessionProfileWritesOnceAndAsReadable(t *testing.T) {
+	cfg := Config{ProfilePath: filepath.Join(t.TempDir(), "profile.d", "caker-seamless.sh")}
+
+	changed, err := InstallSessionProfile(cfg)
+
+	if err != nil || !changed {
+		t.Fatalf("first install: changed=%v err=%v", changed, err)
+	}
+
+	if changed, err = InstallSessionProfile(cfg); err != nil || changed {
+		t.Fatalf("second install should be a no-op: changed=%v err=%v", changed, err)
+	}
+
+	if info, err := os.Stat(cfg.ProfilePath); err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("profile mode: %v %v", info, err)
 	}
 }
