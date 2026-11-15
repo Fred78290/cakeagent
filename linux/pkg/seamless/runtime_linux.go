@@ -36,10 +36,39 @@ func LookupAccount(name string) (Account, error) {
 // ensureRuntimeDir is RuntimeDir, replaceable by tests.
 var ensureRuntimeDir = RuntimeDir
 
+// runtimeDirCandidates lists where the compositor's socket may be: the logind directory first, then our own.
+func runtimeDirCandidates(a Account) []string {
+	return []string{fmt.Sprintf("/run/user/%d", a.UID), filepath.Join("/run/caker-seamless", strconv.Itoa(int(a.UID)))}
+}
+
+// liveRuntimeDir returns the directory holding the socket of a running compositor, if any. The directory RuntimeDir
+// would pick can change while the compositor runs (/run/user/<uid> appears when the user logs in), so what
+// applications are given must follow the compositor, not the choice RuntimeDir makes now.
+func liveRuntimeDir(cfg Config, a Account) (string, bool) {
+	for _, dir := range runtimeDirCandidates(a) {
+		if conn, err := net.DialTimeout("unix", filepath.Join(dir, cfg.SocketName), time.Second); err == nil {
+			conn.Close()
+
+			return dir, true
+		}
+	}
+
+	return "", false
+}
+
+// appRuntimeDir is the runtime directory applications must use: the running compositor's, else RuntimeDir's.
+func appRuntimeDir(cfg Config, a Account) (string, error) {
+	if dir, ok := liveRuntimeDir(cfg, a); ok {
+		return dir, nil
+	}
+
+	return ensureRuntimeDir(a)
+}
+
 // RuntimeDir returns the account's XDG runtime directory, creating it when nobody is logged in: /run/user/<uid> if
 // logind can provide it (it also holds the user's D-Bus and audio sockets), else a private directory of ours.
 func RuntimeDir(a Account) (string, error) {
-	dir := fmt.Sprintf("/run/user/%d", a.UID)
+	dir := runtimeDirCandidates(a)[0]
 
 	if info, err := os.Stat(dir); err == nil && info.IsDir() {
 		return dir, nil
@@ -60,9 +89,31 @@ func RuntimeDir(a Account) (string, error) {
 		}
 	}
 
-	dir = filepath.Join("/run/caker-seamless", strconv.Itoa(int(a.UID)))
+	dir = runtimeDirCandidates(a)[1]
 
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	// The parent is created apart from the user's directory: MkdirAll would give it 0700 too, and, owned by root, it
+	// could not be traversed once the compositor drops privileges.
+	parent := filepath.Dir(dir)
+
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", err
+	}
+
+	// Only repair the parent when it cannot be traversed: an unprivileged caller may not chmod a parent owned by root,
+	// and has no need to when it is already usable.
+	info, err := os.Stat(parent)
+
+	if err != nil {
+		return "", err
+	}
+
+	if info.Mode().Perm()&0o001 == 0 {
+		if err := os.Chmod(parent, 0o755); err != nil {
+			return "", err
+		}
+	}
+
+	if err := os.Mkdir(dir, 0o700); err != nil && !os.IsExist(err) {
 		return "", err
 	}
 
@@ -142,12 +193,54 @@ func AppEnv(cfg Config, a Account, runtimeDir string) []string {
 	)
 }
 
-// logLines forwards a process' output, line by line, to the agent's log.
-func logLines(prefix string, r io.Reader) {
-	scanner := bufio.NewScanner(r)
+// maxLogLine bounds the part of a line that is logged; the rest of a longer line is discarded.
+const maxLogLine = 64 * 1024
 
-	for scanner.Scan() {
-		glog.Infof("%s: %s", prefix, scanner.Text())
+// logLines forwards a process' output, line by line, to the agent's log. It always keeps draining the pipe, so the
+// process never blocks on a full pipe: a line longer than maxLogLine is truncated, not fatal, and a read error is
+// reported, then whatever remains is discarded.
+func logLines(prefix string, r io.Reader) {
+	reader := bufio.NewReaderSize(r, maxLogLine)
+
+	var line []byte
+
+	truncated := false
+
+	for {
+		chunk, isPrefix, err := reader.ReadLine()
+
+		if len(line) < maxLogLine {
+			line = append(line, chunk[:min(len(chunk), maxLogLine-len(line))]...)
+		}
+
+		if isPrefix {
+			truncated = truncated || len(line) >= maxLogLine
+		}
+
+		if err == nil && isPrefix {
+			continue
+		}
+
+		if len(line) > 0 || err == nil {
+			if truncated {
+				glog.Infof("%s: %s [line truncated]", prefix, line)
+			} else {
+				glog.Infof("%s: %s", prefix, line)
+			}
+		}
+
+		line, truncated = line[:0], false
+
+		if err != nil {
+			if err != io.EOF {
+				glog.Warnf("%s: reading output: %v", prefix, err)
+
+				// Keep the pipe drained even after an error.
+				_, _ = io.Copy(io.Discard, r)
+			}
+
+			return
+		}
 	}
 }
 
@@ -161,6 +254,45 @@ func sleep(ctx context.Context, d time.Duration) {
 	}
 }
 
+// systemXKBDirs are where a guest's xkb-data / xkeyboard-config package puts the XKB data, in the order libxkbcommon
+// (the compositor's, 1.11 and later) tries them without XKB_CONFIG_ROOT: the versioned root, then the legacy one, which
+// it only falls back to when the versioned directory does not exist; replaceable by tests.
+var systemXKBDirs = []string{"/usr/share/xkeyboard-config-2", "/usr/share/X11/xkb"}
+
+// hasXKBData tells whether dir holds the XKB data a keymap is compiled from.
+func hasXKBData(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, "rules", "evdev"))
+
+	return err == nil && info.Mode().IsRegular()
+}
+
+// systemXKBServes tells whether the compositor, left to its defaults, finds XKB data in the guest: only the first
+// existing directory of systemXKBDirs is its root, so data in a later one is ignored while an earlier one exists.
+func systemXKBServes() bool {
+	for _, dir := range systemXKBDirs {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return hasXKBData(dir)
+		}
+	}
+
+	return false
+}
+
+// xkbConfigRoot returns the XKB data directory the compositor must be told about (XKB_CONFIG_ROOT), or "" to leave
+// the guest's own data in charge: the guest's data comes first, so its layouts and customisations keep applying; the
+// copy installed beside the compositor only serves guests where the compositor would find none.
+func xkbConfigRoot(binary string) string {
+	if systemXKBServes() {
+		return ""
+	}
+
+	if dir := XKBDir(binary); hasXKBData(dir) {
+		return dir
+	}
+
+	return ""
+}
+
 // runOnce starts the compositor and waits for it to exit.
 func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) error {
 	args := []string{"--connect", cfg.Connect(), "--socket", cfg.SocketName}
@@ -170,6 +302,10 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 
 	if cfg.Layout != "" {
 		cmd.Env = append(cmd.Env, "XKB_DEFAULT_LAYOUT="+cfg.Layout)
+	}
+
+	if root := xkbConfigRoot(cfg.Binary); root != "" {
+		cmd.Env = append(cmd.Env, "XKB_CONFIG_ROOT="+root)
 	}
 
 	cmd.Dir = "/"
@@ -216,7 +352,8 @@ func Run(ctx context.Context, cfg Config) error {
 			continue
 		}
 
-		if _, err = os.Stat(cfg.Binary); err != nil {
+		// An agent updated in place finds the binary of the previous one: its XKB data is still to come, or its copy was interrupted.
+		if _, err = os.Stat(cfg.Binary); err != nil || (embeddedXKB() != nil && !XKBInstalled(cfg.Binary)) {
 			if _, _, err = Install(cfg.Binary); err != nil {
 				glog.Errorf("seamless: %v", err)
 				sleep(ctx, 30*time.Second)
@@ -268,7 +405,7 @@ func Launch(cfg Config, command []string) (int, error) {
 		return 0, err
 	}
 
-	runtimeDir, err := ensureRuntimeDir(a)
+	runtimeDir, err := appRuntimeDir(cfg, a)
 
 	if err != nil {
 		return 0, err
@@ -320,8 +457,14 @@ func LaunchDesktop(cfg Config, id string) (int, error) {
 		return 0, fmt.Errorf("application %q not found", id)
 	}
 
-	// The Exec line has quoting rules of its own: let the shell apply them.
-	return Launch(cfg, []string{"/bin/sh", "-c", "exec " + app.Exec})
+	// The Exec line has quoting rules of its own: decode them, no shell must interpret the line.
+	command, err := SplitExec(app.Exec)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return Launch(cfg, command)
 }
 
 // Status describes what is installed and running.
@@ -351,7 +494,7 @@ func CurrentStatus(cfg Config) Status {
 
 	st.User = a.Name
 
-	for _, dir := range []string{fmt.Sprintf("/run/user/%d", a.UID), filepath.Join("/run/caker-seamless", strconv.Itoa(int(a.UID)))} {
+	for _, dir := range runtimeDirCandidates(a) {
 		path := filepath.Join(dir, cfg.SocketName)
 
 		if conn, err := net.DialTimeout("unix", path, time.Second); err == nil {
@@ -380,7 +523,7 @@ func Env(cfg Config) ([]string, error) {
 		return nil, err
 	}
 
-	runtimeDir, err := ensureRuntimeDir(a)
+	runtimeDir, err := appRuntimeDir(cfg, a)
 
 	if err != nil {
 		return nil, err

@@ -3,7 +3,8 @@
 // caker-seamlessd (Tools/SeamlessCompositor in the caker repository) is a headless Wayland compositor that streams
 // every window to the macOS host over vsock. This package makes the agent the thing that ships and supervises it:
 //
-//   - Install puts the compositor binary (embedded in the agent at build time, see assets/) at a fixed path.
+//   - Install puts the compositor binary (embedded in the agent at build time, see assets/) at a fixed path, with
+//     the XKB data it needs beside it for guests that have none.
 //   - Run starts it as the guest's login user, restarts it when it dies, and stops it with the agent.
 //   - Launch starts a program (or a .desktop entry) as that user, with the environment its toolkit needs to find
 //     the compositor.

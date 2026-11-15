@@ -59,6 +59,10 @@ func getService(cfg *types.Config) (svc.Service, error) {
 		if cfg.SeamlessLayout != "" {
 			args = append(args, fmt.Sprintf("--seamless-layout=%s", cfg.SeamlessLayout))
 		}
+
+		if cfg.SeamlessBinary != "" {
+			args = append(args, fmt.Sprintf("--seamless-binary=%s", cfg.SeamlessBinary))
+		}
 	}
 
 	args = append(args, "$EXTRA_FLAGS")

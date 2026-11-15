@@ -69,6 +69,11 @@ func PickAccount(accounts []Account, name string) (Account, error) {
 	if name != "" {
 		for _, a := range accounts {
 			if a.Name == name {
+				// Skip root account check for now. because cakeagent shell run as root might be needed in some cases.
+				//if a.UID == 0 {
+				//	return Account{}, fmt.Errorf("user %q has uid 0, refusing to use a root account", name)
+				//}
+
 				return a, nil
 			}
 		}

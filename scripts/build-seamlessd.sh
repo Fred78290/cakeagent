@@ -44,6 +44,9 @@ fetch "https://gitlab.freedesktop.org/wlroots/wlroots/-/releases/$WLROOTS_VERSIO
 	meson install -C build
 )
 
+# wlroots (and later the compositor) find the libdrm built above, and wlroots itself, through pkg-config.
+export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
+
 (
 	cd "$WORK" && tar xzf wlroots.tar.gz && cd "wlroots-$WLROOTS_VERSION"
 	meson setup build --prefix="$PREFIX" --buildtype=release -Ddefault_library=static \
@@ -51,8 +54,6 @@ fetch "https://gitlab.freedesktop.org/wlroots/wlroots/-/releases/$WLROOTS_VERSIO
 		-Dcolor-management=disabled -Dlibliftoff=disabled -Dexamples=false
 	meson install -C build
 )
-
-export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 
 cp -R "$SRC" "$WORK/compositor"
 make -C "$WORK/compositor" STATIC=1

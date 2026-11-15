@@ -16,13 +16,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var seamlessBinary string
-
 func seamlessConfig() seamless.Config {
 	return seamless.Config{
 		User:       cfg.SeamlessUser,
 		Port:       cfg.SeamlessPort,
-		Binary:     seamlessBinary,
+		Binary:     cfg.SeamlessBinary,
 		Layout:     cfg.SeamlessLayout,
 		SocketName: "",
 	}
@@ -60,7 +58,7 @@ var seamlessInstallCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		setupLogging()
 
-		source, changed, err := seamless.Install(seamlessBinary)
+		source, changed, err := seamless.Install(cfg.SeamlessBinary)
 
 		if err != nil {
 			glog.Fatalf("%v", err)
@@ -75,8 +73,8 @@ var seamlessInstallCmd = &cobra.Command{
 }
 
 func binaryPath() string {
-	if seamlessBinary != "" {
-		return seamlessBinary
+	if cfg.SeamlessBinary != "" {
+		return cfg.SeamlessBinary
 	}
 
 	return seamless.DefaultBinary
@@ -192,7 +190,7 @@ func init() {
 		c.PersistentFlags().StringVar(&cfg.SeamlessUser, "seamless-user", cfg.SeamlessUser, "User the windows and applications belong to (default: the first regular user)")
 		c.PersistentFlags().IntVar(&cfg.SeamlessPort, "seamless-port", cfg.SeamlessPort, "Host vsock port of the seamless windows channel (default 5100)")
 		c.PersistentFlags().StringVar(&cfg.SeamlessLayout, "seamless-layout", cfg.SeamlessLayout, "XKB keyboard layout, must match the host's")
-		c.PersistentFlags().StringVar(&seamlessBinary, "seamless-binary", seamlessBinary, "Compositor path (default "+seamless.DefaultBinary+")")
+		c.PersistentFlags().StringVar(&cfg.SeamlessBinary, "seamless-binary", cfg.SeamlessBinary, "Compositor path (default "+seamless.DefaultBinary+")")
 	}
 
 	seamlessLaunchCmd.Flags().StringVar(&seamlessLaunchDesktop, "desktop", "", "Launch the application with this desktop file ID")

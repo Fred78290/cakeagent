@@ -3,6 +3,7 @@
 package seamless
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/user"
@@ -169,5 +170,77 @@ func TestStatusWithoutACompositor(t *testing.T) {
 
 	if st := CurrentStatus(cfg); st.Running || !st.Installed {
 		t.Fatalf("unexpected %+v", st)
+	}
+}
+
+func TestLogLinesDrainsOversizedLines(t *testing.T) {
+	input := "short\n" + strings.Repeat("x", 3*maxLogLine) + "\nlast\n"
+	reader := bytes.NewReader([]byte(input))
+
+	logLines("test", reader)
+
+	if reader.Len() != 0 {
+		t.Fatalf("%d bytes were left unread", reader.Len())
+	}
+}
+
+func TestXKBConfigRootOnlyServesGuestsWithoutXKBData(t *testing.T) {
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "libexec", BinaryName)
+	bundled := XKBDir(binary)
+	system := filepath.Join(dir, "system")
+
+	fill := func(root string) {
+		t.Helper()
+
+		if err := os.MkdirAll(filepath.Join(root, "rules"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.WriteFile(filepath.Join(root, "rules", "evdev"), []byte("rules"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	legacy := filepath.Join(dir, "legacy")
+
+	previous := systemXKBDirs
+	systemXKBDirs = []string{system, legacy}
+
+	t.Cleanup(func() { systemXKBDirs = previous })
+
+	if got := xkbConfigRoot(binary); got != "" {
+		t.Fatalf("nothing bundled, nothing in the guest: %q", got)
+	}
+
+	fill(bundled)
+
+	if got := xkbConfigRoot(binary); got != bundled {
+		t.Fatalf("a guest without XKB data must get the bundled one: %q", got)
+	}
+
+	// The versioned root exists but holds no data: the compositor does not fall back to the legacy one.
+	if err := os.MkdirAll(system, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	fill(legacy)
+
+	if got := xkbConfigRoot(binary); got != bundled {
+		t.Fatalf("data in a directory the compositor does not search must not hide the bundled one: %q", got)
+	}
+
+	if err := os.RemoveAll(system); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := xkbConfigRoot(binary); got != "" {
+		t.Fatalf("the legacy root serves when the versioned one does not exist: %q", got)
+	}
+
+	fill(system)
+
+	if got := xkbConfigRoot(binary); got != "" {
+		t.Fatalf("the guest's own data comes first: %q", got)
 	}
 }

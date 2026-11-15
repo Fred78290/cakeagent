@@ -28,6 +28,7 @@ type Config struct {
 	SeamlessUser   string
 	SeamlessPort   int
 	SeamlessLayout string
+	SeamlessBinary string
 }
 
 func NewConfig() *Config {

@@ -55,7 +55,8 @@ Defined in [`proto/agent.proto`](proto/agent.proto):
 The agent ships and runs `caker-seamlessd`, a headless Wayland compositor that streams every window of the guest to
 the macOS host over vsock (Caker shows each one as a native window). The compositor is a static binary embedded in
 the Linux agent (built by `scripts/build-seamlessd.sh`, see `.github/workflows/seamlessd.yaml`), so the guest needs
-nothing but the agent and the XKB data files (`xkb-data` on Debian/Ubuntu, `xkeyboard-config` on Fedora/Alpine).
+nothing but the agent: the XKB data the compositor builds its keymap from is embedded too and installed beside it
+(`/usr/libexec/caker/xkb`), used only when the guest has no `xkb-data` / `xkeyboard-config` of its own.
 
 ```sh
 # run the compositor next to the agent, as the guest's first regular user (or --seamless-user)

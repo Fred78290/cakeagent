@@ -2,7 +2,9 @@ package seamless
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -85,29 +87,147 @@ func ParseDesktopEntry(id string, r io.Reader) *App {
 		return nil
 	}
 
-	app.Exec = StripFieldCodes(app.Exec)
+	// The string-value escapes are undone first, the Exec quoting rules (applied by SplitExec) come second.
+	app.Exec = StripFieldCodes(UnescapeString(app.Exec))
 
 	return app
 }
 
-// StripFieldCodes removes the %f/%U style placeholders of an Exec line, we launch without arguments.
-func StripFieldCodes(exec string) string {
+// UnescapeString undoes the escape sequences of a Desktop Entry string value: \s (space), \n, \t, \r and \\.
+// Any other backslash sequence is kept untouched. This is applied before the Exec quoting rules, so a quote written
+// as \\" in the file reaches SplitExec as \" (an escaped quote) and a literal backslash in a quoted argument
+// takes the four backslashes the specification asks for.
+func UnescapeString(value string) string {
+	if !strings.Contains(value, `\`) {
+		return value
+	}
+
 	var out strings.Builder
 
-	for i := 0; i < len(exec); i++ {
-		if exec[i] != '%' || i+1 >= len(exec) {
-			out.WriteByte(exec[i])
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+
+		if c != '\\' || i+1 >= len(value) {
+			out.WriteByte(c)
+			continue
+		}
+
+		switch value[i+1] {
+		case 's':
+			out.WriteByte(' ')
+		case 'n':
+			out.WriteByte('\n')
+		case 't':
+			out.WriteByte('\t')
+		case 'r':
+			out.WriteByte('\r')
+		case '\\':
+			out.WriteByte('\\')
+		default:
+			out.WriteByte(c)
 			continue
 		}
 
 		i++
+	}
 
-		if exec[i] == '%' {
-			out.WriteByte('%')
+	return out.String()
+}
+
+// StripFieldCodes removes the %f/%U style placeholders of an Exec line, we launch without arguments.
+// Whitespace outside double quotes is collapsed to single spaces, whitespace inside quoted arguments
+// (including quoted executable paths) is preserved as is.
+func StripFieldCodes(exec string) string {
+	var out strings.Builder
+
+	inQuote := false
+	pendingSpace := false
+
+	write := func(c byte) {
+		if pendingSpace {
+			out.WriteByte(' ')
+			pendingSpace = false
+		}
+
+		out.WriteByte(c)
+	}
+
+	for i := 0; i < len(exec); i++ {
+		c := exec[i]
+
+		switch {
+		case c == '%' && i+1 < len(exec):
+			i++
+
+			if exec[i] == '%' {
+				write('%')
+			}
+		case c == '\\' && i+1 < len(exec):
+			write(c)
+			i++
+			write(exec[i])
+		case c == '"':
+			inQuote = !inQuote
+			write(c)
+		case !inQuote && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'):
+			pendingSpace = out.Len() > 0
+		default:
+			write(c)
 		}
 	}
 
-	return strings.Join(strings.Fields(out.String()), " ")
+	return out.String()
+}
+
+// SplitExec decodes an Exec line into an argument vector following the Desktop Entry specification: arguments are
+// separated by whitespace, a double-quoted argument may contain whitespace, and inside quotes a backslash escapes
+// the next character (\" \` \$ \\), so an escaped dollar sign stays a literal one. No shell is involved: nothing
+// is expanded. An unterminated quote is an error.
+func SplitExec(exec string) ([]string, error) {
+	var (
+		args    []string
+		current strings.Builder
+	)
+
+	inQuote, started := false, false
+
+	flush := func() {
+		if started {
+			args = append(args, current.String())
+			current.Reset()
+
+			started = false
+		}
+	}
+
+	for i := 0; i < len(exec); i++ {
+		c := exec[i]
+
+		switch {
+		case c == '\\' && i+1 < len(exec):
+			i++
+			current.WriteByte(exec[i])
+
+			started = true
+		case c == '"':
+			inQuote = !inQuote
+			started = true
+		case !inQuote && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'):
+			flush()
+		default:
+			current.WriteByte(c)
+
+			started = true
+		}
+	}
+
+	if inQuote {
+		return nil, fmt.Errorf("unterminated quote in Exec line %q", exec)
+	}
+
+	flush()
+
+	return args, nil
 }
 
 // ApplicationDirs are the directories .desktop files are looked up in, for a user's home.
@@ -121,7 +241,11 @@ func ApplicationDirs(home string) []string {
 	var dirs []string
 
 	if home != "" {
-		dirs = append(dirs, filepath.Join(home, ".local/share/applications"))
+		dirs = append(dirs,
+			filepath.Join(home, ".local/share/applications"),
+			// Per-user Flatpak installs export their desktop files here.
+			filepath.Join(home, ".local/share/flatpak/exports/share/applications"),
+		)
 	}
 
 	for _, d := range strings.Split(dataDirs, ":") {
@@ -139,36 +263,58 @@ func ListApps(dirs []string) []App {
 	var apps []App
 
 	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-
-		if err != nil {
-			continue
+		// WalkDir does not follow a symlinked root (it would see a single non-directory entry), resolve it first.
+		// IDs are computed against the resolved root, the one actually traversed.
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			dir = resolved
 		}
 
-		for _, entry := range entries {
-			name := entry.Name()
+		// Desktop files may live in subdirectories, "vendor/editor.desktop" has the ID "vendor-editor.desktop".
+		_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				// Skip unreadable directories, keep going with the others.
+				if entry != nil && entry.IsDir() {
+					return filepath.SkipDir
+				}
 
-			if entry.IsDir() || !strings.HasSuffix(name, ".desktop") || seen[name] {
-				continue
+				return nil
 			}
 
-			file, err := os.Open(filepath.Join(dir, name))
+			if entry.IsDir() || !strings.HasSuffix(path, ".desktop") {
+				return nil
+			}
+
+			rel, err := filepath.Rel(dir, path)
 
 			if err != nil {
-				continue
+				return nil
 			}
 
-			app := ParseDesktopEntry(name, file)
+			id := strings.ReplaceAll(rel, string(filepath.Separator), "-")
+
+			if seen[id] {
+				return nil
+			}
+
+			file, err := os.Open(path)
+
+			if err != nil {
+				return nil
+			}
+
+			app := ParseDesktopEntry(id, file)
 
 			file.Close()
 
 			// An ID that is hidden in a higher priority directory stays hidden.
-			seen[name] = true
+			seen[id] = true
 
 			if app != nil {
 				apps = append(apps, *app)
 			}
-		}
+
+			return nil
+		})
 	}
 
 	sort.Slice(apps, func(i, j int) bool { return strings.ToLower(apps[i].Name) < strings.ToLower(apps[j].Name) })

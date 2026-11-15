@@ -1,7 +1,8 @@
 name: Build seamless windows compositor
 
 # Builds the static caker-seamlessd (Tools/SeamlessCompositor of the caker repository) for each Linux architecture.
-# The agent embeds it (linux/pkg/seamless/assets/<arch>/caker-seamlessd), so a guest needs nothing but the agent.
+# The agent embeds it with the XKB data it compiles its keymap from (linux/pkg/seamless/assets/<arch>/caker-seamlessd
+# and xkb/), so a guest needs nothing but the agent.
 
 on:
   workflow_call:
@@ -47,10 +48,11 @@ jobs:
             --output type=local,dest=out .
           file out/caker-seamlessd
           ls -l out/caker-seamlessd
+          test -s out/xkb/rules/evdev
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: seamlessd-${{ matrix.arch }}
-          path: out/caker-seamlessd
+          path: out
           if-no-files-found: error
