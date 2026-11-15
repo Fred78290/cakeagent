@@ -10,13 +10,13 @@ on:
       caker_ref:
         description: Ref of Fred78290/caker providing the compositor source
         type: string
-        default: main
+        default: feature/seamless-windows
   workflow_dispatch:
     inputs:
       caker_ref:
         description: Ref of Fred78290/caker providing the compositor source
         type: string
-        default: main
+        default: feature/seamless-windows
 
 jobs:
   build:
