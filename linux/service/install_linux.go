@@ -45,6 +45,26 @@ func getService(cfg *types.Config) (svc.Service, error) {
 		args = append(args, fmt.Sprintf("--tls-key=%s", cfg.TlsKey))
 	}
 
+	if cfg.Seamless {
+		args = append(args, "--seamless")
+
+		if cfg.SeamlessUser != "" {
+			args = append(args, fmt.Sprintf("--seamless-user=%s", cfg.SeamlessUser))
+		}
+
+		if cfg.SeamlessPort != 0 {
+			args = append(args, fmt.Sprintf("--seamless-port=%d", cfg.SeamlessPort))
+		}
+
+		if cfg.SeamlessLayout != "" {
+			args = append(args, fmt.Sprintf("--seamless-layout=%s", cfg.SeamlessLayout))
+		}
+
+		if cfg.SeamlessBinary != "" {
+			args = append(args, fmt.Sprintf("--seamless-binary=%s", cfg.SeamlessBinary))
+		}
+	}
+
 	args = append(args, "$EXTRA_FLAGS")
 
 	svcConfig := &svc.Config{

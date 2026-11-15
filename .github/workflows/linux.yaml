@@ -19,7 +19,11 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  seamlessd:
+    uses: ./.github/workflows/seamlessd.yaml
+
   build:
+    needs: seamlessd
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -32,6 +36,18 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: 1.26
+
+      - name: Download the seamless windows compositor
+        uses: actions/download-artifact@v4
+        with:
+          name: seamlessd-amd64
+          path: linux/pkg/seamless/assets/amd64
+
+      - name: Download the seamless windows compositor (arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: seamlessd-arm64
+          path: linux/pkg/seamless/assets/arm64
 
       - name: Build Go binary
         run: |

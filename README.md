@@ -50,6 +50,32 @@ Defined in [`proto/agent.proto`](proto/agent.proto):
 | `Tunnel` | bidi-streaming | Bidirectional TCP/UDP tunnel between host and guest network |
 | `Events` | server-streaming | Stream of tunnel port-forward add/remove events |
 
+## Seamless windows (Linux guests)
+
+The agent ships and runs `caker-seamlessd`, a headless Wayland compositor that streams every window of the guest to
+the macOS host over vsock (Caker shows each one as a native window). The compositor is a static binary embedded in
+the Linux agent (built by `scripts/build-seamlessd.sh`, see `.github/workflows/seamlessd.yaml`), so the guest needs
+nothing but the agent: the XKB data the compositor builds its keymap from is embedded too and installed beside it
+(`/usr/libexec/caker/xkb`), used only when the guest has no `xkb-data` / `xkeyboard-config` of its own.
+
+```sh
+# run the compositor next to the agent, as the guest's first regular user (or --seamless-user)
+cakeagent service install --seamless --seamless-layout=fr ...
+
+cakeagent seamless install                      # write the embedded compositor to /usr/libexec/caker/
+cakeagent seamless run                          # foreground supervisor: starts it as the user, restarts it
+cakeagent seamless status [--json]              # installed? running? exit status 1 when it is not
+cakeagent seamless apps [--json]                # .desktop applications of the guest
+cakeagent seamless launch --desktop org.gnome.gedit
+cakeagent seamless launch -- foot               # any program, as the user, with WAYLAND_DISPLAY & co.
+cakeagent seamless env                          # the environment applications need
+```
+
+The agent runs as root but the compositor and the applications run as the user (Wayland clients, D-Bus and audio
+live in the user's runtime directory; `loginctl enable-linger` makes `/run/user/<uid>` exist without a login).
+`--seamless-layout` must match the host's keyboard layout: keys travel by position. A development build without the
+embedded compositor installs the one named by `$CAKER_SEAMLESSD`, or found on `PATH`.
+
 ## Transports & addressing
 
 The `--listen` / `--connect` address is a URL whose scheme selects the transport:

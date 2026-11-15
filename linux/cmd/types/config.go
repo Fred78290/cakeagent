@@ -22,6 +22,13 @@ type Config struct {
 	LogLevel  string
 	Timeout   time.Duration
 	TickEvent time.Duration
+
+	// Seamless windows (Linux guests): run the compositor next to the agent.
+	Seamless       bool
+	SeamlessUser   string
+	SeamlessPort   int
+	SeamlessLayout string
+	SeamlessBinary string
 }
 
 func NewConfig() *Config {
