@@ -58,10 +58,8 @@ type server struct {
 	cakeagent.UnimplementedCakeAgentServiceServer
 	agent guestagent.Agent
 
-	// Seamless windows: an interactive shell belongs to this user (empty: the first regular user) instead of the
-	// agent's, so the applications it starts can use the compositor.
-	seamless     bool
-	seamlessUser string
+	// Seamless windows are on: the runtime directory of a user the agent runs a process for follows the compositor.
+	seamless bool
 }
 
 type pipe struct {
@@ -1019,9 +1017,12 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 		}
 
-		var identity *shellIdentity
+		var identity *userIdentity
+		var user string
 
-		if command.GetShell() {
+		if request := command.GetShell(); request != nil {
+			user = request.GetUser()
+
 			shell := "bash"
 
 			if shell, err = exec.LookPath(shell); err != nil {
@@ -1029,11 +1030,15 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 				err = nil
 			}
 			cmd = exec.CommandContext(ctx, shell, "-i", "-l")
-			identity = s.seamlessShellIdentity()
 		} else if exc := command.GetCommand(); exc != nil {
+			user = exc.GetUser()
 			cmd = exec.CommandContext(ctx, exc.GetCommand(), exc.GetArgs()...)
 		} else {
 			err = fmt.Errorf("wrong protocol")
+		}
+
+		if err == nil {
+			identity, err = s.identityFor(user)
 		}
 
 		if err == nil {
@@ -1101,7 +1106,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 				glog.Errorf("Failed to start command: %v", err)
 			}
 
-			if command.GetShell() {
+			if command.GetShell() != nil {
 				message = cakeagent.CakeAgent_ExecuteResponse{
 					Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 						Stderr: []byte("\r"),
@@ -1452,9 +1457,8 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 			glog.Infof("Starting gRPC server on %s", cfg.Address)
 
 			cakeagent.RegisterCakeAgentServiceServer(grpcServer, &server{
-				agent:        agent,
-				seamless:     cfg.Seamless,
-				seamlessUser: cfg.SeamlessUser,
+				agent:    agent,
+				seamless: cfg.Seamless,
 			})
 
 			var ctx context.Context

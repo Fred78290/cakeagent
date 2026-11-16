@@ -64,7 +64,7 @@ func shellCommand(tty bool) (string, []string) {
 }
 
 func resolveCommand(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteCommand, tty bool) (string, []string, error) {
-	if command.GetShell() {
+	if command.GetShell() != nil {
 		path, args := shellCommand(tty)
 
 		return path, args, nil
@@ -533,7 +533,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 		sess.Close()
 	}
 
-	if command.GetShell() && tty {
+	if command.GetShell() != nil && tty {
 		send(&cakeagent.CakeAgent_ExecuteResponse{
 			Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 				Stderr: []byte("\r"),
