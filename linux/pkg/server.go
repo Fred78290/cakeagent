@@ -57,6 +57,9 @@ const (
 type server struct {
 	cakeagent.UnimplementedCakeAgentServiceServer
 	agent guestagent.Agent
+
+	// Seamless windows are on: the runtime directory of a user the agent runs a process for follows the compositor.
+	seamless bool
 }
 
 type pipe struct {
@@ -1014,7 +1017,12 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 		}
 
-		if command.GetShell() {
+		var identity *userIdentity
+		var user string
+
+		if request := command.GetShell(); request != nil {
+			user = request.GetUser()
+
 			shell := "bash"
 
 			if shell, err = exec.LookPath(shell); err != nil {
@@ -1023,9 +1031,14 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 			cmd = exec.CommandContext(ctx, shell, "-i", "-l")
 		} else if exc := command.GetCommand(); exc != nil {
+			user = exc.GetUser()
 			cmd = exec.CommandContext(ctx, exc.GetCommand(), exc.GetArgs()...)
 		} else {
 			err = fmt.Errorf("wrong protocol")
+		}
+
+		if err == nil {
+			identity, err = s.identityFor(user)
 		}
 
 		if err == nil {
@@ -1035,13 +1048,35 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			cmd.Stdout = tty.StdoutWriter()
 			cmd.Stderr = tty.StderrWriter()
 			cmd.Env = os.Environ()
-			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 			cmd.Dir = home
 			cmd.SysProcAttr = &syscall.SysProcAttr{
 				Setsid:  isTTY,
 				Setctty: isTTY,
 				//Noctty:  !isTTY,
 			}
+
+			if identity != nil {
+				cmd.Env = identity.env
+				cmd.Dir = identity.home
+				cmd.SysProcAttr.Credential = identity.credential
+
+				if isTTY {
+					// The terminal was opened by the agent (root): hand it to the user it now serves.
+					const maxInt32 = uint32(1<<31 - 1)
+
+					if strconv.IntSize == 32 {
+						if identity.credential.Uid > maxInt32 || identity.credential.Gid > maxInt32 {
+							glog.Warningf("Skipping PTY ownership change for oversized uid/gid values: uid=%d gid=%d", identity.credential.Uid, identity.credential.Gid)
+						} else if err := tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid)); err != nil {
+							glog.Warningf("Failed to change PTY ownership to uid=%d gid=%d: %v", identity.credential.Uid, identity.credential.Gid, err)
+						}
+					} else if err := tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid)); err != nil {
+						glog.Warningf("Failed to change PTY ownership to uid=%d gid=%d: %v", identity.credential.Uid, identity.credential.Gid, err)
+					}
+				}
+			}
+
+			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
 			defer cleanup()
 
@@ -1081,7 +1116,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 				glog.Errorf("Failed to start command: %v", err)
 			}
 
-			if command.GetShell() {
+			if command.GetShell() != nil {
 				message = cakeagent.CakeAgent_ExecuteResponse{
 					Response: &cakeagent.CakeAgent_ExecuteResponse_Stderr{
 						Stderr: []byte("\r"),
@@ -1432,7 +1467,8 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 			glog.Infof("Starting gRPC server on %s", cfg.Address)
 
 			cakeagent.RegisterCakeAgentServiceServer(grpcServer, &server{
-				agent: agent,
+				agent:    agent,
+				seamless: cfg.Seamless,
 			})
 
 			var ctx context.Context

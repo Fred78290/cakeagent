@@ -195,11 +195,15 @@ message CakeAgent {
 			message Command {
 				string command = 1;
 				repeated string args = 2;
+				string user = 3;
 			}
 			
+			message Shell {
+				string user = 1;
+			}
 			oneof execute {
 				Command command = 1;
-				bool shell = 2;
+				Shell shell = 2;
 			}
 		}
 		

@@ -659,10 +659,10 @@ public struct Cakeagent_CakeAgent: Sendable {
         set {execute = .command(newValue)}
       }
 
-      public var shell: Bool {
+      public var shell: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell {
         get {
           if case .shell(let v)? = execute {return v}
-          return false
+          return Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell()
         }
         set {execute = .shell(newValue)}
       }
@@ -671,7 +671,7 @@ public struct Cakeagent_CakeAgent: Sendable {
 
       public enum OneOf_Execute: Equatable, Sendable {
         case command(Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command)
-        case shell(Bool)
+        case shell(Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell)
 
       }
 
@@ -683,6 +683,20 @@ public struct Cakeagent_CakeAgent: Sendable {
         public var command: String = String()
 
         public var args: [String] = []
+
+        public var user: String = String()
+
+        public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+        public init() {}
+      }
+
+      public struct Shell: Sendable {
+        // SwiftProtobuf.Message conformance is added in an extension below. See the
+        // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+        // methods supported on all messages.
+
+        public var user: String = String()
 
         public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2136,10 +2150,15 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand: SwiftProtobuf.Messa
         }
       }()
       case 2: try {
-        var v: Bool?
-        try decoder.decodeSingularBoolField(value: &v)
+        var v: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell?
+        var hadOneofValue = false
+        if let current = self.execute {
+          hadOneofValue = true
+          if case .shell(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
         if let v = v {
-          if self.execute != nil {try decoder.handleConflictingOneOf()}
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.execute = .shell(v)
         }
       }()
@@ -2160,7 +2179,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand: SwiftProtobuf.Messa
     }()
     case .shell?: try {
       guard case .shell(let v)? = self.execute else { preconditionFailure() }
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     }()
     case nil: break
     }
@@ -2176,7 +2195,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand: SwiftProtobuf.Messa
 
 extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.protoMessageName + ".Command"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}args\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}command\0\u{1}args\0\u{1}user\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2186,6 +2205,7 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command: SwiftProtob
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.command) }()
       case 2: try { try decoder.decodeRepeatedStringField(value: &self.args) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.user) }()
       default: break
       }
     }
@@ -2198,12 +2218,46 @@ extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command: SwiftProtob
     if !self.args.isEmpty {
       try visitor.visitRepeatedStringField(value: self.args, fieldNumber: 2)
     }
+    if !self.user.isEmpty {
+      try visitor.visitSingularStringField(value: self.user, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command, rhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Command) -> Bool {
     if lhs.command != rhs.command {return false}
     if lhs.args != rhs.args {return false}
+    if lhs.user != rhs.user {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.protoMessageName + ".Shell"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}user\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.user) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.user.isEmpty {
+      try visitor.visitSingularStringField(value: self.user, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell, rhs: Cakeagent_CakeAgent.ExecuteRequest.ExecuteCommand.Shell) -> Bool {
+    if lhs.user != rhs.user {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

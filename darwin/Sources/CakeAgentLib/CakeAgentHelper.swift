@@ -36,12 +36,13 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	public func sendCommand(command: String, arguments: [String]) -> EventLoopFuture<Void> {
+	public func sendCommand(command: String, arguments: [String], user: String? = nil) -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.with {
 				$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.Command.with {
 					$0.command = command
 					$0.args = arguments
+					$0.user = user ?? ""
 				}
 			}
 		}
@@ -50,10 +51,12 @@ extension CakeAgentExecuteStream {
 	}
 
 	@discardableResult
-	public func sendShell() -> EventLoopFuture<Void> {
+	public func sendShell(user: String? = nil) -> EventLoopFuture<Void> {
 		let message = CakeAgent.ExecuteRequest.with {
 			$0.command = CakeAgent.ExecuteRequest.ExecuteCommand.with {
-				$0.shell = true
+				$0.shell = CakeAgent.ExecuteRequest.ExecuteCommand.Shell.with {
+					$0.user = user ?? ""
+				}
 			}
 		}
 
@@ -631,8 +634,8 @@ final class CakeChannelStreamer: @unchecked Sendable {
 	var term: termios? = nil
 
 	enum ExecuteCommand: Equatable, Sendable {
-		case execute(String, [String])
-		case shell(Bool = true)
+		case execute(String, [String], String? = nil)
+		case shell(String? = nil)
 	}
 
 	init(on: EventLoop, inputHandle: FileHandle, outputHandle: FileHandle, errorHandle: FileHandle) {
@@ -804,10 +807,10 @@ final class CakeChannelStreamer: @unchecked Sendable {
 				}
 			}
 
-			if case let .execute(cmd, arguments) = command {
-				stream.sendCommand(command: cmd, arguments: arguments)
-			} else if case .shell = command {
-				stream.sendShell()
+			if case let .execute(cmd, arguments, user) = command {
+				stream.sendCommand(command: cmd, arguments: arguments, user: user)
+			} else if case let .shell(user) = command {
+				stream.sendShell(user: user)
 			}
 
 			do {
@@ -1060,20 +1063,26 @@ public struct CakeAgentHelper: Sendable {
 		}
 	}
 	
+	/// Runs a command in the guest. `user` is the guest account it runs as (Linux agents only, which must run as root
+	/// for it): nil keeps the agent's own.
 	public func exec(command: String,
 					 arguments: [String],
+					 user: String? = nil,
 					 inputHandle: FileHandle = FileHandle.standardInput,
 					 outputHandle: FileHandle = FileHandle.standardOutput,
 					 errorHandle: FileHandle = FileHandle.standardError,
 					 callOptions: CallOptions? = nil) async throws -> Int32 {
-		return try await self.exec(command: .execute(command, arguments), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
+		return try await self.exec(command: .execute(command, arguments, user), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
 	}
 	
-	public func shell(inputHandle: FileHandle = FileHandle.standardInput,
+	/// Opens an interactive shell in the guest, as `user` (Linux agents only, which must run as root for it) or the
+	/// agent's own user when nil.
+	public func shell(user: String? = nil,
+					  inputHandle: FileHandle = FileHandle.standardInput,
 					  outputHandle: FileHandle = FileHandle.standardOutput,
 					  errorHandle: FileHandle = FileHandle.standardError,
 					  callOptions: CallOptions? = nil) async throws -> Int32 {
-		return try await self.exec(command: .shell(), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
+		return try await self.exec(command: .shell(user), inputHandle: inputHandle, outputHandle: outputHandle, errorHandle: errorHandle, callOptions: callOptions)
 	}
 	
 	public func mount(request: CakeAgent.MountRequest, callOptions: CallOptions? = nil) throws -> CakeAgent.MountReply {
