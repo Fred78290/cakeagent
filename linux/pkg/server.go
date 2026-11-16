@@ -57,6 +57,11 @@ const (
 type server struct {
 	cakeagent.UnimplementedCakeAgentServiceServer
 	agent guestagent.Agent
+
+	// Seamless windows: an interactive shell belongs to this user (empty: the first regular user) instead of the
+	// agent's, so the applications it starts can use the compositor.
+	seamless     bool
+	seamlessUser string
 }
 
 type pipe struct {
@@ -1014,6 +1019,8 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 		}
 
+		var identity *shellIdentity
+
 		if command.GetShell() {
 			shell := "bash"
 
@@ -1022,6 +1029,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 				err = nil
 			}
 			cmd = exec.CommandContext(ctx, shell, "-i", "-l")
+			identity = s.seamlessShellIdentity()
 		} else if exc := command.GetCommand(); exc != nil {
 			cmd = exec.CommandContext(ctx, exc.GetCommand(), exc.GetArgs()...)
 		} else {
@@ -1035,13 +1043,25 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			cmd.Stdout = tty.StdoutWriter()
 			cmd.Stderr = tty.StderrWriter()
 			cmd.Env = os.Environ()
-			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 			cmd.Dir = home
 			cmd.SysProcAttr = &syscall.SysProcAttr{
 				Setsid:  isTTY,
 				Setctty: isTTY,
 				//Noctty:  !isTTY,
 			}
+
+			if identity != nil {
+				cmd.Env = identity.env
+				cmd.Dir = identity.home
+				cmd.SysProcAttr.Credential = identity.credential
+
+				if isTTY {
+					// The terminal was opened by the agent (root): hand it to the user it now serves.
+					_ = tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid))
+				}
+			}
+
+			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
 			defer cleanup()
 
@@ -1432,7 +1452,9 @@ func StartServer(cfg *types.Config) (grpcServer *grpc.Server, err error) {
 			glog.Infof("Starting gRPC server on %s", cfg.Address)
 
 			cakeagent.RegisterCakeAgentServiceServer(grpcServer, &server{
-				agent: agent,
+				agent:        agent,
+				seamless:     cfg.Seamless,
+				seamlessUser: cfg.SeamlessUser,
 			})
 
 			var ctx context.Context
