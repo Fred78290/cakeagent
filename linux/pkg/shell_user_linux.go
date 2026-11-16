@@ -69,12 +69,22 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 
 	runtimeDir := fmt.Sprintf("/run/user/%d", uid)
 
-	// With seamless windows the compositor's socket may be in its own directory when logind has none: follow it.
+	var display []string
+
+	// With seamless windows the compositor's socket may be in its own directory when logind has none, and a
+	// command (unlike a login shell, whose profile does it) needs the display variables: follow the running
+	// compositor.
 	if s.seamless {
-		if env, err := seamless.Env(seamless.Config{User: name}); err == nil {
-			for _, kv := range env {
-				if dir, ok := strings.CutPrefix(kv, "XDG_RUNTIME_DIR="); ok {
-					runtimeDir = dir
+		cfg := seamless.Config{User: name}
+
+		if seamless.CurrentStatus(cfg).Running {
+			if env, err := seamless.Env(cfg); err == nil {
+				display = env
+
+				for _, kv := range env {
+					if dir, ok := strings.CutPrefix(kv, "XDG_RUNTIME_DIR="); ok {
+						runtimeDir = dir
+					}
 				}
 			}
 		}
@@ -105,6 +115,7 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 	}
 
 	env = append(env, "HOME="+account.HomeDir, "USER="+account.Username, "LOGNAME="+account.Username, "SHELL="+shell, "XDG_RUNTIME_DIR="+runtimeDir)
+	env = append(env, display...)
 
 	return &userIdentity{credential: cred, home: account.HomeDir, env: env}, nil
 }
