@@ -13,6 +13,15 @@ import (
 	"github.com/Fred78290/cakeagent/pkg/seamless"
 )
 
+var (
+	lookupUser     = user.Lookup
+	getEUID        = os.Geteuid
+	listEnviron    = os.Environ
+	openPasswdFile = func() (*os.File, error) { return os.Open("/etc/passwd") }
+	seamlessStatus = seamless.CurrentStatus
+	seamlessEnv    = seamless.Env
+)
+
 // userIdentity is who a shell or command runs as when the request names a user other than the agent's own.
 type userIdentity struct {
 	credential *syscall.Credential
@@ -31,7 +40,7 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 		return nil, nil
 	}
 
-	account, err := user.Lookup(name)
+	account, err := lookupUser(name)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot run as user %q: %w", name, err)
@@ -49,11 +58,11 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 		return nil, fmt.Errorf("cannot run as user %q: bad gid %q", name, account.Gid)
 	}
 
-	if int(uid) == os.Geteuid() {
+	if int(uid) == getEUID() {
 		return nil, nil
 	}
 
-	if os.Geteuid() != 0 {
+	if getEUID() != 0 {
 		return nil, fmt.Errorf("cannot run as user %q: the agent is not root", name)
 	}
 
@@ -77,8 +86,8 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 	if s.seamless {
 		cfg := seamless.Config{User: name}
 
-		if seamless.CurrentStatus(cfg).Running {
-			if env, err := seamless.Env(cfg); err == nil {
+		if seamlessStatus(cfg).Running {
+			if env, err := seamlessEnv(cfg); err == nil {
 				display = env
 
 				for _, kv := range env {
@@ -92,7 +101,7 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 
 	shell := "/bin/sh"
 
-	if file, err := os.Open("/etc/passwd"); err == nil {
+	if file, err := openPasswdFile(); err == nil {
 		for _, a := range seamless.ParsePasswd(file) {
 			if a.UID == uint32(uid) && a.Shell != "" {
 				shell = a.Shell
@@ -106,9 +115,9 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 
 	var env []string
 
-	for _, kv := range os.Environ() {
+	for _, kv := range listEnviron() {
 		switch {
-		case strings.HasPrefix(kv, "HOME="), strings.HasPrefix(kv, "USER="), strings.HasPrefix(kv, "LOGNAME="), strings.HasPrefix(kv, "SHELL="), strings.HasPrefix(kv, "XDG_RUNTIME_DIR="), strings.HasPrefix(kv, "MAIL="):
+		case strings.HasPrefix(kv, "HOME="), strings.HasPrefix(kv, "USER="), strings.HasPrefix(kv, "LOGNAME="), strings.HasPrefix(kv, "SHELL="), strings.HasPrefix(kv, "XDG_RUNTIME_DIR="), strings.HasPrefix(kv, "MAIL="), strings.HasPrefix(kv, "CAKEAGENT_"):
 		default:
 			env = append(env, kv)
 		}

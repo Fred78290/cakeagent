@@ -1062,7 +1062,9 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 
 				if isTTY {
 					// The terminal was opened by the agent (root): hand it to the user it now serves.
-					_ = tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid))
+					if err := tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid)); err != nil {
+						glog.Warningf("Failed to change PTY ownership to uid=%d gid=%d: %v", identity.credential.Uid, identity.credential.Gid, err)
+					}
 				}
 			}
 
