@@ -58,7 +58,7 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 		return nil, fmt.Errorf("cannot run as user %q: bad gid %q", name, account.Gid)
 	}
 
-	if int(uid) == getEUID() {
+	if euid := getEUID(); euid >= 0 && uid == uint64(euid) {
 		return nil, nil
 	}
 

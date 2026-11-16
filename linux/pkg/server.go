@@ -1062,7 +1062,15 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 
 				if isTTY {
 					// The terminal was opened by the agent (root): hand it to the user it now serves.
-					if err := tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid)); err != nil {
+					const maxInt32 = uint32(1<<31 - 1)
+
+					if strconv.IntSize == 32 {
+						if identity.credential.Uid > maxInt32 || identity.credential.Gid > maxInt32 {
+							glog.Warningf("Skipping PTY ownership change for oversized uid/gid values: uid=%d gid=%d", identity.credential.Uid, identity.credential.Gid)
+						} else if err := tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid)); err != nil {
+							glog.Warningf("Failed to change PTY ownership to uid=%d gid=%d: %v", identity.credential.Uid, identity.credential.Gid, err)
+						}
+					} else if err := tty.pty.Chown(int(identity.credential.Uid), int(identity.credential.Gid)); err != nil {
 						glog.Warningf("Failed to change PTY ownership to uid=%d gid=%d: %v", identity.credential.Uid, identity.credential.Gid, err)
 					}
 				}
