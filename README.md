@@ -109,8 +109,8 @@ display list, reads the size the host asks for through the driver every second, 
 `ChangeDisplaySettingsEx` when that request changes, so a resolution the user picks isn't undone. A refused size is
 retried for a few seconds, then the closest listed mode is used. The helper also makes the virtio GPU the only display on
 the desktop, so windows and the taskbar don't land on the firmware framebuffer display that the host doesn't show; set
-`HKLM\SOFTWARE\Caker\KeepBasicDisplay` to `1` to keep it. The helper logs to `C:\ProgramData\caker\display.log`,
-rotated at 512 KiB. It only works while a user is logged on.
+`HKLM\SOFTWARE\Caker\KeepBasicDisplay` to `1` to keep it. The helper logs to `C:\ProgramData\caker\display.log`; when the helper
+starts and the log is already over 512 KiB, it is renamed to `display.log.old` (a running helper keeps writing past that size). It only works while a user is logged on.
 
 Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; omit them (or pass `--insecure` on the Swift client) to run without transport security — intended for local/dev use only.
 
