@@ -43,12 +43,21 @@ Defined in [`proto/agent.proto`](proto/agent.proto):
 | `Info` | unary | Memory, disk, per-core CPU, network, OS/host, process count |
 | `CurrentUsage` | server-streaming | Live CPU/memory usage sampled at a given frequency |
 | `Run` | unary | Execute a command, return exit code + stdout/stderr once complete |
-| `Execute` | bidi-streaming | Interactive shell/TTY session with resizable terminal, streamed input/output |
+| `Execute` | bidi-streaming | Interactive shell, or a command, with streamed input/output and an optional resizable terminal; can run as a given guest user (see below) |
 | `Mount` / `Umount` | unary | Mount/unmount VirtioFS shares by name, target, uid/gid, read-only, early-boot |
 | `ResizeDisk` | unary | Grow the guest disk to use all available space |
 | `Shutdown` | unary | Gracefully power off the guest |
 | `Tunnel` | bidi-streaming | Bidirectional TCP/UDP tunnel between host and guest network |
 | `Events` | server-streaming | Stream of tunnel port-forward add/remove events |
+
+### Running as another guest user
+
+`ExecuteRequest`'s `command` and `shell` both carry a `user`. On Linux, an agent running as root starts the process as
+that account: its uid, gid and supplementary groups, `HOME`/`USER`/`LOGNAME`/`SHELL`, `XDG_RUNTIME_DIR`, and ownership
+of the terminal. When the seamless compositor runs for that user, the process also gets the compositor's environment, so
+a graphical program started from that shell opens on the host. An empty `user` keeps the agent's own account. The macOS
+and Windows agents ignore it. On the client side, `CakeAgentHelper`'s `exec`/`shell` and the execute stream take an
+optional `user`.
 
 ## Seamless windows (Linux guests)
 
@@ -91,6 +100,18 @@ On Windows, `tcp://` and `vsock://` listening are supported by the Go agent buil
 
 On Windows, `cakeagent service install` registers a service that the Service Control Manager starts as `cakeagent serve …`; `serve` answers the SCM when it is started that way, and runs in front when started from a console.
 
+## Display size (Windows guests)
+
+When `HKLM\SOFTWARE\Caker\FollowDisplaySize` is `1` (Caker's installer sets it when the guest has Caker's virtio GPU
+driver), the service keeps a hidden `cakeagent display-watch` helper running in the logged-on user's session, as that
+user: only a process in the user's session can query and change the display. The helper finds the virtio GPU in the
+display list, reads the size the host asks for through the driver every second, and applies it with
+`ChangeDisplaySettingsEx` when that request changes, so a resolution the user picks isn't undone. A refused size is
+retried for a few seconds, then the closest listed mode is used. The helper also makes the virtio GPU the only display on
+the desktop, so windows and the taskbar don't land on the firmware framebuffer display that the host doesn't show; set
+`HKLM\SOFTWARE\Caker\KeepBasicDisplay` to `1` to keep it. The helper logs to `C:\ProgramData\caker\display.log`; when the helper
+starts and the log is already over 512 KiB, it is renamed to `display.log.old` (a running helper keeps writing past that size). It only works while a user is logged on.
+
 Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; omit them (or pass `--insecure` on the Swift client) to run without transport security — intended for local/dev use only.
 
 ## Repository layout
@@ -101,14 +122,14 @@ Security: pass `--ca-cert`, `--tls-cert` and `--tls-key` to require mutual TLS; 
 - [`darwin/Sources/TestAgent`](darwin/Sources/TestAgent) — `testagent` gRPC test CLI
 - [`darwin/Tests`](darwin/Tests) — Swift unit tests
 - [`linux/main.go`](linux/main.go) — Go CLI and agent server (Linux/Windows)
-- [`linux/pkg`](linux/pkg) — server implementation: `cakeagent` gRPC service, `mount`, `tunnel`, `resize`, `serialport`, `event`, `utils`
+- [`linux/pkg`](linux/pkg) — server implementation: `cakeagent` gRPC service, `mount`, `tunnel`, `resize`, `serialport`, `event`, `seamless` (Linux compositor supervisor), `display` (Windows display size), `utils`, plus the Windows `Execute` and vsock listener
 - [`linux/service`](linux/service) — OS service installation (systemd/OpenRC on Linux, launchd on Darwin)
 - [`linux/console`](linux/console) — PTY/console handling for `Execute`
 - [`proto/agent.proto`](proto/agent.proto) — gRPC contract; `proto/generate.sh` regenerates stubs
-- [`scripts/`](scripts) — local run scripts for both agents and `testagent`
+- [`scripts/`](scripts) — local run scripts for both agents and `testagent`; `build-seamlessd.sh` and `seamlessd.Dockerfile` build the seamless compositor
 - [`tests/`](tests) — standalone Go/Swift clients used to validate the RPC surface end-to-end
 - [`.ci/`](.ci) — macOS signing, packaging (`.pkg`) and notarization scripts used by the release workflow
-- [`_artifacts/`](_artifacts) — build output: `cakeagent-{linux,darwin}-{amd64,arm64}`
+- `_artifacts/` (not committed) — build output: `cakeagent-{linux,darwin}-{amd64,arm64}`, `cakeagent-windows-{amd64,arm64}.exe`
 
 ## Prerequisites
 
@@ -167,6 +188,8 @@ cakeagent
 ├── cpu-usage [--json]                       display continuous CPU usage
 ├── ping [message] [--json]                  round-trip ping test
 ├── mount <name:target[,opts...]>... [--json] mount VirtioFS endpoints
+├── seamless …                               seamless windows compositor (Linux only, see above)
+├── display-watch                            hidden, Windows only: run by the service in the user's session
 └── service
     ├── install                              install as a system service (systemd/OpenRC) and start it
     ├── remove                               remove the system service
@@ -187,6 +210,8 @@ Global flags: `--log-level` (`panic|debug|info|warning|error|fatal`), `--log-for
 | `--timeout` | `120s` | Request timeout (`0s` = no timeout) |
 | `--tick` | `1s` | Tick event interval |
 | `--mount` (`service install` only) | — | Repeatable `name:target[,opts...]` mount to configure at install time |
+| `--seamless` (Linux, `serve`/`service install`) | `false` | Run the seamless windows compositor next to the agent |
+| `--seamless-user`, `--seamless-port`, `--seamless-layout`, `--seamless-binary` (Linux) | first regular user, `5100`, —, `/usr/libexec/caker/caker-seamlessd` | Compositor account, host vsock port, XKB layout and binary path |
 
 `mount` string format: `name:target[,uid=X,gid=Y,ro,early]`, e.g.:
 
@@ -267,7 +292,9 @@ This orchestrates Go generation (`proto/linux.sh`) and Swift generation (`proto/
 ## CI / Release
 
 - [`.github/workflows/release.yaml`](.github/workflows/release.yaml): on push to `master` or a `v*`/`ci-build` tag, builds the Swift agent (universal binary), the Go agent for `linux`/`darwin` × `amd64`/`arm64`, and — for tagged releases — code-signs, notarizes and packages the macOS binary into a `.pkg` via [`.ci/build.sh`](.ci/build.sh) / [`.ci/create-pkg.sh`](.ci/create-pkg.sh).
-- [`.github/workflows/linux.yaml`](.github/workflows/linux.yaml) and [`.cirrus.yml`](.cirrus.yml) provide additional Linux and macOS build coverage.
+- [`.github/workflows/linux.yaml`](.github/workflows/linux.yaml): builds the Go agent for `linux`/`darwin`/`windows` × `amd64`/`arm64`, embedding the seamless compositor in the Linux binaries; on a `ci-linux` tag it publishes them as a prerelease.
+- [`.github/workflows/seamlessd.yaml`](.github/workflows/seamlessd.yaml): builds the seamless compositor from Caker's sources (`caker_ref` input), called by the Linux workflow or run by hand.
+- [`.cirrus.yml`](.cirrus.yml) provides additional build coverage.
 
 ## Troubleshooting
 
