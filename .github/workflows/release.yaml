@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
  
@@ -37,7 +37,7 @@ jobs:
         uses: swift-actions/setup-swift@v2.4.0
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: 1.26
 
@@ -50,13 +50,13 @@ jobs:
           cp $TMPFILE darwin/Sources/CakeAgent/CI/CI.swift
 
       - name: Download the seamless windows compositor
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: seamlessd-amd64
           path: linux/pkg/seamless/assets/amd64
 
       - name: Download the seamless windows compositor (arm64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: seamlessd-arm64
           path: linux/pkg/seamless/assets/arm64
