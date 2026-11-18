@@ -5,12 +5,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
+	"io"
+	"maps"
 	"net"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // A fake host: the other end of the hub's connection to the host.
@@ -45,6 +49,9 @@ func newHubRig(t *testing.T) *hubRig {
 	rig.hub = &Hub{
 		Dial: func() (net.Conn, error) {
 			hubSide, hostSide := net.Pipe()
+
+			closeOnCleanup(t, hubSide, hostSide)
+
 			host := &fakeHost{t: t, conn: hostSide, reader: bufio.NewReader(hostSide), version: 2, scale: 240, received: make(chan []byte, 64)}
 
 			go host.serve()
@@ -69,6 +76,16 @@ func newHubRig(t *testing.T) *hubRig {
 	rig.accounts = map[net.Conn]Account{}
 
 	return rig
+}
+
+// closeOnCleanup closes the connections when the test ends, whether it passes or stops through Fatal. Closing a
+// net.Pipe end twice is harmless, so tests may still close them earlier on purpose.
+func closeOnCleanup(t *testing.T, conns ...net.Conn) {
+	t.Helper()
+
+	for _, c := range conns {
+		t.Cleanup(func() { _ = c.Close() })
+	}
 }
 
 func (h *fakeHost) serve() {
@@ -109,6 +126,8 @@ func (r *hubRig) compositor(account Account) (net.Conn, *bufio.Reader) {
 	r.t.Helper()
 
 	hubSide, compSide := net.Pipe()
+
+	closeOnCleanup(r.t, hubSide, compSide)
 
 	r.mu.Lock()
 	r.accounts[hubSide] = account
@@ -188,6 +207,24 @@ func readOne(t *testing.T, conn net.Conn, reader *bufio.Reader) []byte {
 	}
 
 	return frame
+}
+
+// expectClosed waits for the connection to be closed by the other end. Only an end of stream or a closed connection
+// counts: a deadline that expires, or any other error, means the connection was not closed as expected.
+func expectClosed(t *testing.T, conn net.Conn, reader io.Reader, what string) {
+	t.Helper()
+
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+	frame, err := readFrame(reader, maxHostFrame)
+
+	switch {
+	case err == nil:
+		t.Fatalf("%s: read a frame %x instead of a closed connection", what, frame)
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrClosedPipe), errors.Is(err, net.ErrClosed):
+	default:
+		t.Fatalf("%s: expected the connection to be closed, got: %v", what, err)
+	}
 }
 
 var (
@@ -297,15 +334,52 @@ func TestHubDestroysTheWindowsOfACompositorThatLeaves(t *testing.T) {
 	_, _ = aliceConn.Write(createWindow(2, 0, "b"))
 	_, _ = bobConn.Write(createWindow(1, 0, "c"))
 
-	var bobID uint32
+	// The compositors write on separate connections, so the frames arrive in no fixed order: the window ids are
+	// derived from the slot each peer was given, not from the order of the frames.
+	slotOf := func(uid uint32) uint32 {
+		rig.hub.mu.Lock()
+		defer rig.hub.mu.Unlock()
+
+		for _, p := range rig.hub.peers {
+			if p != nil && p.account.UID == uid {
+				return p.slot
+			}
+		}
+
+		t.Fatalf("no compositor attached for uid %d", uid)
+
+		return 0
+	}
+
+	aliceSlot, bobSlot := slotOf(alice.UID), slotOf(bob.UID)
+
+	if aliceSlot == bobSlot {
+		t.Fatalf("both compositors share the slot %d", aliceSlot)
+	}
+
+	aliceIDs := map[uint32]bool{globalID(aliceSlot, 1): true, globalID(aliceSlot, 2): true}
+	bobID := globalID(bobSlot, 1)
+
+	created := map[uint32]bool{}
 
 	for i := 0; i < 3; i++ {
 		frame := expect(t, host.received)
 
-		// The compositors write on separate connections, so the frames arrive in no fixed order: bob is slot 2.
-		if id := binary.LittleEndian.Uint32(frame[5:]); frame[4] == gWindowCreate && id>>slotShift == 2 {
-			bobID = id
+		if frame[4] != gWindowCreate {
+			t.Fatalf("expected a window creation, got 0x%x", frame[4])
 		}
+
+		created[binary.LittleEndian.Uint32(frame[5:])] = true
+	}
+
+	wantCreated := map[uint32]bool{bobID: true}
+
+	for id := range aliceIDs {
+		wantCreated[id] = true
+	}
+
+	if !maps.Equal(created, wantCreated) {
+		t.Fatalf("unexpected window ids reaching the host: got %v, want %v", created, wantCreated)
 	}
 
 	aliceConn.Close()
@@ -322,8 +396,8 @@ func TestHubDestroysTheWindowsOfACompositorThatLeaves(t *testing.T) {
 		destroyed[binary.LittleEndian.Uint32(frame[5:])] = true
 	}
 
-	if len(destroyed) != 2 || destroyed[bobID] {
-		t.Fatalf("only alice's two windows go: %v (bob %d)", destroyed, bobID)
+	if !maps.Equal(destroyed, aliceIDs) {
+		t.Fatalf("exactly alice's two windows go: destroyed %v, alice %v (bob %d)", destroyed, aliceIDs, bobID)
 	}
 
 	// The host connection stays while bob is there, and goes with the last compositor.
@@ -359,11 +433,7 @@ func TestHubReplacesAUsersPreviousCompositor(t *testing.T) {
 
 	second, _ := rig.compositor(alice)
 
-	_ = first.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-	if _, err := readFrame(firstReader, maxHostFrame); err == nil {
-		t.Fatal("the previous connection of a user must be closed")
-	}
+	expectClosed(t, first, firstReader, "the previous connection of a user must be closed")
 
 	_ = second
 }
@@ -377,11 +447,7 @@ func TestHubRejectsMalformedCompositorMessages(t *testing.T) {
 	// A window id with slot bits already set would let a compositor speak for another one.
 	_, _ = conn.Write(createWindow(1<<slotShift|1, 0, "evil"))
 
-	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-	if _, err := readFrame(reader, maxHostFrame); err == nil {
-		t.Fatal("the connection must be closed")
-	}
+	expectClosed(t, conn, reader, "the connection must be closed")
 }
 
 func TestRewriteRejectsMalformedTitles(t *testing.T) {
@@ -425,11 +491,7 @@ func TestHubDropsCompositorsWhenTheHostIsGone(t *testing.T) {
 
 	host.conn.Close()
 
-	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-	if _, err := readFrame(reader, maxHostFrame); err == nil {
-		t.Fatal("compositors are dropped with the host connection, so that they dial again")
-	}
+	expectClosed(t, conn, reader, "compositors are dropped with the host connection, so that they dial again")
 
 	// A compositor that comes back makes a new host connection.
 	rig.compositor(alice)
@@ -464,11 +526,7 @@ func TestHubHostLossLetsEveryCompositorReconnectAndAnnounceAgain(t *testing.T) {
 		conn   net.Conn
 		reader *bufio.Reader
 	}{{aliceConn, aliceReader}, {bobConn, bobReader}} {
-		_ = c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-		if _, err := readFrame(c.reader, maxHostFrame); err == nil {
-			t.Fatal("every compositor must be disconnected so that it reconnects")
-		}
+		expectClosed(t, c.conn, c.reader, "every compositor must be disconnected so that it reconnects")
 	}
 
 	// Both reconnect, as the compositor does, and announce their windows again to the new host.
@@ -542,8 +600,12 @@ func TestWithTitlePrefixKeepsTitlesWithinTheLimit(t *testing.T) {
 	}
 
 	// The app id after the title is kept, and the cut is on a character boundary.
-	if !strings.HasSuffix(string(out), "app") || strings.Contains(string(out[5+17+2:5+17+2+n]), "�") {
-		t.Fatal("trailer lost or a character cut in half")
+	if !utf8.Valid(out[5+17+2 : 5+17+2+n]) {
+		t.Fatal("a character was cut in half")
+	}
+
+	if !strings.HasSuffix(string(out), "app") {
+		t.Fatal("trailer lost")
 	}
 }
 
@@ -586,6 +648,8 @@ func TestServeShutdownCancelsPendingHostDial(t *testing.T) {
 		<-release
 
 		hubSide, hostSide := net.Pipe()
+
+		closeOnCleanup(t, hubSide, hostSide)
 
 		late <- hostSide
 
@@ -641,8 +705,8 @@ func TestServeShutdownCancelsPendingHostDial(t *testing.T) {
 
 	_ = host.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-	if _, err = host.Read(make([]byte, 1)); err == nil {
-		t.Fatal("the late host connection was used")
+	if _, err = host.Read(make([]byte, 1)); !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrClosedPipe) && !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("the late host connection must be closed, got: %v", err)
 	}
 
 	rig.hub.mu.Lock()
@@ -754,11 +818,13 @@ func TestHubStalledCompositorDoesNotHoldUpTheOthers(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Two connections have no relative order: bob writes once alice's window has reached the host.
+	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
 	if _, err := bobConn.Write(createWindow(1, 0, "Terminal")); err != nil {
 		t.Fatal(err)
 	}
 
-	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
 	bobWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
 
 	// Alice never reads what the host sends her: more than her queue holds. The host connection must keep being read.
