@@ -6,6 +6,8 @@
 
 It is the guest-side counterpart installed and driven by the [Caker](https://github.com/Fred78290/caker) project, which uses it to remotely control and introspect the VMs it manages — but the gRPC contract is generic enough to be used by any host-side client, and a reference client (`testagent`) is included.
 
+Documentation: see the [wiki](https://github.com/Fred78290/cakeagent/wiki) (sources in [`wiki/`](wiki), French and English).
+
 ## How it works
 
 ```mermaid

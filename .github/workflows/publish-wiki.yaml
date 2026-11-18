@@ -1,0 +1,29 @@
+name: Publish Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - wiki/**
+      - '.github/workflows/publish-wiki.yaml'
+      - scripts/publish-wiki.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-wiki:
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Publish wiki
+        env:
+          # A token that can push to the wiki: the default GITHUB_TOKEN can't.
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/publish-wiki.sh "${GITHUB_REPOSITORY}"
