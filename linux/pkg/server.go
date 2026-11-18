@@ -996,7 +996,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			cancel()
 			tty.Close()
 
-			if cmd != nil {
+			if cmd != nil && cmd.ProcessState != nil {
 				message = cakeagent.CakeAgent_ExecuteResponse{
 					Response: &cakeagent.CakeAgent_ExecuteResponse_ExitCode{
 						ExitCode: int32(cmd.ProcessState.ExitCode()),

@@ -64,6 +64,17 @@ func waitFor(t *testing.T, what string, timeout time.Duration, condition func() 
 	t.Fatalf("timed out waiting for %s", what)
 }
 
+func TestSupervisorShutdownRejectsNewSpawn(t *testing.T) {
+	sup := &supervisor{ctx: context.Background(), users: map[string]bool{}}
+	sup.shutdown()
+
+	if sup.spawn("alice") {
+		t.Fatal("spawn succeeded after supervisor shutdown")
+	}
+
+	sup.wg.Wait()
+}
+
 func TestRunStartsTheCompositorWithItsArgumentsAndRestartsIt(t *testing.T) {
 	cfg, out := testConfig(t, `echo "$@ layout=$XKB_DEFAULT_LAYOUT runtime=$XDG_RUNTIME_DIR renderer=$WLR_RENDERER" >> $OUT; sleep 0.1`)
 

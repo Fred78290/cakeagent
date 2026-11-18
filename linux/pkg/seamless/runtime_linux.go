@@ -486,7 +486,10 @@ func Run(ctx context.Context, cfg Config) error {
 
 	<-ctx.Done()
 
-	// No worker is admitted from here on, so Wait never races with an Add.
+	// Clear the global first so new EnsureUser calls cannot obtain this supervisor.
+	setActiveSupervisor(nil)
+
+	// No already-obtained worker is admitted from here on, so Wait never races with an Add.
 	sup.shutdown()
 	sup.wg.Wait()
 
