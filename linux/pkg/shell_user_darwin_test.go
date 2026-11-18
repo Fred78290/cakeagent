@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/user"
 	"reflect"
 	"strconv"
@@ -59,12 +58,25 @@ func TestDarwinIdentityForRejectsNamesThatAreNotUserNames(t *testing.T) {
 }
 
 func TestDarwinIdentityForNeedsRoot(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("running as root")
+	defer setDarwinIdentityHooks()()
+
+	// The lookup succeeds with a uid other than the agent's, so only the root policy can refuse the switch.
+	lookupAccount = func(context.Context, string) (account, error) { return account{uid: 0, gid: 0}, nil }
+	lookupGroups = func(context.Context, string, uint32) ([]uint32, error) {
+		t.Fatal("groups must not be looked up when the agent is not root")
+
+		return nil, nil
+	}
+	getEUID = func() int { return 501 }
+
+	identity, err := (&server{}).identityFor(context.Background(), "root")
+
+	if identity != nil || err == nil {
+		t.Fatalf("a non-root agent cannot switch user: %v %v", identity, err)
 	}
 
-	if _, err := (&server{}).identityFor(context.Background(), "root"); err == nil {
-		t.Fatal("a non-root agent cannot switch user")
+	if !strings.Contains(err.Error(), "the agent is not root") {
+		t.Fatalf("expected the non-root policy error, got: %v", err)
 	}
 }
 
@@ -98,19 +110,36 @@ func TestDarwinIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 		t.Fatalf("wrong home: %q", identity.home)
 	}
 
-	env := strings.Join(identity.env, "\n")
+	env := parseEnvEntries(identity.env)
 
-	for _, want := range []string{"PATH=/usr/bin", "TERM=xterm", "LANG=fr_FR.UTF-8", "LC_ALL=fr_FR.UTF-8", "HOME=/Users/guest", "USER=guest", "LOGNAME=guest", "SHELL=/bin/zsh"} {
-		if !strings.Contains(env, want) {
-			t.Errorf("environment lacks %q: %v", want, identity.env)
+	for key, want := range map[string]string{"PATH": "/usr/bin", "TERM": "xterm", "LANG": "fr_FR.UTF-8", "LC_ALL": "fr_FR.UTF-8", "HOME": "/Users/guest", "USER": "guest", "LOGNAME": "guest", "SHELL": "/bin/zsh"} {
+		if got, ok := env[key]; !ok || got != want {
+			t.Errorf("environment must hold exactly %s=%s, got %q (present: %v): %v", key, want, got, ok, identity.env)
 		}
 	}
 
-	for _, leaked := range []string{"CAKEAGENT_TOKEN", "API_SECRET", "SSH_AUTH_SOCK", "HOME=/var/root", "USER=root", "TMPDIR="} {
-		if strings.Contains(env, leaked) {
+	for _, leaked := range []string{"CAKEAGENT_TOKEN", "API_SECRET", "SSH_AUTH_SOCK", "TMPDIR"} {
+		if _, ok := env[leaked]; ok {
 			t.Errorf("environment leaks %q: %v", leaked, identity.env)
 		}
 	}
+
+	if len(env) != len(identity.env) {
+		t.Errorf("environment holds duplicate or malformed entries: %v", identity.env)
+	}
+}
+
+// parseEnvEntries splits KEY=VALUE entries so assertions compare whole keys and values, never substrings.
+func parseEnvEntries(entries []string) map[string]string {
+	env := make(map[string]string, len(entries))
+
+	for _, entry := range entries {
+		if key, value, ok := strings.Cut(entry, "="); ok {
+			env[key] = value
+		}
+	}
+
+	return env
 }
 
 func TestDarwinIdentityForCapsSupplementaryGroups(t *testing.T) {
@@ -138,7 +167,7 @@ func TestDarwinIdentityForCapsSupplementaryGroups(t *testing.T) {
 		t.Fatalf("groups must be capped at %d: %d", maxSupplementaryGroups, len(identity.credential.Groups))
 	}
 
-	if identity.home != "/var/empty" || !strings.Contains(strings.Join(identity.env, "\n"), "SHELL=/bin/sh") {
+	if identity.home != "/var/empty" || parseEnvEntries(identity.env)["SHELL"] != "/bin/sh" {
 		t.Fatalf("a record without a home or shell needs defaults: %+v", identity)
 	}
 }
