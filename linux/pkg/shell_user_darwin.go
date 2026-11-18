@@ -25,8 +25,9 @@ const lookupTimeout = 10 * time.Second
 var (
 	getEUID     = os.Geteuid
 	listEnviron = os.Environ
-	// lookupAccount and lookupGroups ask the directory service (search policy included). os/user is not used: a build without cgo (the
-	// agent is cross-compiled) only reads /etc/passwd, which on macOS holds the system accounts alone.
+	// lookupAccount and lookupGroups ask the directory service (search policy included) through dscl and id. os/user is not
+	// used: its User has no login shell, which the session needs, and its lookups are by name or id only, not the
+	// name-to-uid check idGroups relies on.
 	lookupAccount = dsclAccount
 	lookupGroups  = idGroups
 )
