@@ -25,4 +25,5 @@ jobs:
         env:
           # A token that can push to the wiki: the default GITHUB_TOKEN can't.
           GH_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/publish-wiki.sh "${GITHUB_REPOSITORY}"

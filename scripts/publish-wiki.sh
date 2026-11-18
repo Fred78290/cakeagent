@@ -23,6 +23,7 @@ if [[ -z "${GITHUB_REPOSITORY}" ]]; then
 fi
 
 TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+USE_SSH="${USE_SSH:-0}"
 WIKI_REMOTE_DISPLAY="https://github.com/${GITHUB_REPOSITORY}.wiki.git"
 
 if [[ "${USE_SSH:-0}" == "1" ]]; then
