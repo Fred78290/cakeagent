@@ -1043,7 +1043,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 		defer cleanup()
 
 		if err == nil {
-			identity, err = s.identityFor(user)
+			identity, err = s.identityFor(ctx, user)
 		}
 
 		if err == nil {

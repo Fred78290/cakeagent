@@ -3,6 +3,7 @@
 package pkg
 
 import (
+	"context"
 	"os"
 	"os/user"
 	"strings"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestIdentityForNoUserKeepsTheAgentsOwn(t *testing.T) {
-	identity, err := (&server{}).identityFor("")
+	identity, err := (&server{}).identityFor(context.Background(), "")
 
 	if identity != nil || err != nil {
 		t.Fatalf("an empty user must leave the process as it is: %v %v", identity, err)
@@ -26,7 +27,7 @@ func TestIdentityForTheAgentsOwnUserKeepsTheAgentsOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	identity, err := (&server{}).identityFor(current.Username)
+	identity, err := (&server{}).identityFor(context.Background(), current.Username)
 
 	if identity != nil || err != nil {
 		t.Fatalf("the agent's own user needs no switch: %v %v", identity, err)
@@ -34,7 +35,7 @@ func TestIdentityForTheAgentsOwnUserKeepsTheAgentsOwn(t *testing.T) {
 }
 
 func TestIdentityForUnknownUser(t *testing.T) {
-	if _, err := (&server{}).identityFor("no-such-user-caker"); err == nil {
+	if _, err := (&server{}).identityFor(context.Background(), "no-such-user-caker"); err == nil {
 		t.Fatal("expected an error for an unknown user")
 	}
 }
@@ -50,7 +51,7 @@ func TestIdentityForNeedsRoot(t *testing.T) {
 		t.Skip("running as root")
 	}
 
-	if _, err := (&server{}).identityFor(other); err == nil {
+	if _, err := (&server{}).identityFor(context.Background(), other); err == nil {
 		t.Fatal("a non-root agent cannot switch user")
 	}
 }
@@ -107,7 +108,7 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 		return []string{"WAYLAND_DISPLAY=wayland-1", "XDG_RUNTIME_DIR=/run/caker-seamless/guest"}, nil
 	}
 
-	identity, err := (&server{seamless: true}).identityFor("guest")
+	identity, err := (&server{seamless: true}).identityFor(context.Background(), "guest")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

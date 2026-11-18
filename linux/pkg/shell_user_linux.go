@@ -3,6 +3,7 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -37,7 +38,7 @@ type userIdentity struct {
 // Caker sends the guest's seamless user here (the account the compositor and its windows belong to): the
 // agent runs as root, whose runtime directory (/run/user/0) holds no compositor socket, so a root shell or command
 // could never open a window.
-func (s *server) identityFor(name string) (*userIdentity, error) {
+func (s *server) identityFor(_ context.Context, name string) (*userIdentity, error) {
 	if name == "" {
 		return nil, nil
 	}
