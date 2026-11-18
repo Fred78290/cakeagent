@@ -5,6 +5,7 @@ on:
     - 'master'
     tags:
       - 'ci-linux'
+      - 'ci-release'
   pull_request:
     branches:
     - 'master'
@@ -70,10 +71,65 @@ jobs:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-linux')
         run: |
           VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
-          gh release create --prerelease --generate-notes --title "${VERSION}" ${VERSION} \
-            ./_artifacts/cakeagent-linux-amd64 \
-            ./_artifacts/cakeagent-linux-arm64 \
-            ./_artifacts/cakeagent-darwin-amd64 \
-            ./_artifacts/cakeagent-darwin-arm64 \
-            ./_artifacts/cakeagent-windows-amd64.exe \
-            ./_artifacts/cakeagent-windows-arm64.exe
+          SHA="$(git rev-parse HEAD)"
+          # --target only applies when the tag is created; an existing tag is not moved.
+          # Refuse to publish if the tag already exists on a different commit.
+          # The peeled (^{}) entry sorts last, so it wins for annotated tags.
+          TAG_SHA="$(git ls-remote --tags origin "refs/tags/${VERSION}" "refs/tags/${VERSION}^{}" | awk 'END { print $1 }')"
+          if [ -n "${TAG_SHA}" ] && [ "${TAG_SHA}" != "${SHA}" ]; then
+            echo "::error::Tag ${VERSION} already exists at ${TAG_SHA}, expected ${SHA}"
+            exit 1
+          fi
+          # ci-linux then ci-release on the same commit share one version: reuse the
+          # existing release (refresh its assets) instead of failing on "already exists".
+          # Never demote an already promoted release back to a prerelease.
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release upload --clobber "${VERSION}" \
+              ./_artifacts/cakeagent-linux-amd64 \
+              ./_artifacts/cakeagent-linux-arm64 \
+              ./_artifacts/cakeagent-darwin-amd64 \
+              ./_artifacts/cakeagent-darwin-arm64 \
+              ./_artifacts/cakeagent-windows-amd64.exe \
+              ./_artifacts/cakeagent-windows-arm64.exe
+          else
+            gh release create --prerelease --generate-notes --target "${SHA}" --title "${VERSION}" ${VERSION} \
+              ./_artifacts/cakeagent-linux-amd64 \
+              ./_artifacts/cakeagent-linux-arm64 \
+              ./_artifacts/cakeagent-darwin-amd64 \
+              ./_artifacts/cakeagent-darwin-arm64 \
+              ./_artifacts/cakeagent-windows-amd64.exe \
+              ./_artifacts/cakeagent-windows-arm64.exe
+          fi
+
+      - name: "Create linux release"
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-release')
+        run: |
+          VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
+          SHA="$(git rev-parse HEAD)"
+          # --target only applies when the tag is created; an existing tag is not moved.
+          # Refuse to publish if the tag already exists on a different commit.
+          # The peeled (^{}) entry sorts last, so it wins for annotated tags.
+          TAG_SHA="$(git ls-remote --tags origin "refs/tags/${VERSION}" "refs/tags/${VERSION}^{}" | awk 'END { print $1 }')"
+          if [ -n "${TAG_SHA}" ] && [ "${TAG_SHA}" != "${SHA}" ]; then
+            echo "::error::Tag ${VERSION} already exists at ${TAG_SHA}, expected ${SHA}"
+            exit 1
+          fi
+          # Promote the prerelease published by ci-linux for this same commit, if any.
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release upload --clobber "${VERSION}" \
+              ./_artifacts/cakeagent-linux-amd64 \
+              ./_artifacts/cakeagent-linux-arm64 \
+              ./_artifacts/cakeagent-darwin-amd64 \
+              ./_artifacts/cakeagent-darwin-arm64 \
+              ./_artifacts/cakeagent-windows-amd64.exe \
+              ./_artifacts/cakeagent-windows-arm64.exe
+            gh release edit "${VERSION}" --prerelease=false --latest
+          else
+            gh release create --latest --generate-notes --target "${SHA}" --title "${VERSION}" ${VERSION} \
+              ./_artifacts/cakeagent-linux-amd64 \
+              ./_artifacts/cakeagent-linux-arm64 \
+              ./_artifacts/cakeagent-darwin-amd64 \
+              ./_artifacts/cakeagent-darwin-arm64 \
+              ./_artifacts/cakeagent-windows-amd64.exe \
+              ./_artifacts/cakeagent-windows-arm64.exe
+          fi
