@@ -856,3 +856,28 @@ func TestHubDoesNotReuseASlotRightAway(t *testing.T) {
 
 	_ = bobConn
 }
+
+func TestHubAttached(t *testing.T) {
+	h := &Hub{}
+
+	if h.Attached(1000) {
+		t.Fatal("no compositor is attached yet")
+	}
+
+	peer := &hubPeer{account: Account{UID: 1000}, done: make(chan struct{})}
+	h.peers[1] = peer
+
+	if !h.Attached(1000) {
+		t.Fatal("the compositor of 1000 is attached")
+	}
+
+	if h.Attached(1001) {
+		t.Fatal("nothing of 1001 is attached")
+	}
+
+	close(peer.done)
+
+	if h.Attached(1000) {
+		t.Fatal("a closed connection is not an attached compositor")
+	}
+}

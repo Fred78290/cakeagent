@@ -1052,7 +1052,15 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 		defer cleanup()
 
 		if err == nil {
-			identity, err = s.identityFor(ctx, user)
+			// Resolving the user may wait for a compositor: stop when the client leaves, not only when the
+			// command's own context ends.
+			identCtx, stop := context.WithCancel(ctx)
+			unwatch := context.AfterFunc(stream.Context(), stop)
+
+			identity, err = s.identityFor(identCtx, user)
+
+			unwatch()
+			stop()
 			identityErr = err
 		}
 

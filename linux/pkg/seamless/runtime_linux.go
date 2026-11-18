@@ -452,19 +452,29 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 
+	// A hub that cannot recover stops the whole supervisor: compositors that cannot reach it would run for nothing.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	sup := &supervisor{ctx: ctx, cfg: cfg, hub: hub, users: map[string]bool{}}
+	var hubErr error
+
+	// Registered before the supervisor is visible to EnsureUser.
+	sup.wg.Add(2)
 
 	setActiveSupervisor(sup)
 
 	defer setActiveSupervisor(nil)
 
-	sup.wg.Add(2)
-
 	go func() {
 		defer sup.wg.Done()
 
-		if err := hub.Serve(ctx, listener); err != nil {
+		if err := serveHub(ctx, hub, listener, func() (net.Listener, error) { return listenGuestHub(cfg) }); err != nil {
 			glog.Errorf("seamless: %v", err)
+
+			hubErr = err
+
+			cancel()
 		}
 	}()
 
@@ -475,9 +485,67 @@ func Run(ctx context.Context, cfg Config) error {
 	}()
 
 	<-ctx.Done()
+
+	// No worker is admitted from here on, so Wait never races with an Add.
+	sup.shutdown()
 	sup.wg.Wait()
 
-	return nil
+	// hubErr is written before the goroutine that sets it is done, which Wait has waited for.
+	return hubErr
+}
+
+const (
+	hubMaxFailures    = 5
+	hubInitialBackoff = 100 * time.Millisecond
+	hubMaxBackoff     = 5 * time.Second
+	// hubHealthyAfter is how long a Serve must have lasted for its failure not to count with the previous ones.
+	hubHealthyAfter = time.Minute
+)
+
+// serveHub serves the hub until ctx is done. When Serve fails (the listener broke: no file descriptors left, the
+// socket was removed...) the listener is closed and a new one opened with relisten, after a growing pause, so that the
+// compositors can connect again. It gives up, returning the error, once failures follow one another too closely
+// (hubMaxFailures without a Serve that lasted hubHealthyAfter), or when ctx ends, which is not an error.
+func serveHub(ctx context.Context, hub *Hub, listener net.Listener, relisten func() (net.Listener, error)) error {
+	backoff := hubInitialBackoff
+	failures := 0
+
+	for {
+		started := time.Now()
+		err := hub.Serve(ctx, listener)
+
+		// Serve only closes the listener when ctx ends.
+		listener.Close()
+
+		if ctx.Err() != nil {
+			return nil
+		}
+
+		if time.Since(started) > hubHealthyAfter {
+			failures, backoff = 0, hubInitialBackoff
+		}
+
+		for {
+			failures++
+
+			if failures > hubMaxFailures {
+				return fmt.Errorf("seamless hub: giving up after %d consecutive failures: %w", failures-1, err)
+			}
+
+			glog.Warnf("seamless: hub failed (%v), listening again in %s", err, backoff)
+			sleep(ctx, backoff)
+
+			backoff = min(backoff*2, hubMaxBackoff)
+
+			if ctx.Err() != nil {
+				return nil
+			}
+
+			if listener, err = relisten(); err == nil {
+				break
+			}
+		}
+	}
 }
 
 // supervisor runs one compositor per guest user.
@@ -487,8 +555,9 @@ type supervisor struct {
 	hub *Hub
 	wg  sync.WaitGroup
 
-	mu    sync.Mutex
-	users map[string]bool
+	mu     sync.Mutex
+	users  map[string]bool
+	closed bool
 }
 
 var (
@@ -523,6 +592,39 @@ func (s *supervisor) claim(name string) bool {
 	return true
 }
 
+// shutdown stops admitting workers: after it returns, spawn refuses and wg only goes down.
+func (s *supervisor) shutdown() {
+	s.mu.Lock()
+	s.closed = true
+	s.mu.Unlock()
+}
+
+// spawn makes sure a worker runs name's compositor, started on demand. It returns false when the supervisor is shutting
+// down. The check, the claim and the registration with wg happen under one lock, so Run's Wait cannot start between them.
+func (s *supervisor) spawn(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return false
+	}
+
+	if s.users[name] {
+		return true
+	}
+
+	s.users[name] = true
+	s.wg.Add(1)
+
+	go func() {
+		defer s.wg.Done()
+
+		s.runUser(name, false)
+	}()
+
+	return true
+}
+
 func (s *supervisor) release(name string) {
 	s.mu.Lock()
 	delete(s.users, name)
@@ -532,7 +634,10 @@ func (s *supervisor) release(name string) {
 // EnsureUser makes sure the compositor of name runs and accepts connections (a few seconds at most: its
 // runtime directory may have to be created), so that what is started for that user shows its windows on the host.
 // It does nothing, and succeeds, when no Run is active (the agent is not serving seamless windows).
-func EnsureUser(name string) error {
+//
+// The wait ends as soon as ctx does, with ctx's error: the compositor keeps starting in the background, only the caller
+// stops waiting for it.
+func EnsureUser(ctx context.Context, name string) error {
 	s := currentSupervisor()
 
 	if s == nil || name == "" {
@@ -545,24 +650,33 @@ func EnsureUser(name string) error {
 		return err
 	}
 
-	if s.claim(a.Name) {
-		s.wg.Add(1)
-
-		go func() {
-			defer s.wg.Done()
-
-			s.runUser(a.Name, false)
-		}()
+	if !s.spawn(a.Name) {
+		return fmt.Errorf("seamless is shutting down")
 	}
 
-	deadline := time.Now().Add(15 * time.Second)
+	timeout := time.NewTimer(15 * time.Second)
+	defer timeout.Stop()
 
-	for time.Now().Before(deadline) && s.ctx.Err() == nil {
-		if _, ok := liveRuntimeDir(s.cfg, a); ok {
-			return nil
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+
+	for s.ctx.Err() == nil {
+		// Ready means the supervised compositor is attached to the hub, and its Wayland socket answers: a socket
+		// alone could be anyone's listener, and an attached compositor may not serve its clients yet.
+		if s.hub.Attached(a.UID) {
+			if _, ok := liveRuntimeDir(s.cfg, a); ok {
+				return nil
+			}
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-tick.C:
+		case <-ctx.Done():
+			return fmt.Errorf("stopped waiting for the compositor of %s: %w", a.Name, ctx.Err())
+		case <-s.ctx.Done():
+		case <-timeout.C:
+			return fmt.Errorf("the compositor of %s did not start", a.Name)
+		}
 	}
 
 	return fmt.Errorf("the compositor of %s did not start", a.Name)
@@ -585,13 +699,51 @@ func (s *supervisor) userLoop(name string, primary bool) {
 			s.hub.SetPrimary(a.Name)
 		}
 
-		// Someone already started this user's compositor on demand: it is theirs to keep running.
 		if s.claim(a.Name) {
 			s.runUser(a.Name, primary)
+
+			return
 		}
 
-		return
+		// Someone already started this user's compositor on demand: it keeps running and is reused, but its worker
+		// does not wait for a primary account that goes away, so the primary loop must not end with this claim. Wait
+		// for the claim to be released, then take over.
+		if !primary {
+			return
+		}
+
+		sleep(s.ctx, time.Second)
 	}
+}
+
+// installMu serializes installations: the primary and the on-demand workers share one binary and one XKB tree, and
+// installXKB removes the completion marker while it copies, so two of them installing at once would corrupt each other.
+var installMu sync.Mutex
+
+// installNeeded tells whether the compositor at binary, or its XKB data, is missing or was not copied completely.
+func installNeeded(binary string) bool {
+	if _, err := os.Stat(binary); err != nil {
+		return true
+	}
+
+	return embeddedXKB() != nil && !XKBInstalled(binary)
+}
+
+// ensureInstalled makes sure the compositor and its XKB data are fully in place at binary. It always takes the lock,
+// even when it finds nothing to do: an installation under way may not have removed the completion marker yet, so a
+// check made outside the lock could pass while the tree is about to be rewritten. A caller that waited then sees the
+// installation complete and does not repeat it, so no compositor starts on a half-copied tree.
+func ensureInstalled(binary string) error {
+	installMu.Lock()
+	defer installMu.Unlock()
+
+	if !installNeeded(binary) {
+		return nil
+	}
+
+	_, _, err := Install(binary)
+
+	return err
 }
 
 // runUser keeps the compositor of an account that this supervisor has claimed running, until the context ends, or
@@ -620,13 +772,11 @@ func (s *supervisor) runUser(name string, primary bool) {
 		}
 
 		// An agent updated in place finds the binary of the previous one: its XKB data is still to come, or its copy was interrupted.
-		if _, err = os.Stat(cfg.Binary); err != nil || (embeddedXKB() != nil && !XKBInstalled(cfg.Binary)) {
-			if _, _, err = Install(cfg.Binary); err != nil {
-				glog.Errorf("seamless: %v", err)
-				sleep(s.ctx, 30*time.Second)
+		if err = ensureInstalled(cfg.Binary); err != nil {
+			glog.Errorf("seamless: %v", err)
+			sleep(s.ctx, 30*time.Second)
 
-				continue
-			}
+			continue
 		}
 
 		runtimeDir, err := ensureRuntimeDir(a)

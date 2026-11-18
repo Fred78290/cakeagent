@@ -38,7 +38,7 @@ type userIdentity struct {
 // Caker sends the guest's seamless user here (the account the compositor and its windows belong to): the
 // agent runs as root, whose runtime directory (/run/user/0) holds no compositor socket, so a root shell or command
 // could never open a window.
-func (s *server) identityFor(_ context.Context, name string) (*userIdentity, error) {
+func (s *server) identityFor(ctx context.Context, name string) (*userIdentity, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -90,7 +90,13 @@ func (s *server) identityFor(_ context.Context, name string) (*userIdentity, err
 		cfg := seamless.Config{User: name}
 
 		// Every user can have windows: the compositor of one that has none yet is started now.
-		if err := seamlessEnsure(name); err != nil {
+		// The wait ends with ctx. A compositor that merely fails to come up is not fatal (the command runs without
+		// windows, as before), but a request that was cancelled has nothing left to run.
+		if err := seamlessEnsure(ctx, name); err != nil {
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("cannot run as user %q: %w", name, ctx.Err())
+			}
+
 			glog.Warnf("seamless: no compositor for %s: %v", name, err)
 		}
 

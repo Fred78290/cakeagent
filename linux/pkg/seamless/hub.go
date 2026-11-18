@@ -547,6 +547,26 @@ func (h *Hub) SetPrimary(name string) {
 	h.mu.Unlock()
 }
 
+// Attached tells whether a compositor of the account with this uid is connected to the hub and acknowledged.
+func (h *Hub) Attached(uid uint32) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for _, p := range h.peers {
+		if p == nil || p.account.UID != uid {
+			continue
+		}
+
+		select {
+		case <-p.done:
+		default:
+			return true
+		}
+	}
+
+	return false
+}
+
 // titlePrefix is what goes in front of the window titles of an account. It is asked again for every title, so
 // compositors that connected before the primary account was known are labelled properly once it is.
 func (h *Hub) titlePrefix(a Account) string {

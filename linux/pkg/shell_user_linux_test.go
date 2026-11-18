@@ -4,6 +4,7 @@ package pkg
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/user"
 	"strings"
@@ -84,7 +85,7 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 		}
 	}
 	ensured := ""
-	seamlessEnsure = func(name string) error {
+	seamlessEnsure = func(_ context.Context, name string) error {
 		ensured = name
 
 		return nil
@@ -147,6 +148,52 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 	if ensured != "guest" {
 		t.Fatalf("the compositor of the user must be asked for, got %q", ensured)
 	}
+}
+
+func stubGuestAccount() {
+	lookupUser = func(string) (*user.User, error) {
+		return &user.User{Uid: "1001", Gid: "1002", Username: "guest", HomeDir: "/home/guest"}, nil
+	}
+	getEUID = func() int { return 0 }
+	openPasswdFile = func() (*os.File, error) { return nil, os.ErrNotExist }
+	listEnviron = func() []string { return []string{"PATH=/usr/bin"} }
+	seamlessStatus = func(seamless.Config) seamless.Status { return seamless.Status{} }
+}
+
+func TestIdentityForCancelledWhileWaitingForTheCompositor(t *testing.T) {
+	restore := setIdentityForTestHooks()
+
+	defer restore()
+	stubGuestAccount()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	seamlessEnsure = func(ctx context.Context, _ string) error {
+		cancel()
+
+		return ctx.Err()
+	}
+
+	if identity, err := (&server{seamless: true}).identityFor(ctx, "guest"); err == nil || identity != nil {
+		t.Fatalf("a cancelled request must not go on: %v %v", identity, err)
+	}
+}
+
+func TestIdentityForCompositorFailureFallsBack(t *testing.T) {
+	restore := setIdentityForTestHooks()
+
+	defer restore()
+	stubGuestAccount()
+
+	seamlessEnsure = func(context.Context, string) error { return errors.New("did not start") }
+
+	identity, err := (&server{seamless: true}).identityFor(context.Background(), "guest")
+
+	if err != nil || identity == nil {
+		t.Fatalf("a compositor that does not start must not stop the command: %v %v", identity, err)
+	}
+
+	assertHasEnv(t, identity.env, "XDG_RUNTIME_DIR=/run/user/1001")
 }
 
 func setIdentityForTestHooks() func() {

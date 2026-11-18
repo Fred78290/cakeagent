@@ -72,22 +72,22 @@ func authenticateCompositor(conn net.Conn) (Account, error) {
 	return Account{}, fmt.Errorf("uid %d is not in /etc/passwd", uid)
 }
 
-// newGuestHub makes the hub the compositors of this guest connect to, and the listener it serves. The socket is
-// open to every local user, like the host's vsock port the compositors used to dial directly: what counts is
-// who the kernel says is on the other end.
-func newGuestHub(cfg Config) (*Hub, net.Listener, error) {
+// listenGuestHub opens the socket the compositors of this guest connect to. It is open to every local user, like the
+// host's vsock port the compositors used to dial directly: what counts is who the kernel says is on the other end.
+// A socket left by a previous listener is replaced, so it also serves to listen again after a failure.
+func listenGuestHub(cfg Config) (net.Listener, error) {
 	cfg = cfg.WithDefaults()
 
 	dir := filepath.Dir(cfg.HubSocket)
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// RuntimeDir makes the same directory for guests without a logind: it must be traversable by everyone.
 	if info, err := os.Stat(dir); err == nil && info.Mode().Perm()&0o001 == 0 {
 		if err = os.Chmod(dir, 0o755); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -96,12 +96,25 @@ func newGuestHub(cfg Config) (*Hub, net.Listener, error) {
 	listener, err := net.Listen("unix", cfg.HubSocket)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("seamless hub: %w", err)
+		return nil, fmt.Errorf("seamless hub: %w", err)
 	}
 
 	if err = os.Chmod(cfg.HubSocket, 0o666); err != nil {
 		listener.Close()
 
+		return nil, err
+	}
+
+	return listener, nil
+}
+
+// newGuestHub makes the hub the compositors of this guest connect to, and the listener it serves.
+func newGuestHub(cfg Config) (*Hub, net.Listener, error) {
+	cfg = cfg.WithDefaults()
+
+	listener, err := listenGuestHub(cfg)
+
+	if err != nil {
 		return nil, nil, err
 	}
 
