@@ -2,9 +2,11 @@ package seamless
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -207,11 +209,13 @@ func TestHubTellsUsersWindowsApartAndRoutesInput(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Two connections have no relative order: bob writes once alice's window has reached the host.
+	first := expect(t, host.received)
+
 	if _, err := bobConn.Write(createWindow(1, 0, "Terminal")); err != nil {
 		t.Fatal(err)
 	}
 
-	first := expect(t, host.received)
 	second := expect(t, host.received)
 
 	idOf := func(frame []byte) uint32 { return binary.LittleEndian.Uint32(frame[5:]) }
@@ -298,8 +302,9 @@ func TestHubDestroysTheWindowsOfACompositorThatLeaves(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		frame := expect(t, host.received)
 
-		if strings.Contains(string(frame), "c") && frame[4] == gWindowCreate && i == 2 {
-			bobID = binary.LittleEndian.Uint32(frame[5:])
+		// The compositors write on separate connections, so the frames arrive in no fixed order: bob is slot 2.
+		if id := binary.LittleEndian.Uint32(frame[5:]); frame[4] == gWindowCreate && id>>slotShift == 2 {
+			bobID = id
 		}
 	}
 
@@ -379,6 +384,39 @@ func TestHubRejectsMalformedCompositorMessages(t *testing.T) {
 	}
 }
 
+func TestRewriteRejectsMalformedTitles(t *testing.T) {
+	id := binary.LittleEndian.AppendUint32(nil, 1)
+	str := func(n int, s string) []byte {
+		return append(binary.LittleEndian.AppendUint16(slices.Clone(id), uint16(n)), s...)
+	}
+
+	cases := map[string][]byte{
+		"no length field": id,
+		"truncated":       str(5, "abc"),
+		"trailing bytes":  str(2, "abcd"),
+		"invalid UTF-8":   str(2, "\xff\xfe"),
+		"too long":        str(maxString+1, strings.Repeat("a", maxString+1)),
+	}
+
+	for name, payload := range cases {
+		for _, prefix := range []string{"", "bob: "} {
+			p := &hubPeer{slot: 2, windows: map[uint32]struct{}{}}
+
+			if _, err := p.rewrite(buildFrame(gWindowTitle, payload), prefix); err == nil {
+				t.Errorf("%s (prefix %q): the title must be refused", name, prefix)
+			}
+		}
+	}
+
+	p := &hubPeer{slot: 2, windows: map[uint32]struct{}{}}
+
+	out, err := p.rewrite(buildFrame(gWindowTitle, str(2, "ok")), "")
+
+	if err != nil || binary.LittleEndian.Uint32(out[5:]) != globalID(2, 1) {
+		t.Fatalf("a valid title must pass with its id patched: %v", err)
+	}
+}
+
 func TestHubDropsCompositorsWhenTheHostIsGone(t *testing.T) {
 	rig := newHubRig(t)
 
@@ -400,6 +438,86 @@ func TestHubDropsCompositorsWhenTheHostIsGone(t *testing.T) {
 	case <-rig.hosts:
 	case <-time.After(5 * time.Second):
 		t.Fatal("no new host connection")
+	}
+}
+
+// The shipped compositor (Tools/SeamlessCompositor, transport_close) does not exit when its connection ends: it
+// retries every second and announces all its windows again after the next acknowledgement. So when the host
+// connection is lost the hub only has to close every compositor, and each one comes back on its own, windows included.
+func TestHubHostLossLetsEveryCompositorReconnectAndAnnounceAgain(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	bobConn, bobReader := rig.compositor(bob)
+
+	_, _ = aliceConn.Write(createWindow(1, 0, "a"))
+	_, _ = bobConn.Write(createWindow(1, 0, "b"))
+
+	expect(t, host.received)
+	expect(t, host.received)
+
+	host.conn.Close()
+
+	for _, c := range []struct {
+		conn   net.Conn
+		reader *bufio.Reader
+	}{{aliceConn, aliceReader}, {bobConn, bobReader}} {
+		_ = c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+		if _, err := readFrame(c.reader, maxHostFrame); err == nil {
+			t.Fatal("every compositor must be disconnected so that it reconnects")
+		}
+	}
+
+	// Both reconnect, as the compositor does, and announce their windows again to the new host.
+	aliceConn, _ = rig.compositor(alice)
+	newHost := <-rig.hosts
+	bobConn, _ = rig.compositor(bob)
+
+	_, _ = aliceConn.Write(createWindow(1, 0, "a"))
+	_, _ = bobConn.Write(createWindow(1, 0, "b"))
+
+	seen := map[uint32]bool{}
+
+	for range 2 {
+		frame := expect(t, newHost.received)
+
+		if frame[4] != gWindowCreate {
+			t.Fatalf("expected a window creation, got 0x%x", frame[4])
+		}
+
+		seen[binary.LittleEndian.Uint32(frame[5:])] = true
+	}
+
+	if len(seen) != 2 {
+		t.Fatalf("both compositors' windows must reach the new host with distinct ids, got %v", seen)
+	}
+}
+
+func TestHubLabelsEveryoneUntilThePrimaryIsKnown(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, _ := rig.compositor(alice)
+	host := <-rig.hosts
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	if first := expect(t, host.received); !strings.Contains(string(first), "alice: Terminal") {
+		t.Fatalf("with no primary known the title says whose it is: %q", first)
+	}
+
+	rig.hub.SetPrimary("alice")
+
+	if _, err := aliceConn.Write(createWindow(2, 0, "Editor")); err != nil {
+		t.Fatal(err)
+	}
+
+	if second := expect(t, host.received); !strings.Contains(string(second), "Editor") || strings.Contains(string(second), "alice: ") {
+		t.Fatalf("once the primary is known its titles are left alone: %q", second)
 	}
 }
 
@@ -454,4 +572,287 @@ func TestServeStopsWithItsContext(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Serve must return once the context is done")
 	}
+}
+
+func TestServeShutdownCancelsPendingHostDial(t *testing.T) {
+	rig := newHubRig(t)
+
+	release := make(chan struct{})
+	dialing := make(chan struct{})
+	late := make(chan net.Conn, 1)
+
+	rig.hub.Dial = func() (net.Conn, error) {
+		close(dialing)
+		<-release
+
+		hubSide, hostSide := net.Pipe()
+
+		late <- hostSide
+
+		return hubSide, nil
+	}
+
+	rig.hub.Authenticate = func(net.Conn) (Account, error) { return Account{Name: "alice", UID: 1000}, nil }
+
+	l, err := net.Listen("unix", t.TempDir()+"/hub.sock")
+
+	if err != nil {
+		t.Skip("no unix sockets here")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+
+	go func() { done <- rig.hub.Serve(ctx, l) }()
+
+	comp, err := net.Dial("unix", l.Addr().String())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer comp.Close()
+
+	if _, err = comp.Write(buildHello(2, "caker-seamlessd")); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-dialing:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the hub never dialled the host")
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve must not wait for a host dial that hangs")
+	}
+
+	// The dial finishes after the shutdown: its connection must be dropped, not published.
+	close(release)
+
+	host := <-late
+
+	_ = host.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+	if _, err = host.Read(make([]byte, 1)); err == nil {
+		t.Fatal("the late host connection was used")
+	}
+
+	rig.hub.mu.Lock()
+	published := rig.hub.link
+	rig.hub.mu.Unlock()
+
+	if published != nil {
+		t.Fatal("a host link was published after shutdown")
+	}
+}
+
+func TestMemBudgetWaitsForRelease(t *testing.T) {
+	b := newMemBudget(100)
+
+	if err := b.acquire(80, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got := make(chan error, 1)
+
+	go func() { got <- b.acquire(50, nil) }()
+
+	select {
+	case <-got:
+		t.Fatal("reserved beyond the budget")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	b.release(80)
+
+	if err := <-got; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := b.acquire(101, nil); err == nil {
+		t.Fatal("a reservation that can never fit was accepted")
+	}
+}
+
+func TestMemBudgetCancelledWaitReleasesNothing(t *testing.T) {
+	b := newMemBudget(100)
+
+	if err := b.acquire(100, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan struct{})
+	got := make(chan error, 1)
+
+	go func() { got <- b.acquire(10, done) }()
+
+	time.Sleep(20 * time.Millisecond)
+	close(done)
+
+	if err := <-got; err == nil {
+		t.Fatal("a cancelled wait succeeded")
+	}
+
+	b.release(100)
+
+	if err := b.acquire(100, nil); err != nil {
+		t.Fatalf("the budget leaked: %v", err)
+	}
+}
+
+func TestReadBudgetedFrameReleasesOnError(t *testing.T) {
+	b := newMemBudget(1024)
+
+	// The header promises 100 bytes, only 3 come.
+	truncated := append(binary.LittleEndian.AppendUint32(nil, 100), 1, 2, 3)
+
+	if _, _, err := readBudgetedFrame(bytes.NewReader(truncated), 1024, b, nil); err == nil {
+		t.Fatal("expected a read error")
+	}
+
+	frame, reserved, err := readBudgetedFrame(bytes.NewReader(buildFrame(gWindowDestroy, make([]byte, 4))), 1024, b, nil)
+
+	if err != nil || len(frame) != 9 || reserved != 9 {
+		t.Fatalf("frame %d, reserved %d, err %v", len(frame), reserved, err)
+	}
+
+	b.release(reserved)
+
+	if err := b.acquire(1024, nil); err != nil {
+		t.Fatalf("the budget leaked: %v", err)
+	}
+}
+
+func TestReadBudgetedFrameLargeFitsWholeBudget(t *testing.T) {
+	b := newMemBudget(frameBudget)
+	payload := make([]byte, 1<<20)
+	frame, reserved, err := readBudgetedFrame(bytes.NewReader(buildFrame(gWindowFrame, payload)), maxGuestFrame, b, nil)
+
+	if err != nil || len(frame) != 5+len(payload) {
+		t.Fatalf("len %d, err %v", len(frame), err)
+	}
+
+	b.release(reserved)
+}
+
+func TestHubStalledCompositorDoesNotHoldUpTheOthers(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, _ := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, bobReader := rig.compositor(bob)
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := bobConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+	bobWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	// Alice never reads what the host sends her: more than her queue holds. The host connection must keep being read.
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for i := 0; i < peerQueueLen+16; i++ {
+			host.send(buildFrame(hPointerLeave, u32(aliceWindow)))
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("a compositor that does not read held up the host connection")
+	}
+
+	host.send(buildFrame(hPointerLeave, u32(bobWindow)))
+
+	if back := readOne(t, bobConn, bobReader); back[4] != hPointerLeave {
+		t.Fatalf("bob got %x", back)
+	}
+}
+
+// The protocol has no acknowledgement of a window's destruction, so the host may still send events for a window that
+// is gone. They must not reach a window that only reuses the id.
+func TestHubDropsHostEventsForWindowsTheCompositorDoesNotOwn(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	_, _ = aliceConn.Write(createWindow(1, 0, "a"))
+
+	created := expect(t, host.received)
+	id := binary.LittleEndian.Uint32(created[5:])
+
+	// A window that was never created, then one destroyed by the compositor: both are stale to the compositor.
+	host.send(buildFrame(hPointerLeave, u32(id&^localIDMask|7)))
+
+	_, _ = aliceConn.Write(createWindow(2, 0, "b"))
+
+	second := expect(t, host.received)
+
+	_, _ = aliceConn.Write(buildFrame(gWindowDestroy, u32(2)))
+	expect(t, host.received)
+
+	host.send(buildFrame(hWindowResize, append(u32(binary.LittleEndian.Uint32(second[5:])), make([]byte, 8)...)))
+
+	// The first event the compositor sees is the one for its live window: the earlier ones were dropped, in order.
+	host.send(buildFrame(hPointerLeave, u32(id)))
+
+	if back := readOne(t, aliceConn, aliceReader); back[4] != hPointerLeave || binary.LittleEndian.Uint32(back[5:]) != 1 {
+		t.Fatalf("only the event for the live window may arrive, got %x", back)
+	}
+}
+
+// A slot is not handed out again at once: the host may still have events for the windows of the compositor that left.
+func TestHubDoesNotReuseASlotRightAway(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, _ := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, _ := rig.compositor(bob)
+
+	_, _ = aliceConn.Write(createWindow(1, 0, "a"))
+
+	oldID := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	aliceConn.Close()
+
+	if frame := expect(t, host.received); frame[4] != gWindowDestroy {
+		t.Fatalf("expected a destroy, got 0x%x", frame[4])
+	}
+
+	carolConn, carolReader := rig.compositor(Account{Name: "carol", UID: 1002, GID: 1002})
+
+	_, _ = carolConn.Write(createWindow(1, 0, "c"))
+
+	newID := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	if newID == oldID {
+		t.Fatalf("a new compositor took over the global id %d of a window that just went", oldID)
+	}
+
+	// An event in flight for the old window reaches nobody; the next one for the new window arrives first.
+	host.send(buildFrame(hPointerLeave, u32(oldID)))
+	host.send(buildFrame(hPointerLeave, u32(newID)))
+
+	if back := readOne(t, carolConn, carolReader); binary.LittleEndian.Uint32(back[5:]) != 1 {
+		t.Fatalf("carol got %x", back)
+	}
+
+	_ = bobConn
 }
