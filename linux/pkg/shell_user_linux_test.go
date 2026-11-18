@@ -82,6 +82,12 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 			"LOGNAME=root",
 		}
 	}
+	ensured := ""
+	seamlessEnsure = func(name string) error {
+		ensured = name
+
+		return nil
+	}
 	seamlessStatus = func(cfg seamless.Config) seamless.Status {
 		if cfg.User != "guest" {
 			t.Fatalf("unexpected seamless user: %q", cfg.User)
@@ -132,6 +138,10 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 	assertHasEnv(t, identity.env, "XDG_RUNTIME_DIR=/run/caker-seamless/guest")
 	assertHasEnv(t, identity.env, "WAYLAND_DISPLAY=wayland-1")
 	assertHasEnv(t, identity.env, "PATH=/usr/bin")
+
+	if ensured != "guest" {
+		t.Fatalf("the compositor of the user must be asked for, got %q", ensured)
+	}
 }
 
 func setIdentityForTestHooks() func() {
@@ -140,6 +150,7 @@ func setIdentityForTestHooks() func() {
 	listEnvironOld := listEnviron
 	openPasswdFileOld := openPasswdFile
 	seamlessStatusOld := seamlessStatus
+	seamlessEnsureOld := seamlessEnsure
 	seamlessEnvOld := seamlessEnv
 
 	return func() {
@@ -148,6 +159,7 @@ func setIdentityForTestHooks() func() {
 		listEnviron = listEnvironOld
 		openPasswdFile = openPasswdFileOld
 		seamlessStatus = seamlessStatusOld
+		seamlessEnsure = seamlessEnsureOld
 		seamlessEnv = seamlessEnvOld
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/Fred78290/cakeagent/pkg/seamless"
+	glog "github.com/sirupsen/logrus"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 	getEUID        = os.Geteuid
 	listEnviron    = os.Environ
 	openPasswdFile = func() (*os.File, error) { return os.Open("/etc/passwd") }
+	seamlessEnsure = seamless.EnsureUser
 	seamlessStatus = seamless.CurrentStatus
 	seamlessEnv    = seamless.Env
 )
@@ -85,6 +87,11 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 	// compositor.
 	if s.seamless {
 		cfg := seamless.Config{User: name}
+
+		// Every user can have windows: the compositor of one that has none yet is started now.
+		if err := seamlessEnsure(name); err != nil {
+			glog.Warnf("seamless: no compositor for %s: %v", name, err)
+		}
 
 		if seamlessStatus(cfg).Running {
 			if env, err := seamlessEnv(cfg); err == nil {
