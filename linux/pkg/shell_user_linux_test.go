@@ -89,6 +89,10 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 		return nil
 	}
 	seamlessStatus = func(cfg seamless.Config) seamless.Status {
+		if ensured != "guest" {
+			t.Fatalf("the compositor of the user must be ensured before its status is checked, got %q", ensured)
+		}
+
 		if cfg.User != "guest" {
 			t.Fatalf("unexpected seamless user: %q", cfg.User)
 		}
