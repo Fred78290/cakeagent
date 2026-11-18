@@ -18,6 +18,7 @@ env:
   TEAM_ID: ${{ secrets.TEAM_ID }}
   APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  BASE_VERSION: ${{ vars.BASE_VERSION || '1.0' }}
 
 jobs:
   seamlessd:
@@ -32,6 +33,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           submodules: recursive
+          fetch-depth: 0
  
       - name: Setup Swift
         uses: swift-actions/setup-swift@v2.4.0
@@ -43,7 +45,11 @@ jobs:
 
       - name: Version
         run: |
-          VERSION="${GITHUB_REF##*/}"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF##*/}"
+          else
+            VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
+          fi
           TMPFILE=$(mktemp)
           envsubst < darwin/Sources/CakeAgent/CI/CI.swift > $TMPFILE
           cp $TMPFILE darwin/Sources/CakeAgent/CI/CI.swift
@@ -65,7 +71,11 @@ jobs:
         run: |
           mkdir -p _artifacts
           pushd linux
-          VERSION="${GITHUB_REF##*/}"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF##*/}"
+          else
+            VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
+          fi
           BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ`
           LDFLAGS="-s -w -X github.com/Fred78290/cakeagent/version.VERSION=${VERSION} -X github.com/Fred78290/cakeagent/version.BUILD_DATE=${BUILD_DATE}"
           GOARCH=amd64 GOOS=linux go build -ldflags="${LDFLAGS}" -o ../_artifacts/cakeagent-linux-amd64
@@ -85,7 +95,11 @@ jobs:
       - name: Create MacOS package
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          export VERSION="${GITHUB_REF##*/}"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            export VERSION="${GITHUB_REF##*/}"
+          else
+            export VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
+          fi
           ./ci/setup-keychain.sh
           ./ci/create-pkg.sh
           security delete-keychain build.keychain
@@ -103,7 +117,7 @@ jobs:
       - name: Create Pre MacOS package
         if: github.event_name == 'push' && github.ref == 'refs/tags/ci-build'
         run: |
-          export VERSION="SNAPSHOT-$(git rev-parse --short=8 HEAD)"
+          export VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
           ./ci/setup-keychain.sh
           ./ci/create-pkg.sh
           security delete-keychain build.keychain
@@ -111,7 +125,7 @@ jobs:
       - name: "Create prerelease"
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ci-build')
         run: |
-          VERSION="SNAPSHOT-$(git rev-parse --short=8 HEAD)"
+          VERSION="v${BASE_VERSION}.$(git rev-list --count HEAD)"
           gh release create --prerelease --generate-notes --title "${VERSION}" ${VERSION} \
             ./.ci/Caker-${VERSION}.pkg \
             ./_artifacts/cakeagent-linux-amd64 \
