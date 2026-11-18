@@ -395,3 +395,17 @@ func TestEnsureInstalledIsSafeForConcurrentWorkers(t *testing.T) {
 		t.Fatal("the compositor is still missing or its XKB data incomplete")
 	}
 }
+
+func TestOutdatedDetectsACompositorFromAnOlderAgent(t *testing.T) {
+	if !outdated([]byte("v2"), []byte("v1")) {
+		t.Fatal("a compositor differing from the embedded one must be replaced")
+	}
+
+	if outdated([]byte("v2"), []byte("v2")) {
+		t.Fatal("an identical compositor must be kept")
+	}
+
+	if outdated(nil, []byte("custom")) {
+		t.Fatal("without an embedded compositor the installed one is left alone")
+	}
+}
