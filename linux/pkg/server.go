@@ -1037,6 +1037,11 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			err = fmt.Errorf("wrong protocol")
 		}
 
+		// Registered before the user is resolved: whatever fails from here on (an unknown user, a command that
+		// cannot start) the client is waiting for an exit code and would otherwise never get one, and the pty
+		// would leak.
+		defer cleanup()
+
 		if err == nil {
 			identity, err = s.identityFor(user)
 		}
@@ -1077,8 +1082,6 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 
 			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
-
-			defer cleanup()
 
 			if err = cmd.Start(); err == nil {
 
