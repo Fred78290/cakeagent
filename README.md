@@ -1,5 +1,6 @@
 # cakeagent
 [![Build](https://github.com/Fred78290/cakeagent/actions/workflows/linux.yaml/badge.svg)](https://github.com/Fred78290/cakeagent/actions/workflows/linux.yaml)
+[![Publish Wiki](https://github.com/Fred78290/cakeagent/actions/workflows/publish-wiki.yaml/badge.svg)](https://github.com/Fred78290/cakeagent/actions/workflows/publish-wiki.yaml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 **cakeagent** is a lightweight gRPC agent that runs *inside* a virtual machine and exposes guest-management operations to the outside world: system telemetry, command execution, an interactive shell/TTY, VirtioFS mounting, disk resizing, graceful shutdown, and TCP/UDP network tunneling / port-forwarding.
