@@ -5,6 +5,7 @@ package seamless
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -723,9 +725,23 @@ func (s *supervisor) userLoop(name string, primary bool) {
 // installXKB removes the completion marker while it copies, so two of them installing at once would corrupt each other.
 var installMu sync.Mutex
 
-// installNeeded tells whether the compositor at binary, or its XKB data, is missing or was not copied completely.
+// outdated tells whether the installed compositor differs from the embedded one. Nothing embedded means nothing to compare.
+func outdated(embedded, installed []byte) bool {
+	return len(embedded) > 0 && sha256.Sum256(embedded) != sha256.Sum256(installed)
+}
+
+// installNeeded tells whether the compositor at binary, or its XKB data, is missing, was not copied completely, or is
+// not the compositor embedded in this agent: an agent updated in place finds the binary of the previous one, which
+// speaks the previous protocol and would never be replaced if only its presence were checked. Only an embedded
+// compositor is compared: a development build, or a binary the operator pointed --seamless-binary at, is left alone.
 func installNeeded(binary string) bool {
-	if _, err := os.Stat(binary); err != nil {
+	current, err := os.ReadFile(binary)
+
+	if err != nil {
+		return true
+	}
+
+	if outdated(embeddedBinary(runtime.GOARCH), current) {
 		return true
 	}
 
