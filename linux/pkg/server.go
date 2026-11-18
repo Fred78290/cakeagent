@@ -821,6 +821,8 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 		var wg sync.WaitGroup
 		var message cakeagent.CakeAgent_ExecuteResponse
 		var cmd *exec.Cmd
+		// Set when the user cannot be resolved, so the deferred cleanup does not overwrite it with the result of sending the exit code.
+		var identityErr error
 
 		doCancel := func(reason string) {
 			if reason != "" {
@@ -994,7 +996,7 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			cancel()
 			tty.Close()
 
-			if cmd != nil {
+			if cmd != nil && cmd.ProcessState != nil {
 				message = cakeagent.CakeAgent_ExecuteResponse{
 					Response: &cakeagent.CakeAgent_ExecuteResponse_ExitCode{
 						ExitCode: int32(cmd.ProcessState.ExitCode()),
@@ -1008,8 +1010,15 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 				}
 			}
 
-			if err = stream.Send(&message); err != nil {
+			err = stream.Send(&message)
+
+			if err != nil {
 				glog.Errorf("Failed to send exit code: %v", err)
+			}
+
+			// Keep the identity resolution failure as the result of the call.
+			if identityErr != nil {
+				err = identityErr
 			}
 
 			if glog.GetLevel() >= glog.TraceLevel {
@@ -1037,8 +1046,22 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			err = fmt.Errorf("wrong protocol")
 		}
 
+		// Registered before the user is resolved: whatever fails from here on (an unknown user, a command that
+		// cannot start) the client is waiting for an exit code and would otherwise never get one, and the pty
+		// would leak.
+		defer cleanup()
+
 		if err == nil {
-			identity, err = s.identityFor(user)
+			// Resolving the user may wait for a compositor: stop when the client leaves, not only when the
+			// command's own context ends.
+			identCtx, stop := context.WithCancel(ctx)
+			unwatch := context.AfterFunc(stream.Context(), stop)
+
+			identity, err = s.identityFor(identCtx, user)
+
+			unwatch()
+			stop()
+			identityErr = err
 		}
 
 		if err == nil {
@@ -1077,8 +1100,6 @@ func (s *server) execute(command *cakeagent.CakeAgent_ExecuteRequest_ExecuteComm
 			}
 
 			cmd.Env = append(cmd.Env, "TERM=xterm-256color")
-
-			defer cleanup()
 
 			if err = cmd.Start(); err == nil {
 

@@ -3,6 +3,7 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/Fred78290/cakeagent/pkg/seamless"
+	glog "github.com/sirupsen/logrus"
 )
 
 var (
@@ -18,6 +20,7 @@ var (
 	getEUID        = os.Geteuid
 	listEnviron    = os.Environ
 	openPasswdFile = func() (*os.File, error) { return os.Open("/etc/passwd") }
+	seamlessEnsure = seamless.EnsureUser
 	seamlessStatus = seamless.CurrentStatus
 	seamlessEnv    = seamless.Env
 )
@@ -35,7 +38,7 @@ type userIdentity struct {
 // Caker sends the guest's seamless user here (the account the compositor and its windows belong to): the
 // agent runs as root, whose runtime directory (/run/user/0) holds no compositor socket, so a root shell or command
 // could never open a window.
-func (s *server) identityFor(name string) (*userIdentity, error) {
+func (s *server) identityFor(ctx context.Context, name string) (*userIdentity, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -85,6 +88,17 @@ func (s *server) identityFor(name string) (*userIdentity, error) {
 	// compositor.
 	if s.seamless {
 		cfg := seamless.Config{User: name}
+
+		// Every user can have windows: the compositor of one that has none yet is started now.
+		// The wait ends with ctx. A compositor that merely fails to come up is not fatal (the command runs without
+		// windows, as before), but a request that was cancelled has nothing left to run.
+		if err := seamlessEnsure(ctx, name); err != nil {
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("cannot run as user %q: %w", name, ctx.Err())
+			}
+
+			glog.Warnf("seamless: no compositor for %s: %v", name, err)
+		}
 
 		if seamlessStatus(cfg).Running {
 			if env, err := seamlessEnv(cfg); err == nil {

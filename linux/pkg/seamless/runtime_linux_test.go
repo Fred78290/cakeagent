@@ -5,6 +5,8 @@ package seamless
 import (
 	"bytes"
 	"context"
+	"errors"
+	"net"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -42,7 +44,8 @@ func testConfig(t *testing.T, script string) (Config, string) {
 
 	t.Cleanup(func() { ensureRuntimeDir = previous })
 
-	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111, ProfilePath: filepath.Join(dir, "profile.sh")}, out
+	// The hub socket lives in the test's directory: the default one is under /run, which only root can create.
+	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111, ProfilePath: filepath.Join(dir, "profile.sh"), HubSocket: filepath.Join(dir, "hub", "hub.sock")}, out
 }
 
 func waitFor(t *testing.T, what string, timeout time.Duration, condition func() bool) {
@@ -59,6 +62,17 @@ func waitFor(t *testing.T, what string, timeout time.Duration, condition func() 
 	}
 
 	t.Fatalf("timed out waiting for %s", what)
+}
+
+func TestSupervisorShutdownRejectsNewSpawn(t *testing.T) {
+	sup := &supervisor{ctx: context.Background(), users: map[string]bool{}}
+	sup.shutdown()
+
+	if sup.spawn("alice") {
+		t.Fatal("spawn succeeded after supervisor shutdown")
+	}
+
+	sup.wg.Wait()
 }
 
 func TestRunStartsTheCompositorWithItsArgumentsAndRestartsIt(t *testing.T) {
@@ -89,7 +103,8 @@ func TestRunStartsTheCompositorWithItsArgumentsAndRestartsIt(t *testing.T) {
 	data, _ := os.ReadFile(out)
 	line := strings.SplitN(string(data), "\n", 2)[0]
 
-	for _, want := range []string{"--connect vsock:5111", "--socket wayland-1", "layout=fr", "renderer=pixman"} {
+	// The compositor reaches the host through the hub, not by dialing vsock itself.
+	for _, want := range []string{"--connect " + cfg.HubConnect(), "--socket wayland-1", "layout=fr", "renderer=pixman"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("%q is missing from %q", want, line)
 		}
@@ -274,5 +289,109 @@ func TestActivationCommands(t *testing.T) {
 		if strings.Contains(a, "=") {
 			t.Fatalf("import-environment must not get values on its command line: %q", a)
 		}
+	}
+}
+
+// brokenListener fails every Accept, like a listener that ran out of file descriptors.
+type brokenListener struct{}
+
+func (brokenListener) Accept() (net.Conn, error) { return nil, errors.New("accept failed") }
+func (brokenListener) Close() error              { return nil }
+func (brokenListener) Addr() net.Addr            { return &net.UnixAddr{Net: "unix"} }
+
+func TestServeHubListensAgainWhenAcceptFails(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "hub.sock")
+	hub := &Hub{Authenticate: func(net.Conn) (Account, error) { return Account{}, errors.New("refused") }}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	relistened := make(chan struct{}, 1)
+
+	go func() {
+		done <- serveHub(ctx, hub, brokenListener{}, func() (net.Listener, error) {
+			l, err := net.Listen("unix", socket)
+
+			if err == nil {
+				relistened <- struct{}{}
+			}
+
+			return l, err
+		})
+	}()
+
+	select {
+	case <-relistened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the hub did not listen again")
+	}
+
+	// The new listener really accepts compositors.
+	waitFor(t, "the new listener to accept", 5*time.Second, func() bool {
+		conn, err := net.Dial("unix", socket)
+
+		if err == nil {
+			conn.Close()
+		}
+
+		return err == nil
+	})
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("a cancelled context is not an error, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serveHub did not return after the context was cancelled")
+	}
+}
+
+func TestServeHubGivesUpWhenTheListenerCannotRecover(t *testing.T) {
+	hub := &Hub{}
+	attempts := 0
+
+	err := serveHub(context.Background(), hub, brokenListener{}, func() (net.Listener, error) {
+		attempts++
+
+		return nil, errors.New("cannot listen")
+	})
+
+	if err == nil {
+		t.Fatal("serveHub must report that it gave up")
+	}
+
+	if attempts == 0 {
+		t.Fatal("the listener was never opened again")
+	}
+}
+
+func TestEnsureInstalledIsSafeForConcurrentWorkers(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source")
+
+	if err := os.WriteFile(source, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(EnvBinary, source)
+
+	dest := filepath.Join(dir, "bin", BinaryName)
+	errs := make(chan error, 8)
+
+	for i := 0; i < cap(errs); i++ {
+		go func() { errs <- ensureInstalled(dest) }()
+	}
+
+	for i := 0; i < cap(errs); i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("ensureInstalled: %v", err)
+		}
+	}
+
+	// Once every caller returned, the installation is complete.
+	if installNeeded(dest) {
+		t.Fatal("the compositor is still missing or its XKB data incomplete")
 	}
 }

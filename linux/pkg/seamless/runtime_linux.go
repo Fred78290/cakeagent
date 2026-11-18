@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -303,7 +304,7 @@ func xkbConfigRoot(binary string) string {
 
 // runOnce starts the compositor and waits for it to exit.
 func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) error {
-	args := []string{"--connect", cfg.Connect(), "--socket", cfg.SocketName}
+	args := []string{"--connect", cfg.HubConnect(), "--socket", cfg.SocketName}
 	cmd := exec.CommandContext(ctx, cfg.Binary, args...)
 
 	cmd.Env = append(baseEnv(a, runtimeDir), "WLR_RENDERER=pixman")
@@ -337,7 +338,7 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 		return err
 	}
 
-	glog.Infof("seamless: compositor started as %s (pid %d), host on %s", a.Name, cmd.Process.Pid, cfg.Connect())
+	glog.Infof("seamless: compositor started as %s (pid %d), hub on %s", a.Name, cmd.Process.Pid, cfg.HubConnect())
 
 	go logLines("caker-seamlessd", stdout)
 	go logLines("caker-seamlessd", stderr)
@@ -435,46 +436,366 @@ func runActivationCommands(ctx context.Context, a Account, runtimeDir, bus strin
 
 // Run keeps the compositor running for the guest's user until ctx is cancelled: it waits for the user to exist,
 // restarts the compositor when it exits (slowing down while it keeps failing) and stops it with ctx.
+//
+// Other users get a compositor when EnsureUser is asked for one. They all reach the host through the Hub Run serves.
 func Run(ctx context.Context, cfg Config) error {
 	cfg = cfg.WithDefaults()
-	backoff := time.Second
 
 	// A command typed in a guest shell reaches the compositor too, not only what "launch" starts.
 	if _, err := InstallSessionProfile(cfg); err != nil {
 		glog.Warnf("seamless: shell profile not installed: %v", err)
 	}
 
-	for ctx.Err() == nil {
-		a, err := LookupAccount(cfg.User)
+	hub, listener, err := newGuestHub(cfg)
+
+	if err != nil {
+		return err
+	}
+
+	// A hub that cannot recover stops the whole supervisor: compositors that cannot reach it would run for nothing.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sup := &supervisor{ctx: ctx, cfg: cfg, hub: hub, users: map[string]bool{}}
+	var hubErr error
+
+	// Registered before the supervisor is visible to EnsureUser.
+	sup.wg.Add(2)
+
+	setActiveSupervisor(sup)
+
+	defer setActiveSupervisor(nil)
+
+	go func() {
+		defer sup.wg.Done()
+
+		if err := serveHub(ctx, hub, listener, func() (net.Listener, error) { return listenGuestHub(cfg) }); err != nil {
+			glog.Errorf("seamless: %v", err)
+
+			hubErr = err
+
+			cancel()
+		}
+	}()
+
+	go func() {
+		defer sup.wg.Done()
+
+		sup.userLoop(cfg.User, true)
+	}()
+
+	<-ctx.Done()
+
+	// Clear the global first so new EnsureUser calls cannot obtain this supervisor.
+	setActiveSupervisor(nil)
+
+	// No already-obtained worker is admitted from here on, so Wait never races with an Add.
+	sup.shutdown()
+	sup.wg.Wait()
+
+	// hubErr is written before the goroutine that sets it is done, which Wait has waited for.
+	return hubErr
+}
+
+const (
+	hubMaxFailures    = 5
+	hubInitialBackoff = 100 * time.Millisecond
+	hubMaxBackoff     = 5 * time.Second
+	// hubHealthyAfter is how long a Serve must have lasted for its failure not to count with the previous ones.
+	hubHealthyAfter = time.Minute
+)
+
+// serveHub serves the hub until ctx is done. When Serve fails (the listener broke: no file descriptors left, the
+// socket was removed...) the listener is closed and a new one opened with relisten, after a growing pause, so that the
+// compositors can connect again. It gives up, returning the error, once failures follow one another too closely
+// (hubMaxFailures without a Serve that lasted hubHealthyAfter), or when ctx ends, which is not an error.
+func serveHub(ctx context.Context, hub *Hub, listener net.Listener, relisten func() (net.Listener, error)) error {
+	backoff := hubInitialBackoff
+	failures := 0
+
+	for {
+		started := time.Now()
+		err := hub.Serve(ctx, listener)
+
+		// Serve only closes the listener when ctx ends.
+		listener.Close()
+
+		if ctx.Err() != nil {
+			return nil
+		}
+
+		if time.Since(started) > hubHealthyAfter {
+			failures, backoff = 0, hubInitialBackoff
+		}
+
+		for {
+			failures++
+
+			if failures > hubMaxFailures {
+				return fmt.Errorf("seamless hub: giving up after %d consecutive failures: %w", failures-1, err)
+			}
+
+			glog.Warnf("seamless: hub failed (%v), listening again in %s", err, backoff)
+			sleep(ctx, backoff)
+
+			backoff = min(backoff*2, hubMaxBackoff)
+
+			if ctx.Err() != nil {
+				return nil
+			}
+
+			if listener, err = relisten(); err == nil {
+				break
+			}
+		}
+	}
+}
+
+// supervisor runs one compositor per guest user.
+type supervisor struct {
+	ctx context.Context
+	cfg Config
+	hub *Hub
+	wg  sync.WaitGroup
+
+	mu     sync.Mutex
+	users  map[string]bool
+	closed bool
+}
+
+var (
+	activeMu         sync.Mutex
+	activeSupervisor *supervisor
+)
+
+func setActiveSupervisor(s *supervisor) {
+	activeMu.Lock()
+	activeSupervisor = s
+	activeMu.Unlock()
+}
+
+func currentSupervisor() *supervisor {
+	activeMu.Lock()
+	defer activeMu.Unlock()
+
+	return activeSupervisor
+}
+
+// claim says the caller is the one to run name's compositor. A user has at most one.
+func (s *supervisor) claim(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.users[name] {
+		return false
+	}
+
+	s.users[name] = true
+
+	return true
+}
+
+// shutdown stops admitting workers: after it returns, spawn refuses and wg only goes down.
+func (s *supervisor) shutdown() {
+	s.mu.Lock()
+	s.closed = true
+	s.mu.Unlock()
+}
+
+// spawn makes sure a worker runs name's compositor, started on demand. It returns false when the supervisor is shutting
+// down. The check, the claim and the registration with wg happen under one lock, so Run's Wait cannot start between them.
+func (s *supervisor) spawn(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return false
+	}
+
+	if s.users[name] {
+		return true
+	}
+
+	s.users[name] = true
+	s.wg.Add(1)
+
+	go func() {
+		defer s.wg.Done()
+
+		s.runUser(name, false)
+	}()
+
+	return true
+}
+
+func (s *supervisor) release(name string) {
+	s.mu.Lock()
+	delete(s.users, name)
+	s.mu.Unlock()
+}
+
+// EnsureUser makes sure the compositor of name runs and accepts connections (a few seconds at most: its
+// runtime directory may have to be created), so that what is started for that user shows its windows on the host.
+// It does nothing, and succeeds, when no Run is active (the agent is not serving seamless windows).
+//
+// The wait ends as soon as ctx does, with ctx's error: the compositor keeps starting in the background, only the caller
+// stops waiting for it.
+func EnsureUser(ctx context.Context, name string) error {
+	s := currentSupervisor()
+
+	if s == nil || name == "" {
+		return nil
+	}
+
+	a, err := LookupAccount(name)
+
+	if err != nil {
+		return err
+	}
+
+	if !s.spawn(a.Name) {
+		return fmt.Errorf("seamless is shutting down")
+	}
+
+	timeout := time.NewTimer(15 * time.Second)
+	defer timeout.Stop()
+
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+
+	for s.ctx.Err() == nil {
+		// Ready means the supervised compositor is attached to the hub, and its Wayland socket answers: a socket
+		// alone could be anyone's listener, and an attached compositor may not serve its clients yet.
+		if s.hub.Attached(a.UID) {
+			if _, ok := liveRuntimeDir(s.cfg, a); ok {
+				return nil
+			}
+		}
+
+		select {
+		case <-tick.C:
+		case <-ctx.Done():
+			return fmt.Errorf("stopped waiting for the compositor of %s: %w", a.Name, ctx.Err())
+		case <-s.ctx.Done():
+		case <-timeout.C:
+			return fmt.Errorf("the compositor of %s did not start", a.Name)
+		}
+	}
+
+	return fmt.Errorf("the compositor of %s did not start", a.Name)
+}
+
+// userLoop runs the compositor of name, or of the first regular user when name is empty, waiting for the user to
+// exist. primary tells the hub whose window titles are left alone.
+func (s *supervisor) userLoop(name string, primary bool) {
+	for s.ctx.Err() == nil {
+		a, err := LookupAccount(name)
 
 		if err != nil {
 			glog.Debugf("seamless: waiting for a user: %v", err)
-			sleep(ctx, 5*time.Second)
+			sleep(s.ctx, 5*time.Second)
+
+			continue
+		}
+
+		if primary {
+			s.hub.SetPrimary(a.Name)
+		}
+
+		if s.claim(a.Name) {
+			s.runUser(a.Name, primary)
+
+			return
+		}
+
+		// Someone already started this user's compositor on demand: it keeps running and is reused, but its worker
+		// does not wait for a primary account that goes away, so the primary loop must not end with this claim. Wait
+		// for the claim to be released, then take over.
+		if !primary {
+			return
+		}
+
+		sleep(s.ctx, time.Second)
+	}
+}
+
+// installMu serializes installations: the primary and the on-demand workers share one binary and one XKB tree, and
+// installXKB removes the completion marker while it copies, so two of them installing at once would corrupt each other.
+var installMu sync.Mutex
+
+// installNeeded tells whether the compositor at binary, or its XKB data, is missing or was not copied completely.
+func installNeeded(binary string) bool {
+	if _, err := os.Stat(binary); err != nil {
+		return true
+	}
+
+	return embeddedXKB() != nil && !XKBInstalled(binary)
+}
+
+// ensureInstalled makes sure the compositor and its XKB data are fully in place at binary. It always takes the lock,
+// even when it finds nothing to do: an installation under way may not have removed the completion marker yet, so a
+// check made outside the lock could pass while the tree is about to be rewritten. A caller that waited then sees the
+// installation complete and does not repeat it, so no compositor starts on a half-copied tree.
+func ensureInstalled(binary string) error {
+	installMu.Lock()
+	defer installMu.Unlock()
+
+	if !installNeeded(binary) {
+		return nil
+	}
+
+	_, _, err := Install(binary)
+
+	return err
+}
+
+// runUser keeps the compositor of an account that this supervisor has claimed running, until the context ends, or
+// the account is gone (unless it is the primary one, which waits for it to come back).
+func (s *supervisor) runUser(name string, primary bool) {
+	defer s.release(name)
+
+	cfg := s.cfg
+	cfg.User = name
+	backoff := time.Second
+
+	for s.ctx.Err() == nil {
+		a, err := LookupAccount(name)
+
+		if err != nil {
+			if !primary {
+				glog.Infof("seamless: %s is gone, stopping its compositor", name)
+
+				return
+			}
+
+			glog.Debugf("seamless: waiting for a user: %v", err)
+			sleep(s.ctx, 5*time.Second)
+
 			continue
 		}
 
 		// An agent updated in place finds the binary of the previous one: its XKB data is still to come, or its copy was interrupted.
-		if _, err = os.Stat(cfg.Binary); err != nil || (embeddedXKB() != nil && !XKBInstalled(cfg.Binary)) {
-			if _, _, err = Install(cfg.Binary); err != nil {
-				glog.Errorf("seamless: %v", err)
-				sleep(ctx, 30*time.Second)
-				continue
-			}
+		if err = ensureInstalled(cfg.Binary); err != nil {
+			glog.Errorf("seamless: %v", err)
+			sleep(s.ctx, 30*time.Second)
+
+			continue
 		}
 
 		runtimeDir, err := ensureRuntimeDir(a)
 
 		if err != nil {
 			glog.Errorf("seamless: no runtime directory for %s: %v", a.Name, err)
-			sleep(ctx, 10*time.Second)
+			sleep(s.ctx, 10*time.Second)
+
 			continue
 		}
 
 		started := time.Now()
-		err = runOnce(ctx, cfg, a, runtimeDir)
+		err = runOnce(s.ctx, cfg, a, runtimeDir)
 
-		if ctx.Err() != nil {
-			return nil
+		if s.ctx.Err() != nil {
+			return
 		}
 
 		wait := backoff
@@ -485,11 +806,9 @@ func Run(ctx context.Context, cfg Config) error {
 			backoff *= 2
 		}
 
-		glog.Warnf("seamless: compositor exited (%v), restarting in %s", err, wait)
-		sleep(ctx, wait)
+		glog.Warnf("seamless: compositor of %s exited (%v), restarting in %s", a.Name, err, wait)
+		sleep(s.ctx, wait)
 	}
-
-	return nil
 }
 
 // Launch starts a command as the guest's user, detached, with the compositor's environment. It returns the pid.

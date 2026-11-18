@@ -1,8 +1,11 @@
-//go:build !windows && !linux
+//go:build !windows && !linux && !darwin
 
 package pkg
 
-import "syscall"
+import (
+	"context"
+	"syscall"
+)
 
 type userIdentity struct {
 	credential *syscall.Credential
@@ -10,4 +13,4 @@ type userIdentity struct {
 	env        []string
 }
 
-func (s *server) identityFor(name string) (*userIdentity, error) { return nil, nil }
+func (s *server) identityFor(_ context.Context, name string) (*userIdentity, error) { return nil, nil }

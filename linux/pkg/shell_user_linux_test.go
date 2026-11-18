@@ -3,6 +3,8 @@
 package pkg
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/user"
 	"strings"
@@ -12,7 +14,7 @@ import (
 )
 
 func TestIdentityForNoUserKeepsTheAgentsOwn(t *testing.T) {
-	identity, err := (&server{}).identityFor("")
+	identity, err := (&server{}).identityFor(context.Background(), "")
 
 	if identity != nil || err != nil {
 		t.Fatalf("an empty user must leave the process as it is: %v %v", identity, err)
@@ -26,7 +28,7 @@ func TestIdentityForTheAgentsOwnUserKeepsTheAgentsOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	identity, err := (&server{}).identityFor(current.Username)
+	identity, err := (&server{}).identityFor(context.Background(), current.Username)
 
 	if identity != nil || err != nil {
 		t.Fatalf("the agent's own user needs no switch: %v %v", identity, err)
@@ -34,7 +36,7 @@ func TestIdentityForTheAgentsOwnUserKeepsTheAgentsOwn(t *testing.T) {
 }
 
 func TestIdentityForUnknownUser(t *testing.T) {
-	if _, err := (&server{}).identityFor("no-such-user-caker"); err == nil {
+	if _, err := (&server{}).identityFor(context.Background(), "no-such-user-caker"); err == nil {
 		t.Fatal("expected an error for an unknown user")
 	}
 }
@@ -50,7 +52,7 @@ func TestIdentityForNeedsRoot(t *testing.T) {
 		t.Skip("running as root")
 	}
 
-	if _, err := (&server{}).identityFor(other); err == nil {
+	if _, err := (&server{}).identityFor(context.Background(), other); err == nil {
 		t.Fatal("a non-root agent cannot switch user")
 	}
 }
@@ -82,7 +84,17 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 			"LOGNAME=root",
 		}
 	}
+	ensured := ""
+	seamlessEnsure = func(_ context.Context, name string) error {
+		ensured = name
+
+		return nil
+	}
 	seamlessStatus = func(cfg seamless.Config) seamless.Status {
+		if ensured != "guest" {
+			t.Fatalf("the compositor of the user must be ensured before its status is checked, got %q", ensured)
+		}
+
 		if cfg.User != "guest" {
 			t.Fatalf("unexpected seamless user: %q", cfg.User)
 		}
@@ -97,7 +109,7 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 		return []string{"WAYLAND_DISPLAY=wayland-1", "XDG_RUNTIME_DIR=/run/caker-seamless/guest"}, nil
 	}
 
-	identity, err := (&server{seamless: true}).identityFor("guest")
+	identity, err := (&server{seamless: true}).identityFor(context.Background(), "guest")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -132,6 +144,56 @@ func TestIdentityForSwitchesUserAndSanitizesEnvironment(t *testing.T) {
 	assertHasEnv(t, identity.env, "XDG_RUNTIME_DIR=/run/caker-seamless/guest")
 	assertHasEnv(t, identity.env, "WAYLAND_DISPLAY=wayland-1")
 	assertHasEnv(t, identity.env, "PATH=/usr/bin")
+
+	if ensured != "guest" {
+		t.Fatalf("the compositor of the user must be asked for, got %q", ensured)
+	}
+}
+
+func stubGuestAccount() {
+	lookupUser = func(string) (*user.User, error) {
+		return &user.User{Uid: "1001", Gid: "1002", Username: "guest", HomeDir: "/home/guest"}, nil
+	}
+	getEUID = func() int { return 0 }
+	openPasswdFile = func() (*os.File, error) { return nil, os.ErrNotExist }
+	listEnviron = func() []string { return []string{"PATH=/usr/bin"} }
+	seamlessStatus = func(seamless.Config) seamless.Status { return seamless.Status{} }
+}
+
+func TestIdentityForCancelledWhileWaitingForTheCompositor(t *testing.T) {
+	restore := setIdentityForTestHooks()
+
+	defer restore()
+	stubGuestAccount()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	seamlessEnsure = func(ctx context.Context, _ string) error {
+		cancel()
+
+		return ctx.Err()
+	}
+
+	if identity, err := (&server{seamless: true}).identityFor(ctx, "guest"); err == nil || identity != nil {
+		t.Fatalf("a cancelled request must not go on: %v %v", identity, err)
+	}
+}
+
+func TestIdentityForCompositorFailureFallsBack(t *testing.T) {
+	restore := setIdentityForTestHooks()
+
+	defer restore()
+	stubGuestAccount()
+
+	seamlessEnsure = func(context.Context, string) error { return errors.New("did not start") }
+
+	identity, err := (&server{seamless: true}).identityFor(context.Background(), "guest")
+
+	if err != nil || identity == nil {
+		t.Fatalf("a compositor that does not start must not stop the command: %v %v", identity, err)
+	}
+
+	assertHasEnv(t, identity.env, "XDG_RUNTIME_DIR=/run/user/1001")
 }
 
 func setIdentityForTestHooks() func() {
@@ -140,6 +202,7 @@ func setIdentityForTestHooks() func() {
 	listEnvironOld := listEnviron
 	openPasswdFileOld := openPasswdFile
 	seamlessStatusOld := seamlessStatus
+	seamlessEnsureOld := seamlessEnsure
 	seamlessEnvOld := seamlessEnv
 
 	return func() {
@@ -148,6 +211,7 @@ func setIdentityForTestHooks() func() {
 		listEnviron = listEnvironOld
 		openPasswdFile = openPasswdFileOld
 		seamlessStatus = seamlessStatusOld
+		seamlessEnsure = seamlessEnsureOld
 		seamlessEnv = seamlessEnvOld
 	}
 }
