@@ -44,7 +44,8 @@ func testConfig(t *testing.T, script string) (Config, string) {
 
 	t.Cleanup(func() { ensureRuntimeDir = previous })
 
-	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111, ProfilePath: filepath.Join(dir, "profile.sh")}, out
+	// The hub socket lives in the test's directory: the default one is under /run, which only root can create.
+	return Config{User: current.Username, Binary: binary, Layout: "fr", Port: 5111, ProfilePath: filepath.Join(dir, "profile.sh"), HubSocket: filepath.Join(dir, "hub", "hub.sock")}, out
 }
 
 func waitFor(t *testing.T, what string, timeout time.Duration, condition func() bool) {
@@ -91,7 +92,8 @@ func TestRunStartsTheCompositorWithItsArgumentsAndRestartsIt(t *testing.T) {
 	data, _ := os.ReadFile(out)
 	line := strings.SplitN(string(data), "\n", 2)[0]
 
-	for _, want := range []string{"--connect vsock:5111", "--socket wayland-1", "layout=fr", "renderer=pixman"} {
+	// The compositor reaches the host through the hub, not by dialing vsock itself.
+	for _, want := range []string{"--connect " + cfg.HubConnect(), "--socket wayland-1", "layout=fr", "renderer=pixman"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("%q is missing from %q", want, line)
 		}
