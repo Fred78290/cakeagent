@@ -4,7 +4,7 @@
 #
 #   scripts/build-seamlessd.sh <compositor source dir> <output file>
 #
-# The source is Tools/SeamlessCompositor of https://github.com/Fred78290/caker. Run it on Alpine (a container or a
+# The source is the seamlessd/ directory of this repository. Run it on Alpine (a container or a
 # VM) of the architecture to build for; scripts/seamlessd.Dockerfile does that. wlroots is built from source with
 # only the headless backend and the pixman renderer, the distribution's wlroots drags in DRM, libinput, X11,
 # Vulkan... which have no static libraries.

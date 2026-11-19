@@ -1,6 +1,6 @@
 // Package seamless runs Caker's seamless windows compositor inside a Linux guest.
 //
-// caker-seamlessd (Tools/SeamlessCompositor in the caker repository) is a headless Wayland compositor that streams
+// caker-seamlessd (seamlessd/ in this repository) is a headless Wayland compositor that streams
 // every window to the macOS host over vsock. This package makes the agent the thing that ships and supervises it:
 //
 //   - Install puts the compositor binary (embedded in the agent at build time, see assets/) at a fixed path, with

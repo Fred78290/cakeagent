@@ -295,7 +295,7 @@ This orchestrates Go generation (`proto/linux.sh`) and Swift generation (`proto/
 
 - [`.github/workflows/release.yaml`](.github/workflows/release.yaml): on push to `master` or a `v*`/`ci-build` tag, builds the Swift agent (universal binary), the Go agent for `linux`/`darwin` × `amd64`/`arm64`, and — for tagged releases — code-signs, notarizes and packages the macOS binary into a `.pkg` via [`.ci/build.sh`](.ci/build.sh) / [`.ci/create-pkg.sh`](.ci/create-pkg.sh).
 - [`.github/workflows/linux.yaml`](.github/workflows/linux.yaml): builds the Go agent for `linux`/`darwin`/`windows` × `amd64`/`arm64`, embedding the seamless compositor in the Linux binaries; on a `ci-linux` tag it publishes them as a prerelease, and on a `ci-release` tag as a release (promoting the prerelease of the same commit if one exists).
-- [`.github/workflows/seamlessd.yaml`](.github/workflows/seamlessd.yaml): builds the seamless compositor from Caker's sources (`caker_ref` input), called by the Linux workflow or run by hand.
+- [`.github/workflows/seamlessd.yaml`](.github/workflows/seamlessd.yaml): builds the seamless compositor from [`seamlessd/`](seamlessd), called by the Linux workflow or run by hand.
 - [`.cirrus.yml`](.cirrus.yml) provides additional build coverage.
 
 ## Troubleshooting

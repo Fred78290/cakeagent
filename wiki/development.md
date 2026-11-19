@@ -47,7 +47,7 @@ Les binaires Linux embarquent `caker-seamlessd`, construit à part :
 scripts/build-seamlessd.sh      # voir aussi scripts/seamlessd.Dockerfile
 ```
 
-Le workflow `seamlessd.yaml` le construit pour `amd64` et `arm64` à partir des sources de Caker (`Tools/SeamlessCompositor`, entrée `caker_ref`) et les workflows Linux téléchargent les artefacts dans `linux/pkg/seamless/assets/<arch>/` avant de compiler. Un build local sans ces fichiers n'embarque pas de compositeur (voir [Fenêtres seamless](seamless-windows)).
+Le workflow `seamlessd.yaml` le construit pour `amd64` et `arm64` à partir de ses sources (répertoire `seamlessd/` de ce dépôt) et les workflows Linux téléchargent les artefacts dans `linux/pkg/seamless/assets/<arch>/` avant de compiler. Un build local sans ces fichiers n'embarque pas de compositeur (voir [Fenêtres seamless](seamless-windows)).
 
 ## CI
 
@@ -111,7 +111,7 @@ The Linux binaries embed `caker-seamlessd`, built separately:
 scripts/build-seamlessd.sh      # see also scripts/seamlessd.Dockerfile
 ```
 
-The `seamlessd.yaml` workflow builds it for `amd64` and `arm64` from Caker's sources (`Tools/SeamlessCompositor`, the `caker_ref` input) and the Linux workflows download the artifacts into `linux/pkg/seamless/assets/<arch>/` before compiling. A local build without those files embeds no compositor (see [Seamless windows](seamless-windows)).
+The `seamlessd.yaml` workflow builds it for `amd64` and `arm64` from its sources (the `seamlessd/` directory of this repository) and the Linux workflows download the artifacts into `linux/pkg/seamless/assets/<arch>/` before compiling. A local build without those files embeds no compositor (see [Seamless windows](seamless-windows)).
 
 ## CI
 

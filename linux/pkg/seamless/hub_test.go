@@ -503,7 +503,7 @@ func TestHubDropsCompositorsWhenTheHostIsGone(t *testing.T) {
 	}
 }
 
-// The shipped compositor (Tools/SeamlessCompositor, transport_close) does not exit when its connection ends: it
+// The shipped compositor (seamlessd/, transport_close) does not exit when its connection ends: it
 // retries every second and announces all its windows again after the next acknowledgement. So when the host
 // connection is lost the hub only has to close every compositor, and each one comes back on its own, windows included.
 func TestHubHostLossLetsEveryCompositorReconnectAndAnnounceAgain(t *testing.T) {

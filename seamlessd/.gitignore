@@ -1,0 +1,4 @@
+*.o
+caker-seamlessd
+*-protocol.h
+.mode
