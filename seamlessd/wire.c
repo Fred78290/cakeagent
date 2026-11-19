@@ -65,7 +65,9 @@ void wbuf_str(struct wbuf *b, const char *s) {
 	if (n > SEAMLESS_MAX_STRING) {
 		n = SEAMLESS_MAX_STRING;
 
-		/* Don't cut in the middle of a UTF-8 sequence: back up to a lead byte. */
+		/* Don't cut in the middle of a UTF-8 sequence. s[n] is the first byte left out (it exists: strlen(s) > n);
+		 * when it is a continuation byte the cut would split a sequence, so back up until the byte left out is not
+		 * one, which makes the kept bytes end on a character boundary. */
 		while (n > 0 && ((uint8_t)s[n] & 0xC0) == 0x80)
 			n--;
 	}
