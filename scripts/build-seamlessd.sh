@@ -22,7 +22,7 @@ PREFIX=/opt/seamlessd-deps
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-apk add --no-cache build-base pkgconf meson ninja curl \
+apk add --no-cache build-base pkgconf meson ninja curl file \
 	wayland-dev wayland-static wayland-protocols \
 	libxkbcommon-dev libxkbcommon-static pixman-dev pixman-static \
 	lz4-dev lz4-static expat-static libffi-dev
