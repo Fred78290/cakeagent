@@ -1,12 +1,11 @@
 # Static caker-seamlessd for the architecture this image is built on, with the XKB data it compiles its keymap from:
-#   docker build -f scripts/seamlessd.Dockerfile --build-context compositor=<caker>/Tools/SeamlessCompositor \
-#          --output type=local,dest=out .
+#   docker build -f scripts/seamlessd.Dockerfile --output type=local,dest=out .
 # leaves out/caker-seamlessd and out/xkb/. The compositor needs the data (libxkbcommon reads rules, keycodes, types,
 # compat and symbols files at run time), the agent installs it beside the binary for guests without xkb-data.
 FROM alpine:3.24 AS build
 RUN apk add --no-cache file xkeyboard-config
 COPY scripts/build-seamlessd.sh /build-seamlessd.sh
-COPY --from=compositor . /src
+COPY seamlessd /src
 RUN /build-seamlessd.sh /src /caker-seamlessd
 
 # Only what libxkbcommon reads: no geometry, no rules registry (xml, lst). Dereferenced, the distribution links some.

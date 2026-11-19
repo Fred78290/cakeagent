@@ -1,22 +1,12 @@
 name: Build seamless windows compositor
 
-# Builds the static caker-seamlessd (Tools/SeamlessCompositor of the caker repository) for each Linux architecture.
+# Builds the static caker-seamlessd (seamlessd/ of this repository) for each Linux architecture.
 # The agent embeds it with the XKB data it compiles its keymap from (linux/pkg/seamless/assets/<arch>/caker-seamlessd
 # and xkb/), so a guest needs nothing but the agent.
 
 on:
   workflow_call:
-    inputs:
-      caker_ref:
-        description: Ref of Fred78290/caker providing the compositor source
-        type: string
-        default: feature/seamless-windows
   workflow_dispatch:
-    inputs:
-      caker_ref:
-        description: Ref of Fred78290/caker providing the compositor source
-        type: string
-        default: feature/seamless-windows
 
 jobs:
   build:
@@ -33,19 +23,9 @@ jobs:
       - name: checkout cakeagent
         uses: actions/checkout@v7
 
-      - name: checkout compositor source
-        uses: actions/checkout@v7
-        with:
-          repository: Fred78290/caker
-          ref: ${{ inputs.caker_ref }}
-          path: caker
-          sparse-checkout: Tools/SeamlessCompositor
-
       - name: Build static compositor (Alpine, musl)
         run: |
-          docker build -f scripts/seamlessd.Dockerfile \
-            --build-context compositor=caker/Tools/SeamlessCompositor \
-            --output type=local,dest=out .
+          docker build -f scripts/seamlessd.Dockerfile --output type=local,dest=out .
           file out/caker-seamlessd
           ls -l out/caker-seamlessd
           test -s out/xkb/rules/evdev

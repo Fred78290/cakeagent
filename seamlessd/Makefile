@@ -1,0 +1,68 @@
+# Guest compositor of Caker's seamless windows. Builds on a Linux guest:
+#
+#   sudo apt install build-essential pkg-config libwlroots-0.19-dev wayland-protocols libwayland-dev \
+#                    libwayland-bin liblz4-dev libxkbcommon-dev libpixman-1-dev
+#   make
+#
+# Targets wlroots 0.19 (Ubuntu 26.04, Fedora 42+, Debian trixie backports).
+
+PKGS := wlroots-0.19 wayland-server xkbcommon pixman-1 liblz4 libdrm
+CFLAGS ?= -O2 -g
+
+# STATIC=1 links everything into one binary with no runtime dependencies (the agent embeds that one). It needs
+# static libraries: scripts/build-seamlessd.sh of this repository builds them on Alpine (musl). Switching
+# between `make` and `make STATIC=1` recompiles and relinks (see .mode below).
+ifdef STATIC
+PKGCONFIG := pkg-config --static
+LDFLAGS += -static
+else
+PKGCONFIG := pkg-config
+endif
+
+override CFLAGS += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -DWLR_USE_UNSTABLE -I. $(shell $(PKGCONFIG) --cflags $(PKGS))
+override LDLIBS := $(shell $(PKGCONFIG) --libs $(PKGS)) -lm
+
+WL_PROTOCOLS := $(shell pkg-config --variable=pkgdatadir wayland-protocols)
+
+# Protocol headers that wlroots' public headers include.
+PROTO_HEADERS := xdg-shell-protocol.h xdg-decoration-unstable-v1-protocol.h fractional-scale-v1-protocol.h \
+	cursor-shape-v1-protocol.h tablet-v2-protocol.h
+
+# The link mode changes the flags but not any file: record it, so that switching modes rebuilds instead of
+# reporting a binary built the other way as up to date.
+MODE := $(if $(STATIC),static,dynamic)
+
+.DEFAULT_GOAL := all
+
+.mode: FORCE
+	@echo $(MODE) | cmp -s - $@ || echo $(MODE) > $@
+
+FORCE:
+
+all: caker-seamlessd
+
+xdg-shell-protocol.h:
+	wayland-scanner server-header $(WL_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
+
+xdg-decoration-unstable-v1-protocol.h:
+	wayland-scanner server-header $(WL_PROTOCOLS)/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml $@
+
+fractional-scale-v1-protocol.h:
+	wayland-scanner server-header $(WL_PROTOCOLS)/staging/fractional-scale/fractional-scale-v1.xml $@
+
+cursor-shape-v1-protocol.h:
+	wayland-scanner server-header $(WL_PROTOCOLS)/staging/cursor-shape/cursor-shape-v1.xml $@
+
+tablet-v2-protocol.h:
+	wayland-scanner server-header $(WL_PROTOCOLS)/stable/tablet/tablet-v2.xml $@
+
+main.o: main.c wire.h $(PROTO_HEADERS) .mode
+wire.o: wire.c wire.h .mode
+
+caker-seamlessd: main.o wire.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+clean:
+	rm -f *.o caker-seamlessd $(PROTO_HEADERS) .mode
+
+.PHONY: all clean FORCE

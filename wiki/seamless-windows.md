@@ -4,7 +4,7 @@
 
 # Fenêtres seamless (invités Linux)
 
-L'agent Linux embarque et supervise `caker-seamlessd`, un compositeur Wayland sans écran qui envoie chaque fenêtre de l'invité à l'hôte macOS par vsock. Caker affiche chacune comme une fenêtre native (titre préfixé du nom de la VM). Le compositeur est un binaire statique intégré à l'agent (construit par `scripts/build-seamlessd.sh`, voir `.github/workflows/seamlessd.yaml`, depuis les sources de Caker) : l'invité n'a besoin de rien d'autre que l'agent. Les données XKB dont le compositeur tire sa disposition de clavier sont intégrées aussi et installées à côté (`/usr/libexec/caker/xkb`) ; elles ne servent que si l'invité n'a pas son propre `xkb-data` ou `xkeyboard-config`.
+L'agent Linux embarque et supervise `caker-seamlessd`, un compositeur Wayland sans écran qui envoie chaque fenêtre de l'invité à l'hôte macOS par vsock. Caker affiche chacune comme une fenêtre native (titre préfixé du nom de la VM). Le compositeur est un binaire statique intégré à l'agent (construit par `scripts/build-seamlessd.sh`, voir `.github/workflows/seamlessd.yaml`, depuis les sources du répertoire `seamlessd/`) : l'invité n'a besoin de rien d'autre que l'agent. Les données XKB dont le compositeur tire sa disposition de clavier sont intégrées aussi et installées à côté (`/usr/libexec/caker/xkb`) ; elles ne servent que si l'invité n'a pas son propre `xkb-data` ou `xkeyboard-config`.
 
 ## Activer
 
@@ -49,7 +49,7 @@ caker-seamlessd (bob)   ---+--> hub (agent) --> une connexion vsock --> l'hôte
 - Le hub borne la mémoire des images en vol, la file d'écriture de chaque compositeur et les délais d'écriture vers l'hôte ; il sert jusqu'à 255 compositeurs.
 - Un compositeur est démarré pour un utilisateur quand quelque chose en demande un, par exemple une commande `Execute` ou `cakeagent seamless launch` sous ce compte.
 
-Rien ne change au format du protocole : un hôte et un compositeur qui ignorent le hub continuent de fonctionner. Le protocole est dupliqué à la main dans le compositeur (`Tools/SeamlessCompositor/wire.{h,c}` de Caker) et dans `linux/pkg/seamless` : toute modification doit toucher les deux, et le côté hôte de Caker.
+Rien ne change au format du protocole : un hôte et un compositeur qui ignorent le hub continuent de fonctionner. Le protocole est dupliqué à la main dans le compositeur (`seamlessd/wire.{h,c}`) et dans `linux/pkg/seamless` : toute modification doit toucher les deux, et le côté hôte de Caker (`SeamlessProtocol.swift`).
 
 </div>
 
@@ -57,7 +57,7 @@ Rien ne change au format du protocole : un hôte et un compositeur qui ignorent 
 
 # Seamless windows (Linux guests)
 
-The Linux agent embeds and supervises `caker-seamlessd`, a headless Wayland compositor that streams every window of the guest to the macOS host over vsock. Caker shows each one as a native window (titles prefixed with the VM's name). The compositor is a static binary embedded in the agent (built by `scripts/build-seamlessd.sh`, see `.github/workflows/seamlessd.yaml`, from Caker's sources), so the guest needs nothing but the agent. The XKB data the compositor builds its keymap from is embedded too and installed beside it (`/usr/libexec/caker/xkb`); it is only used when the guest has no `xkb-data` or `xkeyboard-config` of its own.
+The Linux agent embeds and supervises `caker-seamlessd`, a headless Wayland compositor that streams every window of the guest to the macOS host over vsock. Caker shows each one as a native window (titles prefixed with the VM's name). The compositor is a static binary embedded in the agent (built by `scripts/build-seamlessd.sh`, see `.github/workflows/seamlessd.yaml`, from the `seamlessd/` directory), so the guest needs nothing but the agent. The XKB data the compositor builds its keymap from is embedded too and installed beside it (`/usr/libexec/caker/xkb`); it is only used when the guest has no `xkb-data` or `xkeyboard-config` of its own.
 
 ## Turning it on
 
@@ -102,6 +102,6 @@ caker-seamlessd (bob)   ---+--> hub (agent) --> one vsock connection --> the hos
 - The hub bounds the memory of frames in flight, each compositor's write queue and the write deadlines to the host; it serves up to 255 compositors.
 - A compositor is started for a user when something asks for one, for example an `Execute` command or `cakeagent seamless launch` as that account.
 
-Nothing changes in the wire format: a host and a compositor that know nothing about the hub keep working. The protocol is mirrored by hand in the compositor (Caker's `Tools/SeamlessCompositor/wire.{h,c}`) and in `linux/pkg/seamless`: change both, and Caker's host side, together.
+Nothing changes in the wire format: a host and a compositor that know nothing about the hub keep working. The protocol is mirrored by hand in the compositor (`seamlessd/wire.{h,c}`) and in `linux/pkg/seamless`: change both, and Caker's host side (`SeamlessProtocol.swift`), together.
 
 </div>
