@@ -197,6 +197,17 @@ int wire_parse_host(uint8_t type, const uint8_t *payload, size_t n, struct host_
 		out->code = rd_u32(&r);
 		out->flag = rd_u8(&r) != 0;
 		break;
+	case H_CLIPBOARD: {
+		uint8_t format = rd_u8(&r);
+		uint32_t length = rd_u32(&r);
+
+		if (format != 0 || length > SEAMLESS_MAX_CLIPBOARD)
+			r.bad = true;
+
+		out->data = rd_take(&r, length);
+		out->data_len = length;
+		break;
+	}
 	default:
 		return -1;
 	}

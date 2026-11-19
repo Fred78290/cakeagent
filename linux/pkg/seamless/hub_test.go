@@ -947,3 +947,106 @@ func TestHubAttached(t *testing.T) {
 		t.Fatal("a closed connection is not an attached compositor")
 	}
 }
+
+func clipboardFrame(typ byte, text string) []byte {
+	payload := append([]byte{0}, u32(uint32(len(text)))...)
+
+	return buildFrame(typ, append(payload, text...))
+}
+
+func TestHubGivesTheHostClipboardToTheFocusedUserOnly(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, bobReader := rig.compositor(bob)
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	if _, err := bobConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	expect(t, host.received)
+
+	host.send(buildFrame(hWindowFocus, append(u32(aliceWindow), 1)))
+	readOne(t, aliceConn, aliceReader)
+
+	host.send(clipboardFrame(hClipboard, "from the Mac"))
+
+	got := readOne(t, aliceConn, aliceReader)
+
+	if got[4] != hClipboard || string(got[10:]) != "from the Mac" {
+		t.Fatalf("alice must get the text: %x", got)
+	}
+
+	// Bob's next message is the output scale, not the clipboard.
+	host.send(buildFrame(hOutput, u32(360)))
+
+	if out := readOne(t, bobConn, bobReader); out[4] != hOutput {
+		t.Fatalf("bob must not see the host's clipboard: %x", out)
+	}
+}
+
+func TestHubTakesTheClipboardOfTheFocusedUserOnly(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, _ := rig.compositor(bob)
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	host.send(buildFrame(hWindowFocus, append(u32(aliceWindow), 1)))
+	readOne(t, aliceConn, aliceReader)
+
+	// Bob is in the background: dropped. Alice's goes through, and it is the next thing the host receives.
+	_, _ = bobConn.Write(clipboardFrame(gClipboard, "bob's secret"))
+	_, _ = aliceConn.Write(clipboardFrame(gClipboard, "alice's text"))
+
+	got := expect(t, host.received)
+
+	if got[4] != gClipboard || string(got[10:]) != "alice's text" {
+		t.Fatalf("only the focused user's clipboard reaches the host: %x", got)
+	}
+}
+
+func TestHubRejectsAMalformedClipboard(t *testing.T) {
+	for name, payload := range map[string][]byte{
+		"length does not match": append([]byte{0}, append(u32(10), 'a', 'b')...),
+		"unknown format":        append([]byte{7}, append(u32(1), 'a')...),
+		"too short":             {0, 1},
+		"over the limit":        append([]byte{0}, u32(maxClipboard+1)...),
+	} {
+		t.Run(name, func(t *testing.T) {
+			rig := newHubRig(t)
+
+			conn, reader := rig.compositor(alice)
+			<-rig.hosts
+
+			_, _ = conn.Write(buildFrame(gClipboard, payload))
+
+			expectClosed(t, conn, reader, "the connection must be closed")
+		})
+	}
+}
+
+func TestCheckClipboardAcceptsAnEmptyAndAFullText(t *testing.T) {
+	if err := checkClipboard(append([]byte{0}, u32(0)...)); err != nil {
+		t.Fatal(err)
+	}
+
+	full := append([]byte{0}, u32(maxClipboard)...)
+
+	if err := checkClipboard(append(full, make([]byte, maxClipboard)...)); err != nil {
+		t.Fatal(err)
+	}
+}

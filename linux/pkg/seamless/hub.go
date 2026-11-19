@@ -41,8 +41,10 @@ const (
 
 	// maxGuestFrame mirrors SeamlessProtocol.maxFrameLength.
 	maxGuestFrame = 192 * 1024 * 1024
-	// maxHostFrame mirrors SEAMLESS_MAX_HOST_FRAME: host messages are tiny.
-	maxHostFrame = 64 * 1024
+	// maxClipboard mirrors SEAMLESS_MAX_CLIPBOARD: the text of a clipboard message, in bytes.
+	maxClipboard = 1024 * 1024
+	// maxHostFrame mirrors SEAMLESS_MAX_HOST_FRAME: host messages are tiny, but for the clipboard.
+	maxHostFrame = maxClipboard + 64*1024
 	// maxString mirrors SeamlessProtocol.maxStringLength.
 	maxString = 4096
 
@@ -77,6 +79,7 @@ const (
 	gWindowFrame   = 0x06
 	gWindowDestroy = 0x07
 	gCursor        = 0x08
+	gClipboard     = 0x09
 )
 
 // Host -> guest message types.
@@ -92,6 +95,7 @@ const (
 	hPointerButton = 0x89
 	hPointerAxis   = 0x8A
 	hKey           = 0x8B
+	hClipboard     = 0x8C
 )
 
 var errShortMessage = errors.New("short message")
@@ -776,7 +780,17 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 			prefix = h.titlePrefix(account)
 		}
 
-		err = peer.forward(frame, prefix)
+		if frame[4] == gClipboard && !h.mayShareClipboard(peer) {
+			// Not the user the host is looking at: a background session does not get to overwrite the host's clipboard.
+			// Still checked, so that a malformed message ends this compositor as it would anywhere else.
+			if err = checkClipboard(frame[5:]); err == nil {
+				budget.release(reserved)
+
+				continue
+			}
+		} else {
+			err = peer.forward(frame, prefix)
+		}
 
 		// The frame is out of the way, however it went.
 		budget.release(reserved)
@@ -785,6 +799,34 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 			return err
 		}
 	}
+}
+
+// checkClipboard validates the payload of a clipboard message: a known format and a length that is exactly what follows.
+func checkClipboard(payload []byte) error {
+	if len(payload) < 5 {
+		return errShortMessage
+	}
+
+	if payload[0] != 0 {
+		return fmt.Errorf("clipboard format %d", payload[0])
+	}
+
+	n := binary.LittleEndian.Uint32(payload[1:])
+
+	if n > maxClipboard || int(n) != len(payload)-5 {
+		return fmt.Errorf("clipboard of %d bytes in a message of %d", n, len(payload)-5)
+	}
+
+	return nil
+}
+
+// mayShareClipboard says whether the compositor's clipboard goes to the host: the host's keyboard focus is in its
+// windows, or nowhere yet.
+func (h *Hub) mayShareClipboard(p *hubPeer) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	return h.focus == nil || h.focus == p
 }
 
 // forward rewrites one compositor message and sends it to the host.
@@ -1146,6 +1188,12 @@ func (p *hubPeer) rewrite(frame []byte, prefix string) ([]byte, error) {
 
 		binary.LittleEndian.PutUint32(payload, globalID(p.slot, id))
 
+	case gClipboard:
+		// u8 format (0: UTF-8 text) + u32 length + bytes. There is no window id: whose it is, is the hub's business.
+		if err := checkClipboard(payload); err != nil {
+			return nil, err
+		}
+
 	case gWindowDestroy:
 		id, err := local(0)
 
@@ -1287,6 +1335,20 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 		peer.write(frame)
 
 	case hKey:
+		h.mu.Lock()
+		peer := h.focus
+		h.mu.Unlock()
+
+		if peer != nil && peer.link == link {
+			peer.write(frame)
+		}
+
+	case hClipboard:
+		if err := checkClipboard(payload); err != nil {
+			return err
+		}
+
+		// The user whose window has the focus: the clipboard of the host is not given to every account of the guest.
 		h.mu.Lock()
 		peer := h.focus
 		h.mu.Unlock()

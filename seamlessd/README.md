@@ -35,12 +35,26 @@ Keyboard layout: the host sends physical keys (evdev codes), the guest's layout 
 
 `SEAMLESS_FORCE_FOCUS=1` gives keyboard focus to every new toplevel, for hosts that can't report window focus.
 
+## Clipboard (protocol 3)
+
+Text only, both ways, up to 1 MiB (`SEAMLESS_MAX_CLIPBOARD`). When an application sets the selection (copy), the compositor
+reads its `text/plain` at once (a pipe, bounded in size and time, 3 s) and sends it as `G_CLIPBOARD` (`0x09`: `u8 format`
+(0, UTF-8 text) + `u32 length` + bytes). The host's clipboard comes as `H_CLIPBOARD` (`0x8C`, same payload) and becomes the
+selection of the seat, offered as `text/plain;charset=utf-8`, `text/plain`, `UTF8_STRING`, `STRING` and `TEXT`; the source it
+came in is recognised when the seat reports the selection back, so it does not go round again. Primary selection is shared
+between the guest's applications only. `wlr-data-control` is offered so `wl-copy`/`wl-paste` and clipboard managers work
+without a focused surface (which the host decides on). The agent's hub gives the host's clipboard to the focused user's
+compositor only, and takes a clipboard from the focused user's compositor only (or from any when no window has the focus).
+A host on protocol 2 (or a compositor on protocol 2) has none of this: the host simply doesn't send the message.
+
 ## Verified
 
 Ubuntu 26.04 arm64 guest in Caker, host `caked seamless-demo --no-guest` over the real vsock bridge:
-`weston-simple-shm` (animated) and `foot` (a shell: typed keys reach the guest, output is drawn back).
+`weston-simple-shm` (animated) and `foot` (a shell: typed keys reach the guest, output is drawn back). Clipboard: a test host
+speaking the protocol, `wl-copy`/`wl-paste`, both directions, 900 KB from the host, a 1.1 MB copy dropped; and from the
+guest to a real host through the hub.
 
 ## Not done
 
-XWayland (X11 apps), clipboard, client-drawn cursor images, IME (`text-input`), popup grabs against real toolkits
+XWayland (X11 apps), images and other formats on the clipboard, client-drawn cursor images, IME (`text-input`), popup grabs against real toolkits
 (code exists, untested), `wl_output` changes when the host moves a window between displays, GPU acceleration.
