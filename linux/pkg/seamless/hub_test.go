@@ -29,6 +29,7 @@ type fakeHost struct {
 
 type hubRig struct {
 	t         *testing.T
+	version   uint16
 	hub       *Hub
 	dir       string
 	hosts     chan *fakeHost
@@ -42,7 +43,14 @@ type hubRig struct {
 func newHubRig(t *testing.T) *hubRig {
 	t.Helper()
 
-	rig := &hubRig{t: t, hosts: make(chan *fakeHost, 4)}
+	return newHubRigVersion(t, 2)
+}
+
+// newHubRigVersion makes a rig whose host and compositors speak the given protocol version.
+func newHubRigVersion(t *testing.T, version uint16) *hubRig {
+	t.Helper()
+
+	rig := &hubRig{t: t, version: version, hosts: make(chan *fakeHost, 4)}
 
 	// The compositor's account is told by a one byte "who am I" the test's compositors send before anything else:
 	// there is no SO_PEERCRED on a pipe.
@@ -52,7 +60,7 @@ func newHubRig(t *testing.T) *hubRig {
 
 			closeOnCleanup(t, hubSide, hostSide)
 
-			host := &fakeHost{t: t, conn: hostSide, reader: bufio.NewReader(hostSide), version: 2, scale: 240, received: make(chan []byte, 64)}
+			host := &fakeHost{t: t, conn: hostSide, reader: bufio.NewReader(hostSide), version: version, scale: 240, received: make(chan []byte, 64)}
 
 			go host.serve()
 
@@ -135,7 +143,7 @@ func (r *hubRig) compositor(account Account) (net.Conn, *bufio.Reader) {
 
 	go r.hub.handle(hubSide)
 
-	if _, err := compSide.Write(buildHello(2, "caker-seamlessd 0.1")); err != nil {
+	if _, err := compSide.Write(buildHello(r.version, "caker-seamlessd 0.1")); err != nil {
 		r.t.Fatal(err)
 	}
 
@@ -151,7 +159,7 @@ func (r *hubRig) compositor(account Account) (net.Conn, *bufio.Reader) {
 
 	version, scale, err := parseHelloAck(ack)
 
-	if err != nil || version != 2 || scale != 240 {
+	if err != nil || version != r.version || scale != 240 {
 		r.t.Fatalf("bad acknowledgement: %d %d %v", version, scale, err)
 	}
 
@@ -955,7 +963,7 @@ func clipboardFrame(typ byte, text string) []byte {
 }
 
 func TestHubGivesTheHostClipboardToTheFocusedUserOnly(t *testing.T) {
-	rig := newHubRig(t)
+	rig := newHubRigVersion(t, clipboardVersion)
 
 	aliceConn, aliceReader := rig.compositor(alice)
 	host := <-rig.hosts
@@ -993,7 +1001,7 @@ func TestHubGivesTheHostClipboardToTheFocusedUserOnly(t *testing.T) {
 }
 
 func TestHubTakesTheClipboardOfTheFocusedUserOnly(t *testing.T) {
-	rig := newHubRig(t)
+	rig := newHubRigVersion(t, clipboardVersion)
 
 	aliceConn, aliceReader := rig.compositor(alice)
 	host := <-rig.hosts
@@ -1008,8 +1016,16 @@ func TestHubTakesTheClipboardOfTheFocusedUserOnly(t *testing.T) {
 	host.send(buildFrame(hWindowFocus, append(u32(aliceWindow), 1)))
 	readOne(t, aliceConn, aliceReader)
 
-	// Bob is in the background: dropped. Alice's goes through, and it is the next thing the host receives.
+	// Bob is in the background: dropped. A connection's frames are handled in order, so a window creation sent after
+	// his clipboard and seen by the host proves the clipboard was routed (and dropped) before Alice's is sent.
 	_, _ = bobConn.Write(clipboardFrame(gClipboard, "bob's secret"))
+	_, _ = bobConn.Write(createWindow(1, 0, "marker"))
+
+	if marker := expect(t, host.received); marker[4] != gWindowCreate {
+		t.Fatalf("bob's clipboard must not reach the host, got %x", marker)
+	}
+
+	// Alice's goes through, and it is the next thing the host receives.
 	_, _ = aliceConn.Write(clipboardFrame(gClipboard, "alice's text"))
 
 	got := expect(t, host.received)
@@ -1025,9 +1041,10 @@ func TestHubRejectsAMalformedClipboard(t *testing.T) {
 		"unknown format":        append([]byte{7}, append(u32(1), 'a')...),
 		"too short":             {0, 1},
 		"over the limit":        append([]byte{0}, u32(maxClipboard+1)...),
+		"not UTF-8":             append([]byte{0}, append(u32(2), 0xff, 0xfe)...),
 	} {
 		t.Run(name, func(t *testing.T) {
-			rig := newHubRig(t)
+			rig := newHubRigVersion(t, clipboardVersion)
 
 			conn, reader := rig.compositor(alice)
 			<-rig.hosts
@@ -1048,5 +1065,52 @@ func TestCheckClipboardAcceptsAnEmptyAndAFullText(t *testing.T) {
 
 	if err := checkClipboard(append(full, make([]byte, maxClipboard)...)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHubKeepsClipboardOffProtocolVersion2(t *testing.T) {
+	rig := newHubRig(t)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, bobReader := rig.compositor(bob)
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	host.send(buildFrame(hWindowFocus, append(u32(aliceWindow), 1)))
+	readOne(t, aliceConn, aliceReader)
+
+	// A clipboard from the host is not delivered: the next thing alice gets is the output scale.
+	host.send(clipboardFrame(hClipboard, "from the Mac"))
+	host.send(buildFrame(hOutput, u32(360)))
+
+	if out := readOne(t, aliceConn, aliceReader); out[4] != hOutput {
+		t.Fatalf("a protocol 2 compositor must not get the clipboard: %x", out)
+	}
+
+	if out := readOne(t, bobConn, bobReader); out[4] != hOutput {
+		t.Fatalf("bob must not get the clipboard either: %x", out)
+	}
+
+	// A clipboard from a compositor never reaches the host, and ends that compositor only.
+	_, _ = aliceConn.Write(clipboardFrame(gClipboard, "unknown to the host"))
+
+	expectClosed(t, aliceConn, aliceReader, "the compositor must be disconnected")
+
+	// The host sees alice's window go, not her clipboard, and the shared connection lives on for bob.
+	if got := expect(t, host.received); got[4] != gWindowDestroy {
+		t.Fatalf("the host must see no clipboard: %x", got)
+	}
+
+	if _, err := bobConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := expect(t, host.received); got[4] != gWindowCreate {
+		t.Fatalf("the shared host connection must live on: %x", got)
 	}
 }

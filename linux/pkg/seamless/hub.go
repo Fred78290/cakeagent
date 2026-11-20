@@ -48,6 +48,10 @@ const (
 	// maxString mirrors SeamlessProtocol.maxStringLength.
 	maxString = 4096
 
+	// clipboardVersion is the first protocol version with the clipboard messages. A host or a compositor on an older one
+	// does not know them: the host would close the whole session on one it cannot decode.
+	clipboardVersion = 3
+
 	// frameBudget is how much memory the frames being read from the compositors may take all together. It must hold
 	// a frame of maxGuestFrame, so that a complete large frame is still accepted when nothing else is in flight.
 	frameBudget = 256 * 1024 * 1024
@@ -783,6 +787,11 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 		if frame[4] == gClipboard && !h.mayShareClipboard(peer) {
 			// Not the user the host is looking at: a background session does not get to overwrite the host's clipboard.
 			// Still checked, so that a malformed message ends this compositor as it would anywhere else.
+			//
+			// The decision is made once, here, on a complete message (after the wait for memory, the only unbounded delay
+			// before it), and is not revisited before the write. Revalidating would not order anything better: holding mu
+			// across link.write would stall the host reader behind a slow write, and a message already on the wire to the
+			// host cannot be recalled when the focus moves. Admission time is the contract.
 			if err = checkClipboard(frame[5:]); err == nil {
 				budget.release(reserved)
 
@@ -801,7 +810,8 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 	}
 }
 
-// checkClipboard validates the payload of a clipboard message: a known format and a length that is exactly what follows.
+// checkClipboard validates the payload of a clipboard message: a known format, a length that is exactly what follows,
+// and, for text (format 0), valid UTF-8: the host's decoder refuses anything else and closes the whole session.
 func checkClipboard(payload []byte) error {
 	if len(payload) < 5 {
 		return errShortMessage
@@ -815,6 +825,10 @@ func checkClipboard(payload []byte) error {
 
 	if n > maxClipboard || int(n) != len(payload)-5 {
 		return fmt.Errorf("clipboard of %d bytes in a message of %d", n, len(payload)-5)
+	}
+
+	if payload[0] == 0 && !utf8.Valid(payload[5:]) {
+		return errors.New("clipboard text is not UTF-8")
 	}
 
 	return nil
@@ -1189,6 +1203,10 @@ func (p *hubPeer) rewrite(frame []byte, prefix string) ([]byte, error) {
 		binary.LittleEndian.PutUint32(payload, globalID(p.slot, id))
 
 	case gClipboard:
+		if p.link.version < clipboardVersion {
+			return nil, fmt.Errorf("clipboard message on protocol version %d", p.link.version)
+		}
+
 		// u8 format (0: UTF-8 text) + u32 length + bytes. There is no window id: whose it is, is the hub's business.
 		if err := checkClipboard(payload); err != nil {
 			return nil, err
@@ -1346,6 +1364,12 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 	case hClipboard:
 		if err := checkClipboard(payload); err != nil {
 			return err
+		}
+
+		// Compositors on an older protocol do not know the message (the link has one version, and every compositor on it
+		// speaks it): it is not delivered.
+		if link.version < clipboardVersion {
+			return nil
 		}
 
 		// The user whose window has the focus: the clipboard of the host is not given to every account of the guest.
