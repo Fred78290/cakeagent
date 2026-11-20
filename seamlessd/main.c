@@ -37,11 +37,13 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_cursor_shape_v1.h>
+#include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
+#include <wlr/types/wlr_primary_selection.h>
 #include <wlr/types/wlr_primary_selection_v1.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_subcompositor.h>
@@ -135,6 +137,11 @@ struct server {
 
 	struct wl_listener new_surface, new_toplevel, new_popup, new_decoration, request_set_shape, request_set_cursor;
 	struct wl_listener kb_key, kb_modifiers;
+	struct wl_listener request_set_selection, request_set_primary_selection, set_selection;
+	struct clip_source *clip_own; /* the host's clipboard, offered to the guest's applications */
+	struct clip_read *clip_rd;    /* a read of an application's selection in progress */
+	unsigned clip_wr_count;       /* writes of the host's clipboard to applications still pending */
+	size_t clip_wr_bytes;         /* and the memory their payloads hold */
 	pid_t child;
 };
 
@@ -392,6 +399,344 @@ static void notify_axis(struct server *s, const struct host_msg *m) {
 	wlr_seat_pointer_notify_frame(s->seat);
 }
 
+/* ======================================================================== clipboard */
+
+/*
+ * Text only, both ways. A selection an application sets is read at once (a pipe, bounded in size and time) and sent
+ * to the host, which puts it on its clipboard; the host's clipboard comes as H_CLIPBOARD and becomes the selection
+ * of the seat, offered as plain text. The source the host's text came in is recognised when the seat reports the
+ * selection back, so it does not go round again.
+ */
+
+#define CLIP_READ_TIMEOUT_MS 3000
+/* A reader that makes no progress for this long loses its write; any progress starts the delay again. */
+#define CLIP_WRITE_TIMEOUT_MS 5000
+/* Bounds on the writes pending at once, so applications that open pipes and never read cannot exhaust memory or fds. */
+#define CLIP_WRITE_MAX_COUNT 8
+#define CLIP_WRITE_MAX_BYTES (4 * (size_t)SEAMLESS_MAX_CLIPBOARD)
+
+static const char *const clip_text_mimes[] = {"text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", "TEXT"};
+
+struct clip_source {
+	struct wlr_data_source base;
+	struct server *srv;
+	char *text;
+	size_t len;
+};
+
+struct clip_write {
+	struct server *srv;
+	struct wl_event_source *src, *timer;
+	int fd;
+	char *text;
+	size_t len, off;
+};
+
+struct clip_read {
+	struct server *srv;
+	struct wl_event_source *src, *timer;
+	int fd;
+	uint8_t *buf;
+	size_t len, cap;
+};
+
+static void clip_write_finish(struct clip_write *w) {
+	if (w->src)
+		wl_event_source_remove(w->src);
+
+	if (w->timer)
+		wl_event_source_remove(w->timer);
+
+	w->srv->clip_wr_count--;
+	w->srv->clip_wr_bytes -= w->len;
+	close(w->fd);
+	free(w->text);
+	free(w);
+}
+
+static int on_clip_write_timeout(void *data) {
+	clip_write_finish(data);
+
+	return 0;
+}
+
+static int on_clip_write(int fd, uint32_t mask, void *data) {
+	struct clip_write *w = data;
+
+	if (mask & (WL_EVENT_HANGUP | WL_EVENT_ERROR)) {
+		clip_write_finish(w);
+		return 0;
+	}
+
+	while (w->off < w->len) {
+		ssize_t n = write(fd, w->text + w->off, w->len - w->off);
+
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+
+			if (errno == EAGAIN)
+				return 0;
+
+			clip_write_finish(w);
+			return 0;
+		}
+
+		w->off += (size_t)n;
+		/* The reader is taking data: it gets the whole delay again. */
+		wl_event_source_timer_update(w->timer, CLIP_WRITE_TIMEOUT_MS);
+	}
+
+	clip_write_finish(w);
+
+	return 0;
+}
+
+static void clip_source_send(struct wlr_data_source *source, const char *mime_type, int32_t fd) {
+	struct clip_source *cs = wl_container_of(source, cs, base);
+	bool known = false;
+
+	for (size_t i = 0; i < sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]); i++) {
+		if (strcmp(clip_text_mimes[i], mime_type) == 0)
+			known = true;
+	}
+
+	struct server *s = cs->srv;
+
+	if (!known || s->clip_wr_count >= CLIP_WRITE_MAX_COUNT || s->clip_wr_bytes + cs->len > CLIP_WRITE_MAX_BYTES) {
+		close(fd);
+		return;
+	}
+
+	struct clip_write *w = calloc(1, sizeof(*w));
+
+	if (!w || !(w->text = malloc(cs->len ? cs->len : 1))) {
+		free(w);
+		close(fd);
+		return;
+	}
+
+	memcpy(w->text, cs->text, cs->len);
+	w->srv = s;
+	w->len = cs->len;
+	w->fd = fd;
+	s->clip_wr_count++;
+	s->clip_wr_bytes += w->len;
+	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+	/* A pipe takes what fits at once, the rest goes when the reader has made room. */
+	w->src = wl_event_loop_add_fd(s->loop, fd, WL_EVENT_WRITABLE, on_clip_write, w);
+	w->timer = wl_event_loop_add_timer(s->loop, on_clip_write_timeout, w);
+
+	if (!w->src || !w->timer || wl_event_source_timer_update(w->timer, CLIP_WRITE_TIMEOUT_MS) < 0)
+		clip_write_finish(w);
+}
+
+static void clip_source_destroy(struct wlr_data_source *source) {
+	struct clip_source *cs = wl_container_of(source, cs, base);
+
+	if (cs->srv->clip_own == cs)
+		cs->srv->clip_own = NULL;
+
+	free(cs->text);
+	free(cs);
+}
+
+static const struct wlr_data_source_impl clip_source_impl = {
+	.send = clip_source_send,
+	.destroy = clip_source_destroy,
+};
+
+/* The host's text becomes the selection of the guest. */
+static void host_set_clipboard(struct server *s, const uint8_t *data, size_t len) {
+	if (len == 0 || len > SEAMLESS_MAX_CLIPBOARD)
+		return;
+
+	struct clip_source *cs = calloc(1, sizeof(*cs));
+
+	if (!cs)
+		return;
+
+	cs->text = malloc(len);
+
+	if (!cs->text) {
+		free(cs);
+		return;
+	}
+
+	memcpy(cs->text, data, len);
+	cs->len = len;
+	cs->srv = s;
+	wlr_data_source_init(&cs->base, &clip_source_impl);
+
+	for (size_t i = 0; i < sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]); i++) {
+		char **slot = wl_array_add(&cs->base.mime_types, sizeof(*slot));
+
+		if (slot)
+			*slot = strdup(clip_text_mimes[i]);
+	}
+
+	s->clip_own = cs;
+	/* The seat destroys the source it replaces, and this one when it is replaced in turn. */
+	wlr_seat_set_selection(s->seat, &cs->base, wl_display_next_serial(s->display));
+}
+
+static void clip_read_free(struct clip_read *r) {
+	if (r->srv->clip_rd == r)
+		r->srv->clip_rd = NULL;
+
+	if (r->src)
+		wl_event_source_remove(r->src);
+
+	if (r->timer)
+		wl_event_source_remove(r->timer);
+
+	close(r->fd);
+	free(r->buf);
+	free(r);
+}
+
+static void send_clipboard(struct server *s, const uint8_t *text, size_t len) {
+	struct wbuf b = {0};
+	size_t st = wire_begin(&b, G_CLIPBOARD);
+
+	wbuf_u8(&b, 0);
+	wbuf_u32(&b, (uint32_t)len);
+	wbuf_bytes(&b, text, len);
+	wire_end(&b, st);
+	send_message(s, &b);
+	wbuf_free(&b);
+}
+
+static int on_clip_read(int fd, uint32_t mask, void *data) {
+	struct clip_read *r = data;
+	struct server *s = r->srv;
+
+	for (;;) {
+		if (r->len == r->cap) {
+			size_t cap = r->cap ? r->cap * 2 : 4096;
+
+			if (cap > SEAMLESS_MAX_CLIPBOARD + 1)
+				cap = SEAMLESS_MAX_CLIPBOARD + 1;
+
+			/* Past the limit: too big to share, dropped. */
+			if (cap == r->cap) {
+				clip_read_free(r);
+				return 0;
+			}
+
+			uint8_t *p = realloc(r->buf, cap);
+
+			if (!p) {
+				clip_read_free(r);
+				return 0;
+			}
+
+			r->buf = p;
+			r->cap = cap;
+		}
+
+		ssize_t n = read(fd, r->buf + r->len, r->cap - r->len);
+
+		if (n > 0) {
+			r->len += (size_t)n;
+			continue;
+		}
+
+		if (n < 0 && errno == EINTR)
+			continue;
+
+		if (n < 0 && errno == EAGAIN)
+			return 0;
+
+		break;
+	}
+
+	/* End of the data (or an error): what was read is the selection. */
+	if (r->len > 0 && r->len <= SEAMLESS_MAX_CLIPBOARD && s->ready)
+		send_clipboard(s, r->buf, r->len);
+
+	clip_read_free(r);
+
+	return 0;
+}
+
+static int on_clip_read_timeout(void *data) {
+	clip_read_free(data);
+
+	return 0;
+}
+
+/* An application set the selection: read its text, when it offers some, and send it to the host. */
+static void on_set_selection(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, set_selection);
+	struct wlr_data_source *source = s->seat->selection_source;
+
+	if (s->clip_rd)
+		clip_read_free(s->clip_rd);
+
+	if (!source || !s->ready || source->impl == &clip_source_impl)
+		return;
+
+	const char *mime = NULL;
+
+	for (size_t i = 0; i < sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]) && !mime; i++) {
+		char **offered;
+
+		wl_array_for_each(offered, &source->mime_types) {
+			if (strcmp(*offered, clip_text_mimes[i]) == 0) {
+				mime = clip_text_mimes[i];
+				break;
+			}
+		}
+	}
+
+	if (!mime)
+		return;
+
+	int fds[2];
+
+	if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) < 0)
+		return;
+
+	struct clip_read *r = calloc(1, sizeof(*r));
+
+	if (!r) {
+		close(fds[0]);
+		close(fds[1]);
+		return;
+	}
+
+	r->srv = s;
+	r->fd = fds[0];
+	/* Closes the write end once it has been handed to the application, which then holds the only one. */
+	wlr_data_source_send(source, mime, fds[1]);
+	r->src = wl_event_loop_add_fd(s->loop, r->fd, WL_EVENT_READABLE, on_clip_read, r);
+	r->timer = wl_event_loop_add_timer(s->loop, on_clip_read_timeout, r);
+
+	if (!r->src || !r->timer) {
+		clip_read_free(r);
+		return;
+	}
+
+	wl_event_source_timer_update(r->timer, CLIP_READ_TIMEOUT_MS);
+	s->clip_rd = r;
+}
+
+/* Applications ask to set the selection: always allowed, the host decides nothing about it. */
+static void on_request_set_selection(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, request_set_selection);
+	struct wlr_seat_request_set_selection_event *ev = data;
+
+	wlr_seat_set_selection(s->seat, ev->source, ev->serial);
+}
+
+static void on_request_set_primary_selection(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, request_set_primary_selection);
+	struct wlr_seat_request_set_primary_selection_event *ev = data;
+
+	wlr_seat_set_primary_selection(s->seat, ev->source, ev->serial);
+}
+
 static void handle_host_message(struct server *s, const struct host_msg *m) {
 	struct window *w = window_by_id(s, m->id);
 
@@ -451,6 +796,9 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 	case H_POINTER_AXIS:
 		if (w)
 			notify_axis(s, m);
+		break;
+	case H_CLIPBOARD:
+		host_set_clipboard(s, m->data, m->data_len);
 		break;
 	case H_KEY: {
 		struct wlr_keyboard_key_event ev = {
@@ -1448,6 +1796,8 @@ int main(int argc, char **argv) {
 	wlr_subcompositor_create(s->display);
 	wlr_data_device_manager_create(s->display);
 	wlr_primary_selection_v1_device_manager_create(s->display);
+	/* wl-copy / wl-paste and clipboard managers: they need no focused surface, which the host decides on. */
+	wlr_data_control_manager_v1_create(s->display);
 	wlr_viewporter_create(s->display);
 	s->fractional = wlr_fractional_scale_manager_v1_create(s->display, 1);
 	s->cursor_shape = wlr_cursor_shape_manager_v1_create(s->display, 1);
@@ -1520,6 +1870,12 @@ int main(int argc, char **argv) {
 	wl_signal_add(&s->cursor_shape->events.request_set_shape, &s->request_set_shape);
 	s->request_set_cursor.notify = on_request_set_cursor;
 	wl_signal_add(&s->seat->events.request_set_cursor, &s->request_set_cursor);
+	s->request_set_selection.notify = on_request_set_selection;
+	wl_signal_add(&s->seat->events.request_set_selection, &s->request_set_selection);
+	s->request_set_primary_selection.notify = on_request_set_primary_selection;
+	wl_signal_add(&s->seat->events.request_set_primary_selection, &s->request_set_primary_selection);
+	s->set_selection.notify = on_set_selection;
+	wl_signal_add(&s->seat->events.set_selection, &s->set_selection);
 
 	s->new_decoration.notify = on_new_decoration;
 	wl_signal_add(&s->decoration_manager->events.new_toplevel_decoration, &s->new_decoration);
@@ -1575,6 +1931,9 @@ int main(int argc, char **argv) {
 	wl_list_remove(&s->new_decoration.link);
 	wl_list_remove(&s->request_set_shape.link);
 	wl_list_remove(&s->request_set_cursor.link);
+	wl_list_remove(&s->request_set_selection.link);
+	wl_list_remove(&s->request_set_primary_selection.link);
+	wl_list_remove(&s->set_selection.link);
 	wl_list_remove(&s->kb_key.link);
 	wl_list_remove(&s->kb_modifiers.link);
 
