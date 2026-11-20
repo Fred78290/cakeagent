@@ -264,7 +264,7 @@ func TestXKBConfigRootOnlyServesGuestsWithoutXKBData(t *testing.T) {
 }
 
 func TestActivationCommands(t *testing.T) {
-	vars := activationVars(Config{})
+	vars := activationVars(Config{}, t.TempDir())
 
 	if len(vars) == 0 || vars[0] != "WAYLAND_DISPLAY=wayland-1" {
 		t.Fatalf("activation vars should start with the default display, got %v", vars)
@@ -407,5 +407,90 @@ func TestOutdatedDetectsACompositorFromAnOlderAgent(t *testing.T) {
 
 	if outdated(nil, []byte("custom")) {
 		t.Fatal("without an embedded compositor the installed one is left alone")
+	}
+}
+
+func TestX11DisplayReadsWhatTheCompositorWrote(t *testing.T) {
+	dir := t.TempDir()
+
+	if got := X11Display(Config{}, dir); got != "" {
+		t.Fatalf("no display file: expected none, got %q", got)
+	}
+
+	file := filepath.Join(dir, "wayland-1.display")
+
+	for content, want := range map[string]string{
+		":1\n":           ":1",
+		":12":            ":12",
+		"\n":             "",
+		"1":              "",
+		":1; rm -rf /\n": "",
+		"unix:/tmp/x":    "",
+		":123456":        "",
+	} {
+		if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		if got := X11Display(Config{}, dir); got != want {
+			t.Errorf("display file %q: expected %q, got %q", content, want, got)
+		}
+	}
+
+	other := Config{SocketName: "wayland-7"}
+
+	if got := X11Display(other, dir); got != "" {
+		t.Fatalf("another compositor's file is not ours: %q", got)
+	}
+}
+
+func envValue(env []string, name string) (string, bool) {
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, name+"="); ok {
+			return v, true
+		}
+	}
+
+	return "", false
+}
+
+func TestAppEnvFallsBackToX11OnlyWhenTheCompositorServesIt(t *testing.T) {
+	dir := t.TempDir()
+	a := Account{Name: "u", Home: dir}
+
+	env := AppEnv(Config{}, a, dir)
+
+	if _, ok := envValue(env, "DISPLAY"); ok {
+		t.Fatalf("without Xwayland there is no DISPLAY: %v", env)
+	}
+
+	if v, _ := envValue(env, "GDK_BACKEND"); v != "wayland" {
+		t.Fatalf("without Xwayland GTK uses Wayland alone, got %q", v)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "wayland-1.display"), []byte(":3\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env = AppEnv(Config{}, a, dir)
+
+	for name, want := range map[string]string{
+		"DISPLAY":            ":3",
+		"GDK_BACKEND":        "wayland,x11",
+		"QT_QPA_PLATFORM":    "wayland;xcb",
+		"SDL_VIDEODRIVER":    "wayland,x11",
+		"WAYLAND_DISPLAY":    "wayland-1",
+		"XDG_SESSION_TYPE":   "wayland",
+		"MOZ_ENABLE_WAYLAND": "1",
+	} {
+		if got, _ := envValue(env, name); got != want {
+			t.Errorf("%s: expected %q, got %q", name, want, got)
+		}
+	}
+
+	vars := activationVars(Config{}, dir)
+
+	if got, _ := envValue(vars, "DISPLAY"); got != ":3" {
+		t.Fatalf("session services get the X display too: %v", vars)
 	}
 }

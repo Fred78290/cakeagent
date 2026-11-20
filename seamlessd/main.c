@@ -17,6 +17,7 @@
 #include <math.h>
 #include <netdb.h>
 #include <signal.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +57,7 @@
 #include <wlr/types/wlr_xdg_toplevel_icon_v1.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
+#include <wlr/xwayland.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "wire.h"
@@ -75,6 +77,8 @@ struct window {
 	struct wlr_xdg_surface *xdg;
 	struct wlr_xdg_toplevel *toplevel;
 	struct wlr_xdg_popup *popup;
+	struct wlr_xwayland_surface *xw; /* an X11 window (XWayland) instead of an xdg surface */
+	bool assoc;                      /* its wl_surface exists: the map, unmap and commit listeners are on it */
 	struct window *parent;
 
 	uint32_t id; /* 0 while not announced to the host */
@@ -94,6 +98,7 @@ struct window {
 
 	struct wl_listener map, unmap, destroy, commit;
 	struct wl_listener set_title, set_app_id, request_maximize, request_fullscreen, request_minimize, request_move, request_resize;
+	struct wl_listener xw_associate, xw_dissociate, xw_destroy, xw_set_title, xw_set_class, xw_set_hints, xw_request_configure;
 };
 
 struct out_item {
@@ -116,6 +121,9 @@ struct server {
 	struct wlr_fractional_scale_manager_v1 *fractional;
 	struct wlr_cursor_shape_manager_v1 *cursor_shape;
 	struct wlr_xdg_decoration_manager_v1 *decoration_manager;
+	struct wlr_xwayland *xwayland; /* NULL when the guest has no Xwayland: X11 applications then fail to connect */
+	struct wl_listener xwayland_new_surface;
+	char x11_display_file[PATH_MAX];
 
 	struct wlr_keyboard keyboard;
 	struct xkb_context *xkb;
@@ -302,8 +310,28 @@ static void send_hints(struct server *s, struct window *w) {
 	if (!s->ready || w->id == 0 || w->kind != WIN_TOPLEVEL)
 		return;
 
-	struct wlr_xdg_toplevel_state *cur = &w->toplevel->current;
-	uint32_t h[4] = {(uint32_t)cur->min_width, (uint32_t)cur->min_height, (uint32_t)cur->max_width, (uint32_t)cur->max_height};
+	uint32_t h[4] = {0, 0, 0, 0};
+
+	if (w->xw) {
+		const xcb_size_hints_t *sh = w->xw->size_hints;
+
+		if (sh && (sh->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE) && sh->min_width > 0 && sh->min_height > 0) {
+			h[0] = (uint32_t)sh->min_width;
+			h[1] = (uint32_t)sh->min_height;
+		}
+
+		if (sh && (sh->flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE) && sh->max_width > 0 && sh->max_height > 0) {
+			h[2] = (uint32_t)sh->max_width;
+			h[3] = (uint32_t)sh->max_height;
+		}
+	} else {
+		struct wlr_xdg_toplevel_state *cur = &w->toplevel->current;
+
+		h[0] = (uint32_t)cur->min_width;
+		h[1] = (uint32_t)cur->min_height;
+		h[2] = (uint32_t)cur->max_width;
+		h[3] = (uint32_t)cur->max_height;
+	}
 
 	if (w->hints_known && memcmp(h, w->hints, sizeof(h)) == 0)
 		return;
@@ -364,8 +392,42 @@ static void focus_window(struct server *s, struct window *w, bool focused);
 static void pointer_enter_or_motion(struct server *s, struct window *w, float x, float y, bool enter);
 static void apply_scale(struct server *s, uint32_t scale120);
 
+/* The wl_surface of a window: an xdg surface's, or an X11 window's (NULL until Xwayland has paired them). */
 static struct wlr_surface *root_surface_of(struct window *w) {
-	return w->xdg->surface;
+	if (w->xw)
+		return w->xw->surface;
+
+	return w->xdg ? w->xdg->surface : NULL;
+}
+
+static void window_for_each_surface(struct window *w, wlr_surface_iterator_func_t fn, void *data) {
+	if (w->xw) {
+		if (w->xw->surface)
+			wlr_surface_for_each_surface(w->xw->surface, fn, data);
+	} else if (w->xdg) {
+		wlr_xdg_surface_for_each_surface(w->xdg, fn, data);
+	}
+}
+
+static struct wlr_surface *window_surface_at(struct window *w, double x, double y, double *sx, double *sy) {
+	if (w->xw)
+		return w->xw->surface ? wlr_surface_surface_at(w->xw->surface, x, y, sx, sy) : NULL;
+
+	return w->xdg ? wlr_xdg_surface_surface_at(w->xdg, x, y, sx, sy) : NULL;
+}
+
+static const char *window_title(struct window *w) {
+	if (w->kind != WIN_TOPLEVEL)
+		return "";
+
+	return w->xw ? w->xw->title : w->toplevel->title;
+}
+
+static const char *window_app_id(struct window *w) {
+	if (w->kind != WIN_TOPLEVEL)
+		return "";
+
+	return w->xw ? w->xw->class : w->toplevel->app_id;
 }
 
 /* One wl_pointer axis frame. A wheel sends libinput's 15 units per click plus the discrete value120 step, a trackpad its pixels as a
@@ -759,13 +821,19 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 		apply_scale(s, m->u32a);
 		break;
 	case H_WINDOW_RESIZE:
-		if (w && w->kind == WIN_TOPLEVEL && m->u32a > 0 && m->u32b > 0 && m->u32a <= SEAMLESS_MAX_DIMENSION && m->u32b <= SEAMLESS_MAX_DIMENSION)
-			wlr_xdg_toplevel_set_size(w->toplevel, (int32_t)m->u32a, (int32_t)m->u32b);
+		if (w && w->kind == WIN_TOPLEVEL && m->u32a > 0 && m->u32b > 0 && m->u32a <= SEAMLESS_MAX_DIMENSION && m->u32b <= SEAMLESS_MAX_DIMENSION) {
+			if (w->xw)
+				wlr_xwayland_surface_configure(w->xw, 0, 0, (uint16_t)m->u32a, (uint16_t)m->u32b);
+			else
+				wlr_xdg_toplevel_set_size(w->toplevel, (int32_t)m->u32a, (int32_t)m->u32b);
+		}
 		break;
 	case H_WINDOW_CLOSE:
-		if (w && w->kind == WIN_TOPLEVEL)
+		if (w && w->xw)
+			wlr_xwayland_surface_close(w->xw);
+		else if (w && w->kind == WIN_TOPLEVEL)
 			wlr_xdg_toplevel_send_close(w->toplevel);
-		else if (w && w->kind == WIN_POPUP)
+		else if (w && w->kind == WIN_POPUP && w->popup)
 			wlr_xdg_popup_destroy(w->popup);
 		break;
 	case H_WINDOW_FOCUS:
@@ -999,10 +1067,21 @@ static void window_frame_done(struct window *w) {
 	struct timespec now;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	wlr_xdg_surface_for_each_surface(w->xdg, frame_done_iter, &now);
+	window_for_each_surface(w, frame_done_iter, &now);
 }
 
 static bool window_geometry(struct window *w, struct wlr_box *geo) {
+	if (w->xw) {
+		/* An X11 window is its surface: no geometry rectangle inside it. */
+		struct wlr_surface *sf = w->xw->surface;
+
+		geo->x = geo->y = 0;
+		geo->width = sf ? sf->current.width : 0;
+		geo->height = sf ? sf->current.height : 0;
+
+		return geo->width > 0 && geo->height > 0;
+	}
+
 	*geo = w->xdg->geometry;
 
 	if (geo->width <= 0 || geo->height <= 0) {
@@ -1057,9 +1136,51 @@ static bool diff_bounds(const uint8_t *cur, size_t stride, const uint8_t *prev, 
 	return true;
 }
 
+/*
+ * The window an X11 menu or tooltip hangs off: its transient parent when it names one, else the focused window of the same
+ * process, else the newest window of that process, else the focused X11 window, else the newest.
+ */
+static struct window *x11_popup_parent(struct server *s, struct window *popup) {
+	struct window *o, *same_pid = NULL, *newest = NULL;
+
+	if (popup->xw->parent) {
+		struct window *p = popup->xw->parent->data;
+
+		if (p && p->xw && p->kind == WIN_TOPLEVEL && p->id != 0)
+			return p;
+	}
+
+	wl_list_for_each(o, &s->windows, link) {
+		if (!o->xw || o->kind != WIN_TOPLEVEL || o->id == 0)
+			continue;
+
+		newest = o;
+
+		if (popup->xw->pid > 0 && o->xw->pid == popup->xw->pid) {
+			/* The focused window of the process wins over a newer one. */
+			if (o == s->focus_win)
+				return o;
+
+			same_pid = o;
+		}
+	}
+
+	if (same_pid)
+		return same_pid;
+
+	if (s->focus_win && s->focus_win->xw && s->focus_win->kind == WIN_TOPLEVEL && s->focus_win->id != 0)
+		return s->focus_win;
+
+	return newest;
+}
+
 static void announce_window(struct server *s, struct window *w) {
 	if (w->id != 0 || !s->ready || !w->mapped)
 		return;
+
+	/* An X11 menu or tooltip (override-redirect) belongs to one of that application's windows. */
+	if (w->xw && w->kind == WIN_POPUP && (!w->parent || w->parent->id == 0))
+		w->parent = x11_popup_parent(s, w);
 
 	/* A popup needs its parent on the host first. */
 	if (w->kind == WIN_POPUP && (!w->parent || w->parent->id == 0))
@@ -1069,7 +1190,11 @@ static void announce_window(struct server *s, struct window *w) {
 
 	int32_t px = 0, py = 0;
 
-	if (w->kind == WIN_POPUP) {
+	if (w->kind == WIN_POPUP && w->xw) {
+		/* Every X11 window sits at the origin of the X screen, so an override-redirect window's position is already relative to its parent. */
+		px = w->xw->x;
+		py = w->xw->y;
+	} else if (w->kind == WIN_POPUP) {
 		struct wlr_box pgeo;
 
 		double dx = 0, dy = 0;
@@ -1090,8 +1215,8 @@ static void announce_window(struct server *s, struct window *w) {
 	wbuf_u8(&b, w->kind == WIN_POPUP ? KIND_POPUP : KIND_TOPLEVEL);
 	wbuf_i32(&b, px);
 	wbuf_i32(&b, py);
-	wbuf_str(&b, w->kind == WIN_TOPLEVEL ? w->toplevel->title : "");
-	wbuf_str(&b, w->kind == WIN_TOPLEVEL ? w->toplevel->app_id : "");
+	wbuf_str(&b, window_title(w));
+	wbuf_str(&b, window_app_id(w));
 	wire_end(&b, st);
 
 	bool ok = send_message(s, &b);
@@ -1111,8 +1236,15 @@ static void announce_window(struct server *s, struct window *w) {
 static void announce_all(struct server *s) {
 	struct window *w;
 
+	/* Toplevels first: an X11 menu or tooltip picks its parent among the announced toplevels, whatever the list order. */
 	wl_list_for_each(w, &s->windows, link) {
-		announce_window(s, w);
+		if (w->kind != WIN_POPUP)
+			announce_window(s, w);
+	}
+
+	wl_list_for_each(w, &s->windows, link) {
+		if (w->kind == WIN_POPUP)
+			announce_window(s, w);
 	}
 }
 
@@ -1167,7 +1299,7 @@ static void render_and_send(struct server *s, struct window *w) {
 
 	struct render_ctx ctx = {.pass = pass, .geo = geo, .k = k};
 
-	wlr_xdg_surface_for_each_surface(w->xdg, render_surface, &ctx);
+	window_for_each_surface(w, render_surface, &ctx);
 
 	if (!wlr_render_pass_submit(pass))
 		return;
@@ -1289,7 +1421,12 @@ static struct window *window_of_surface(struct wlr_surface *surface) {
 	struct wlr_surface *root = wlr_surface_get_root_surface(surface);
 	struct wlr_xdg_surface *xs = wlr_xdg_surface_try_from_wlr_surface(root);
 
-	return xs ? xs->data : NULL;
+	if (xs)
+		return xs->data;
+
+	struct wlr_xwayland_surface *xw = wlr_xwayland_surface_try_from_wlr_surface(root);
+
+	return xw ? xw->data : NULL;
 }
 
 static void on_surface_commit_global(struct wlr_surface *surface) {
@@ -1381,7 +1518,7 @@ static void apply_scale(struct server *s, uint32_t scale120) {
 	struct window *w;
 
 	wl_list_for_each(w, &s->windows, link) {
-		wlr_xdg_surface_for_each_surface(w->xdg, scale_iter, &scale120);
+		window_for_each_surface(w, scale_iter, &scale120);
 		w->force_full = true;
 		mark_dirty(s, w);
 	}
@@ -1404,17 +1541,37 @@ static void window_free(struct window *w) {
 	}
 
 	wl_list_remove(&w->link);
-	wl_list_remove(&w->map.link);
-	wl_list_remove(&w->unmap.link);
-	wl_list_remove(&w->destroy.link);
-	wl_list_remove(&w->commit.link);
+
+	if (w->xw) {
+		if (w->assoc) {
+			wl_list_remove(&w->map.link);
+			wl_list_remove(&w->unmap.link);
+			wl_list_remove(&w->commit.link);
+		}
+
+		/* wlroots asserts that nobody listens to a destroyed X11 window. */
+		wl_list_remove(&w->xw_associate.link);
+		wl_list_remove(&w->xw_dissociate.link);
+		wl_list_remove(&w->xw_destroy.link);
+		wl_list_remove(&w->xw_set_title.link);
+		wl_list_remove(&w->xw_set_class.link);
+		wl_list_remove(&w->xw_set_hints.link);
+		wl_list_remove(&w->xw_request_configure.link);
+		w->xw->data = NULL;
+	} else {
+		wl_list_remove(&w->map.link);
+		wl_list_remove(&w->unmap.link);
+		wl_list_remove(&w->destroy.link);
+		wl_list_remove(&w->commit.link);
+	}
 
 	if (w->decoration) {
 		wl_list_remove(&w->decoration_destroy.link);
 		w->decoration = NULL;
 	}
 
-	if (w->kind == WIN_TOPLEVEL) {
+	/* An xdg toplevel's own listeners: an X11 window has none of them. */
+	if (!w->xw && w->kind == WIN_TOPLEVEL) {
 		wl_list_remove(&w->set_title.link);
 		wl_list_remove(&w->set_app_id.link);
 		wl_list_remove(&w->request_maximize.link);
@@ -1591,19 +1748,232 @@ static void on_new_popup(struct wl_listener *l, void *data) {
 	wl_signal_add(&popup->events.destroy, &w->destroy);
 }
 
+/* ======================================================================== XWayland */
+
+static void on_xw_associate(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_associate);
+	struct wlr_surface *surface = w->xw->surface;
+
+	if (!surface || w->assoc)
+		return;
+
+	w->kind = w->xw->override_redirect ? WIN_POPUP : WIN_TOPLEVEL;
+	w->assoc = true;
+	wl_signal_add(&surface->events.map, &w->map);
+	wl_signal_add(&surface->events.unmap, &w->unmap);
+	wl_signal_add(&surface->events.commit, &w->commit);
+
+	if (!w->xw->override_redirect)
+		wlr_xwayland_surface_configure(w->xw, 0, 0, w->xw->width, w->xw->height);
+
+	if (surface->mapped)
+		on_window_map(&w->map, NULL);
+}
+
+static void on_xw_dissociate(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_dissociate);
+
+	if (!w->assoc)
+		return;
+
+	if (w->mapped)
+		on_window_unmap(&w->unmap, NULL);
+
+	wl_list_remove(&w->map.link);
+	wl_list_remove(&w->unmap.link);
+	wl_list_remove(&w->commit.link);
+	w->assoc = false;
+}
+
+static void on_xw_destroy(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_destroy);
+
+	if (w->assoc) {
+		on_xw_dissociate(&w->xw_dissociate, NULL);
+	}
+
+	send_destroy(w->srv, w);
+	window_free(w);
+}
+
+static void on_xw_set_title(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_set_title);
+
+	if (w->kind == WIN_TOPLEVEL)
+		send_title(w->srv, w, G_WINDOW_TITLE, w->xw->title);
+}
+
+static void on_xw_set_class(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_set_class);
+
+	if (w->kind == WIN_TOPLEVEL)
+		send_title(w->srv, w, G_WINDOW_APPID, w->xw->class);
+}
+
+static void on_xw_set_hints(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_set_hints);
+
+	send_hints(w->srv, w);
+}
+
+/* The X11 clients lay themselves out: honour the size, keep the window at the origin (menus keep the position they ask for). */
+static void on_xw_request_configure(struct wl_listener *l, void *data) {
+	struct window *w = wl_container_of(l, w, xw_request_configure);
+	struct wlr_xwayland_surface_configure_event *ev = data;
+
+	if (w->xw->override_redirect)
+		wlr_xwayland_surface_configure(w->xw, ev->x, ev->y, ev->width, ev->height);
+	else
+		wlr_xwayland_surface_configure(w->xw, 0, 0, ev->width, ev->height);
+}
+
+static void on_xwayland_new_surface(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, xwayland_new_surface);
+	struct wlr_xwayland_surface *xw = data;
+	struct window *w = calloc(1, sizeof(*w));
+
+	if (!w)
+		return;
+
+	w->srv = s;
+	w->kind = xw->override_redirect ? WIN_POPUP : WIN_TOPLEVEL;
+	w->xw = xw;
+	xw->data = w;
+	wl_list_insert(s->windows.prev, &w->link);
+
+	w->map.notify = on_window_map;
+	w->unmap.notify = on_window_unmap;
+	w->commit.notify = on_window_commit;
+	w->xw_associate.notify = on_xw_associate;
+	wl_signal_add(&xw->events.associate, &w->xw_associate);
+	w->xw_dissociate.notify = on_xw_dissociate;
+	wl_signal_add(&xw->events.dissociate, &w->xw_dissociate);
+	w->xw_destroy.notify = on_xw_destroy;
+	wl_signal_add(&xw->events.destroy, &w->xw_destroy);
+	w->xw_set_title.notify = on_xw_set_title;
+	wl_signal_add(&xw->events.set_title, &w->xw_set_title);
+	w->xw_set_class.notify = on_xw_set_class;
+	wl_signal_add(&xw->events.set_class, &w->xw_set_class);
+	w->xw_set_hints.notify = on_xw_set_hints;
+	wl_signal_add(&xw->events.set_hints, &w->xw_set_hints);
+	w->xw_request_configure.notify = on_xw_request_configure;
+	wl_signal_add(&xw->events.request_configure, &w->xw_request_configure);
+
+	if (xw->surface)
+		on_xw_associate(&w->xw_associate, NULL);
+}
+
+static bool in_path(const char *name) {
+	const char *path = getenv("PATH");
+
+	if (!path)
+		path = "/usr/local/bin:/usr/bin:/bin";
+
+	char *copy = strdup(path), *save = NULL;
+
+	if (!copy)
+		return false;
+
+	bool found = false;
+
+	for (char *dir = strtok_r(copy, ":", &save); dir && !found; dir = strtok_r(NULL, ":", &save)) {
+		char full[PATH_MAX];
+
+		snprintf(full, sizeof(full), "%s/%s", *dir ? dir : ".", name);
+		found = access(full, X_OK) == 0;
+	}
+
+	free(copy);
+
+	return found;
+}
+
+/*
+ * Starts the X11 side: wlroots listens on an X display now and runs Xwayland when the first X11 client connects, so a guest
+ * that never runs one pays nothing. The display name goes into DISPLAY for the command the compositor runs, and into a file
+ * next to the Wayland socket for everything else (login shells, the agent launching an application).
+ * SEAMLESS_XWAYLAND=0 turns it off; a guest without the Xwayland program just has no X11 support.
+ */
+static void xwayland_init(struct server *s, const char *sock) {
+	const char *rt = getenv("XDG_RUNTIME_DIR");
+
+	/* A file left by a compositor that did not exit cleanly names a display that is not ours. */
+	if (rt && snprintf(s->x11_display_file, sizeof(s->x11_display_file), "%s/%s.display", rt, sock) < (int)sizeof(s->x11_display_file))
+		unlink(s->x11_display_file);
+	else
+		s->x11_display_file[0] = '\0';
+
+	const char *display_name = "";
+	const char *off = getenv("SEAMLESS_XWAYLAND");
+
+	const char *program = getenv("WLR_XWAYLAND");
+
+	/* wlroots starts the Xwayland it was built against (/usr/bin/Xwayland), or WLR_XWAYLAND. */
+	bool installed = (program && access(program, X_OK) == 0) || access("/usr/bin/Xwayland", X_OK) == 0 || in_path("Xwayland");
+
+	if ((off && strcmp(off, "0") == 0) || !installed) {
+		wlr_log(WLR_INFO, "no XWayland (%s)", off && strcmp(off, "0") == 0 ? "disabled" : "the Xwayland program is not installed");
+	} else {
+		s->xwayland = wlr_xwayland_create(s->display, s->compositor, true);
+
+		if (!s->xwayland) {
+			wlr_log(WLR_ERROR, "cannot create XWayland");
+		} else {
+			s->xwayland_new_surface.notify = on_xwayland_new_surface;
+			wl_signal_add(&s->xwayland->events.new_surface, &s->xwayland_new_surface);
+			wlr_xwayland_set_seat(s->xwayland, s->seat);
+			setenv("DISPLAY", s->xwayland->display_name, 1);
+			display_name = s->xwayland->display_name;
+			wlr_log(WLR_INFO, "XWayland on DISPLAY=%s", display_name);
+		}
+	}
+
+	/*
+	 * The file is written whatever the outcome, empty when there is no X display: it tells whoever waits for the compositor
+	 * (the agent exporting the display to the session services) that the X side is settled, since the Wayland socket exists
+	 * before this runs. It is written whole, then renamed, so a reader never sees it half done.
+	 */
+	if (s->x11_display_file[0]) {
+		char tmp[PATH_MAX + 8];
+
+		snprintf(tmp, sizeof(tmp), "%s.tmp", s->x11_display_file);
+
+		FILE *f = fopen(tmp, "w");
+
+		if (f) {
+			if (*display_name)
+				fprintf(f, "%s\n", display_name);
+
+			if (fclose(f) != 0 || rename(tmp, s->x11_display_file) != 0)
+				unlink(tmp);
+		} else {
+			s->x11_display_file[0] = '\0';
+		}
+	}
+}
+
 /* ======================================================================== input */
+
+static void window_activate(struct window *w, bool activated) {
+	if (w->xw)
+		wlr_xwayland_surface_activate(w->xw, activated);
+	else if (w->toplevel)
+		wlr_xdg_toplevel_set_activated(w->toplevel, activated);
+}
 
 static void focus_window(struct server *s, struct window *w, bool focused) {
 	if (focused) {
 		if (s->focus_win && s->focus_win != w)
-			wlr_xdg_toplevel_set_activated(s->focus_win->toplevel, false);
+			window_activate(s->focus_win, false);
 
 		s->focus_win = w;
-		wlr_xdg_toplevel_set_activated(w->toplevel, true);
+		window_activate(w, true);
 		wlr_seat_set_keyboard(s->seat, &s->keyboard);
-		wlr_seat_keyboard_notify_enter(s->seat, root_surface_of(w), s->keyboard.keycodes, s->keyboard.num_keycodes, &s->keyboard.modifiers);
+
+		if (root_surface_of(w))
+			wlr_seat_keyboard_notify_enter(s->seat, root_surface_of(w), s->keyboard.keycodes, s->keyboard.num_keycodes, &s->keyboard.modifiers);
 	} else if (s->focus_win == w) {
-		wlr_xdg_toplevel_set_activated(w->toplevel, false);
+		window_activate(w, false);
 		wlr_seat_keyboard_notify_clear_focus(s->seat);
 		s->focus_win = NULL;
 	}
@@ -1615,7 +1985,7 @@ static void pointer_enter_or_motion(struct server *s, struct window *w, float x,
 
 	window_geometry(w, &geo);
 
-	struct wlr_surface *surface = wlr_xdg_surface_surface_at(w->xdg, x + geo.x, y + geo.y, &sub_x, &sub_y);
+	struct wlr_surface *surface = window_surface_at(w, x + geo.x, y + geo.y, &sub_x, &sub_y);
 
 	if (!surface) {
 		wlr_seat_pointer_notify_clear_focus(s->seat);
@@ -1899,6 +2269,7 @@ int main(int argc, char **argv) {
 
 	setenv("WAYLAND_DISPLAY", sock, 1);
 	wlr_log(WLR_INFO, "seamless compositor on WAYLAND_DISPLAY=%s, host at %s", sock, connect_spec);
+	xwayland_init(s, sock);
 
 	s->frame_timer = wl_event_loop_add_timer(s->loop, on_frame_timer, s);
 	s->reconnect_timer = wl_event_loop_add_timer(s->loop, on_reconnect_timer, s);
@@ -1922,7 +2293,17 @@ int main(int argc, char **argv) {
 	wl_display_run(s->display);
 
 	transport_close(s);
+
+	if (s->x11_display_file[0])
+		unlink(s->x11_display_file);
+
 	wl_display_destroy_clients(s->display);
+
+	if (s->xwayland) {
+		wl_list_remove(&s->xwayland_new_surface.link);
+		wlr_xwayland_destroy(s->xwayland);
+		s->xwayland = NULL;
+	}
 
 	/* wlroots asserts that nobody is still listening when the display goes away (SIGTERM aborted with a core dump) */
 	wl_list_remove(&s->new_surface.link);

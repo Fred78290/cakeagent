@@ -17,6 +17,12 @@ Avec Caker, c'est `caked build --seamless` pour une nouvelle VM, ou `caked confi
 
 `--seamless-layout` doit correspondre à la disposition du clavier de l'hôte : les touches voyagent par position.
 
+## Applications X11 (XWayland)
+
+Une application qui ne parle qu'X11 (GIMP 2.10, GTK2, Wine, d'anciens Qt ou Java) n'a pas de surface Wayland où dessiner : le compositeur lui sert un affichage X par Xwayland. Il faut le programme `Xwayland` dans l'invité (paquet `xwayland`, ou `xorg-x11-server-Xwayland` sur Fedora et Red Hat ; les scripts d'installation de Caker l'installent quand les fenêtres seamless sont activées). Le compositeur écoute sur un affichage X libre au démarrage et ne lance Xwayland qu'à la première connexion d'un client X11 : sans application X11, rien n'est consommé. `SEAMLESS_XWAYLAND=0` désactive cette prise en charge.
+
+Le nom de l'affichage est écrit dans `$XDG_RUNTIME_DIR/<socket>.display` (par exemple `wayland-1.display` contient `:0`). `cakeagent seamless launch`, le profil des shells de connexion et l'environnement d'activation D-Bus/systemd de l'utilisateur en tirent `DISPLAY`, et les variables des boîtes à outils deviennent des listes avec repli sur X11 (`GDK_BACKEND=wayland,x11`, `QT_QPA_PLATFORM=wayland;xcb`). Les fenêtres X11 s'affichent comme les autres ; les menus et info-bulles (override-redirect) sont des fenêtres contextuelles de la fenêtre de la même application. Le curseur dessiné par un client X11 n'est pas transmis (les formes standard le sont).
+
 ## Sous-commandes `cakeagent seamless`
 
 ```bash
@@ -69,6 +75,12 @@ cakeagent service install --seamless --seamless-layout=fr ...
 With Caker that is `caked build --seamless` for a new VM, or `caked configure <vm> --seamless true` followed by an agent update for an existing one.
 
 `--seamless-layout` must match the host's keyboard layout: keys travel by position.
+
+## X11 applications (XWayland)
+
+An application that only speaks X11 (GIMP 2.10, GTK2, Wine, older Qt or Java) has no Wayland surface to draw on: the compositor gives it an X display through Xwayland. The guest needs the `Xwayland` program (package `xwayland`, or `xorg-x11-server-Xwayland` on Fedora and Red Hat; Caker's install scripts install it when seamless windows are on). The compositor listens on a free X display at start and only runs Xwayland when the first X11 client connects, so a guest without X11 applications pays nothing. `SEAMLESS_XWAYLAND=0` turns the support off.
+
+The display name is written to `$XDG_RUNTIME_DIR/<socket>.display` (for example `wayland-1.display` contains `:0`). `cakeagent seamless launch`, the login-shell profile and the user's D-Bus/systemd activation environment take `DISPLAY` from it, and the toolkit variables become lists that fall back to X11 (`GDK_BACKEND=wayland,x11`, `QT_QPA_PLATFORM=wayland;xcb`). X11 windows show like the others; menus and tooltips (override-redirect) are popups of the same application's window. The cursor an X11 client draws is not forwarded (the standard shapes are).
 
 ## `cakeagent seamless` subcommands
 

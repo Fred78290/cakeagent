@@ -454,6 +454,8 @@ func TestSessionProfileIsConditionalAndQuotesTheSocketName(t *testing.T) {
 		"export WAYLAND_DISPLAY='wayland-1'",
 		`GDK_BACKEND="wayland,x11"`,
 		`QT_QPA_PLATFORM="wayland;xcb"`,
+		`[ -r "$_caker_rt/"'wayland-1'.display ]`,
+		`export DISPLAY="$_caker_x11"`,
 		"DBUS_SESSION_BUS_ADDRESS",
 	} {
 		if !strings.Contains(p, want) {

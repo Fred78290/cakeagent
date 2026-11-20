@@ -47,14 +47,50 @@ without a focused surface (which the host decides on). The agent's hub gives the
 compositor only, and takes a clipboard from the focused user's compositor only (or from any when no window has the focus).
 A host on protocol 2 (or a compositor on protocol 2) has none of this: the host simply doesn't send the message.
 
+## XWayland (X11 applications)
+
+An application that only speaks X11 (GIMP 2.10, GTK2 and older Qt programs, Wine, many Java and Electron builds) has no
+Wayland surface to draw on. The compositor serves an X display through Xwayland: when the guest has the `Xwayland` program
+(`/usr/bin/Xwayland`, or `WLR_XWAYLAND`), wlroots listens on a free X display (`:0`, `:1`...) at start and runs Xwayland
+only when the first X11 client connects, so a guest that never runs one pays nothing. `SEAMLESS_XWAYLAND=0` turns it off.
+
+The display name is written to `$XDG_RUNTIME_DIR/<wayland socket>.display` (`wayland-1.display` contains `:0`) and set as
+`DISPLAY` for the command the compositor runs. The agent reads that file: `cakeagent seamless launch`, the login-shell
+profile and the user's D-Bus/systemd activation environment get `DISPLAY`, and with it the toolkit variables become lists
+that fall back to X11 (`GDK_BACKEND=wayland,x11`, `QT_QPA_PLATFORM=wayland;xcb`, `SDL_VIDEODRIVER=wayland,x11`). Without
+Xwayland they stay Wayland only.
+
+The windows reuse the protocol of the Wayland ones, nothing changed on the wire (protocol 3):
+
+- An X11 window is a toplevel; its title is `WM_NAME`/`_NET_WM_NAME`, its application id `WM_CLASS`, its minimum and maximum
+  size come from `WM_NORMAL_HINTS`.
+- Every managed window sits at the origin of the X screen and keeps the size it asks for; the host's resize becomes a
+  configure of the X window.
+- An override-redirect window (menu, tooltip, combo box) is a popup. Its parent is a window of the same process (`_NET_WM_PID`),
+  else the focused X11 window, else the newest; its position is the one the client asked for, which is already relative to the
+  parent since the parents sit at the origin.
+- Focus follows the host: the X window is activated and gets the keyboard; the X11 selection and the Wayland one are bridged
+  by wlroots, so the clipboard works between both kinds of applications.
+
+The static build (`scripts/build-seamlessd.sh`) links the xcb libraries wlroots needs for it and builds libXau, which Alpine
+only has as a shared library. The `Xwayland` program itself is not embedded: it comes from the guest (the package is
+`xwayland` on Debian, Ubuntu, openSUSE and Alpine, `xorg-x11-server-Xwayland` on Fedora and Red Hat; Caker's install
+scripts install it when seamless windows are on).
+
+Not done for X11 windows: the cursor an X11 client draws is not forwarded (the standard shapes are), a window is always at
+the origin so two windows that position themselves relative to each other (rare) lose that, the host's scale is applied by
+stretching (X11 clients are not scale-aware, so Retina displays show them softer), maximize/fullscreen/minimize requests are
+ignored like the xdg ones.
+
 ## Verified
 
 Ubuntu 26.04 arm64 guest in Caker, host `caked seamless-demo --no-guest` over the real vsock bridge:
 `weston-simple-shm` (animated) and `foot` (a shell: typed keys reach the guest, output is drawn back). Clipboard: a test host
 speaking the protocol, `wl-copy`/`wl-paste`, both directions, 900 KB from the host, a 1.1 MB copy dropped; and from the
-guest to a real host through the hub.
+guest to a real host through the hub. XWayland: `xclock` and GIMP 2.10.36 (GTK2, X11 only) started through the agent show as
+windows on the host (`[linux] xclock`, `[linux] GNU Image Manipulation Program`, 1024x800).
 
 ## Not done
 
-XWayland (X11 apps), images and other formats on the clipboard, client-drawn cursor images, IME (`text-input`), popup grabs against real toolkits
+Images and other formats on the clipboard, client-drawn cursor images, IME (`text-input`), popup grabs against real toolkits
 (code exists, untested), `wl_output` changes when the host moves a window between displays, GPU acceleration.
