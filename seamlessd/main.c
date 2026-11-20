@@ -140,6 +140,8 @@ struct server {
 	struct wl_listener request_set_selection, request_set_primary_selection, set_selection;
 	struct clip_source *clip_own; /* the host's clipboard, offered to the guest's applications */
 	struct clip_read *clip_rd;    /* a read of an application's selection in progress */
+	unsigned clip_wr_count;       /* writes of the host's clipboard to applications still pending */
+	size_t clip_wr_bytes;         /* and the memory their payloads hold */
 	pid_t child;
 };
 
@@ -407,6 +409,11 @@ static void notify_axis(struct server *s, const struct host_msg *m) {
  */
 
 #define CLIP_READ_TIMEOUT_MS 3000
+/* A reader that makes no progress for this long loses its write; any progress starts the delay again. */
+#define CLIP_WRITE_TIMEOUT_MS 5000
+/* Bounds on the writes pending at once, so applications that open pipes and never read cannot exhaust memory or fds. */
+#define CLIP_WRITE_MAX_COUNT 8
+#define CLIP_WRITE_MAX_BYTES (4 * (size_t)SEAMLESS_MAX_CLIPBOARD)
 
 static const char *const clip_text_mimes[] = {"text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", "TEXT"};
 
@@ -418,7 +425,8 @@ struct clip_source {
 };
 
 struct clip_write {
-	struct wl_event_source *src;
+	struct server *srv;
+	struct wl_event_source *src, *timer;
 	int fd;
 	char *text;
 	size_t len, off;
@@ -436,9 +444,20 @@ static void clip_write_finish(struct clip_write *w) {
 	if (w->src)
 		wl_event_source_remove(w->src);
 
+	if (w->timer)
+		wl_event_source_remove(w->timer);
+
+	w->srv->clip_wr_count--;
+	w->srv->clip_wr_bytes -= w->len;
 	close(w->fd);
 	free(w->text);
 	free(w);
+}
+
+static int on_clip_write_timeout(void *data) {
+	clip_write_finish(data);
+
+	return 0;
 }
 
 static int on_clip_write(int fd, uint32_t mask, void *data) {
@@ -464,6 +483,8 @@ static int on_clip_write(int fd, uint32_t mask, void *data) {
 		}
 
 		w->off += (size_t)n;
+		/* The reader is taking data: it gets the whole delay again. */
+		wl_event_source_timer_update(w->timer, CLIP_WRITE_TIMEOUT_MS);
 	}
 
 	clip_write_finish(w);
@@ -480,7 +501,14 @@ static void clip_source_send(struct wlr_data_source *source, const char *mime_ty
 			known = true;
 	}
 
-	struct clip_write *w = known ? calloc(1, sizeof(*w)) : NULL;
+	struct server *s = cs->srv;
+
+	if (!known || s->clip_wr_count >= CLIP_WRITE_MAX_COUNT || s->clip_wr_bytes + cs->len > CLIP_WRITE_MAX_BYTES) {
+		close(fd);
+		return;
+	}
+
+	struct clip_write *w = calloc(1, sizeof(*w));
 
 	if (!w || !(w->text = malloc(cs->len ? cs->len : 1))) {
 		free(w);
@@ -489,13 +517,17 @@ static void clip_source_send(struct wlr_data_source *source, const char *mime_ty
 	}
 
 	memcpy(w->text, cs->text, cs->len);
+	w->srv = s;
 	w->len = cs->len;
 	w->fd = fd;
+	s->clip_wr_count++;
+	s->clip_wr_bytes += w->len;
 	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
 	/* A pipe takes what fits at once, the rest goes when the reader has made room. */
-	w->src = wl_event_loop_add_fd(cs->srv->loop, fd, WL_EVENT_WRITABLE, on_clip_write, w);
+	w->src = wl_event_loop_add_fd(s->loop, fd, WL_EVENT_WRITABLE, on_clip_write, w);
+	w->timer = wl_event_loop_add_timer(s->loop, on_clip_write_timeout, w);
 
-	if (!w->src)
+	if (!w->src || !w->timer || wl_event_source_timer_update(w->timer, CLIP_WRITE_TIMEOUT_MS) < 0)
 		clip_write_finish(w);
 }
 
