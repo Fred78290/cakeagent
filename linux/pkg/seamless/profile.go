@@ -29,6 +29,18 @@ if [ -z "${WAYLAND_DISPLAY:-}" ]; then
 		export XDG_SESSION_TYPE=wayland
 		export GDK_BACKEND="wayland,x11"
 		export QT_QPA_PLATFORM="wayland;xcb"
+
+		# X11 applications: the compositor serves an X display (Xwayland) and writes its name next to its socket.
+		if [ -z "${DISPLAY:-}" ] && [ -r "$_caker_rt/"%[1]s.display ]; then
+			_caker_x11="$(head -n 1 "$_caker_rt/"%[1]s.display 2>/dev/null)"
+
+			case "$_caker_x11" in
+				:[0-9]*) export DISPLAY="$_caker_x11" ;;
+			esac
+
+			unset _caker_x11
+		fi
+
 		export MOZ_ENABLE_WAYLAND=1
 		export ELECTRON_OZONE_PLATFORM_HINT=auto
 

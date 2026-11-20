@@ -4,6 +4,8 @@
 # compat and symbols files at run time), the agent installs it beside the binary for guests without xkb-data.
 FROM alpine:3.24 AS build
 RUN apk add --no-cache file xkeyboard-config
+ARG SEAMLESSD_KEEP_SYMBOLS=0
+ENV SEAMLESSD_KEEP_SYMBOLS=$SEAMLESSD_KEEP_SYMBOLS
 COPY scripts/build-seamlessd.sh /build-seamlessd.sh
 COPY seamlessd /src
 RUN /build-seamlessd.sh /src /caker-seamlessd

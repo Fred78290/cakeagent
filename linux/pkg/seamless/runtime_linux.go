@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -180,6 +181,40 @@ func baseEnv(a Account, runtimeDir string) []string {
 	}
 }
 
+// x11DisplayPattern is what the compositor writes for an X display: ":" and its number.
+var x11DisplayPattern = regexp.MustCompile(`^:[0-9]{1,5}$`)
+
+// X11Display returns the X display the compositor serves for X11 applications (":1"), or "" when it has none: the guest
+// has no Xwayland, or the compositor does not run yet. The compositor writes the name next to its Wayland socket when it
+// starts, the display is chosen then (the first free one), so it is read, never assumed.
+func X11Display(cfg Config, runtimeDir string) string {
+	cfg = cfg.WithDefaults()
+
+	data, err := os.ReadFile(filepath.Join(runtimeDir, cfg.SocketName+".display"))
+
+	if err != nil {
+		return ""
+	}
+
+	display := strings.TrimSpace(string(data))
+
+	if !x11DisplayPattern.MatchString(display) {
+		return ""
+	}
+
+	return display
+}
+
+// toolkitBackends are the values of the toolkit variables: Wayland, and X11 as a fallback when the compositor serves
+// an X display (an application written for X11 only, or a toolkit without a Wayland backend, then still shows up).
+func toolkitBackends(x11 bool) (gdk, qt, sdl string) {
+	if x11 {
+		return "wayland,x11", "wayland;xcb", "wayland,x11"
+	}
+
+	return "wayland", "wayland", "wayland"
+}
+
 // AppEnv is the environment applications need to find the compositor.
 func AppEnv(cfg Config, a Account, runtimeDir string) []string {
 	cfg = cfg.WithDefaults()
@@ -192,12 +227,19 @@ func AppEnv(cfg Config, a Account, runtimeDir string) []string {
 		env = append(env, "DBUS_SESSION_BUS_ADDRESS=unix:path="+bus)
 	}
 
+	display := X11Display(cfg, runtimeDir)
+	gdk, qt, sdl := toolkitBackends(display != "")
+
+	if display != "" {
+		env = append(env, "DISPLAY="+display)
+	}
+
 	return append(env,
 		"WAYLAND_DISPLAY="+cfg.SocketName,
 		"XDG_SESSION_TYPE=wayland",
-		"GDK_BACKEND=wayland",
-		"QT_QPA_PLATFORM=wayland",
-		"SDL_VIDEODRIVER=wayland",
+		"GDK_BACKEND="+gdk,
+		"QT_QPA_PLATFORM="+qt,
+		"SDL_VIDEODRIVER="+sdl,
 		"MOZ_ENABLE_WAYLAND=1",
 		"ELECTRON_OZONE_PLATFORM_HINT=wayland",
 		"_JAVA_AWT_WM_NONREPARENTING=1",
@@ -355,18 +397,27 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 // activationVars is what a service that D-Bus or systemd starts on the user's behalf (gnome-terminal-server, the
 // portals, Nautilus' and Files' services...) needs to reach the compositor. An application started by "launch" gets it
 // from its own environment, but those services are children of the user's systemd and D-Bus, which have none.
-func activationVars(cfg Config) []string {
+func activationVars(cfg Config, runtimeDir string) []string {
 	cfg = cfg.WithDefaults()
 
-	return []string{
+	display := X11Display(cfg, runtimeDir)
+	gdk, qt, sdl := toolkitBackends(display != "")
+
+	vars := []string{
 		"WAYLAND_DISPLAY=" + cfg.SocketName,
 		"XDG_SESSION_TYPE=wayland",
-		"GDK_BACKEND=wayland",
-		"QT_QPA_PLATFORM=wayland",
-		"SDL_VIDEODRIVER=wayland",
+		"GDK_BACKEND=" + gdk,
+		"QT_QPA_PLATFORM=" + qt,
+		"SDL_VIDEODRIVER=" + sdl,
 		"MOZ_ENABLE_WAYLAND=1",
 		"ELECTRON_OZONE_PLATFORM_HINT=wayland",
 	}
+
+	if display != "" {
+		vars = append(vars, "DISPLAY="+display)
+	}
+
+	return vars
 }
 
 // activationCommands returns the commands that put vars into the user's D-Bus activation environment and systemd user
@@ -393,13 +444,15 @@ func activationCommands(vars []string) [][]string {
 func exportActivationEnv(ctx context.Context, cfg Config, a Account, runtimeDir string) {
 	cfg = cfg.WithDefaults()
 
-	vars := activationVars(cfg)
 	bus := filepath.Join(runtimeDir, "bus")
 	socket := filepath.Join(runtimeDir, cfg.SocketName)
 
 	for attempt := 0; attempt < 30 && ctx.Err() == nil; attempt++ {
 		// The services only matter once the compositor listens and the user's bus exists.
 		if _, err := os.Stat(socket); err == nil {
+			// Read after the socket exists: the compositor writes its X display name right after creating it.
+			vars := activationVars(cfg, runtimeDir)
+
 			if _, err = os.Stat(bus); err == nil && runActivationCommands(ctx, a, runtimeDir, bus, vars) {
 				glog.Infof("seamless: Wayland display exported to %s's session services", a.Name)
 				return
@@ -968,7 +1021,7 @@ func Env(cfg Config) ([]string, error) {
 	var out []string
 
 	for _, kv := range AppEnv(cfg, a, runtimeDir) {
-		if strings.HasPrefix(kv, "XDG_RUNTIME_DIR=") || strings.HasPrefix(kv, "WAYLAND_DISPLAY=") || strings.HasPrefix(kv, "XDG_SESSION_TYPE=") || strings.Contains(kv, "WAYLAND=") || strings.HasPrefix(kv, "GDK_") || strings.HasPrefix(kv, "QT_") || strings.HasPrefix(kv, "MOZ_") || strings.HasPrefix(kv, "ELECTRON_") || strings.HasPrefix(kv, "SDL_") {
+		if strings.HasPrefix(kv, "XDG_RUNTIME_DIR=") || strings.HasPrefix(kv, "WAYLAND_DISPLAY=") || strings.HasPrefix(kv, "DISPLAY=") || strings.HasPrefix(kv, "XDG_SESSION_TYPE=") || strings.Contains(kv, "WAYLAND=") || strings.HasPrefix(kv, "GDK_") || strings.HasPrefix(kv, "QT_") || strings.HasPrefix(kv, "MOZ_") || strings.HasPrefix(kv, "ELECTRON_") || strings.HasPrefix(kv, "SDL_") {
 			out = append(out, kv)
 		}
 	}
