@@ -2,6 +2,7 @@ package seamless
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -43,14 +44,22 @@ const (
 	maxGuestFrame = 192 * 1024 * 1024
 	// maxClipboard mirrors SEAMLESS_MAX_CLIPBOARD: the text of a clipboard message, in bytes.
 	maxClipboard = 1024 * 1024
+	// maxClipboardImage mirrors SEAMLESS_MAX_CLIPBOARD_IMAGE: the PNG file of a clipboard message, in bytes.
+	maxClipboardImage = 32 * 1024 * 1024
 	// maxHostFrame mirrors SEAMLESS_MAX_HOST_FRAME: host messages are tiny, but for the clipboard.
-	maxHostFrame = maxClipboard + 64*1024
+	maxHostFrame = maxClipboardImage + 64*1024
 	// maxString mirrors SeamlessProtocol.maxStringLength.
 	maxString = 4096
 
 	// clipboardVersion is the first protocol version with the clipboard messages. A host or a compositor on an older one
 	// does not know them: the host would close the whole session on one it cannot decode.
 	clipboardVersion = 3
+	// clipboardImageVersion is the first protocol version whose clipboard carries images (format 1, PNG).
+	clipboardImageVersion = 4
+
+	// clipboardText and clipboardPNG are the format byte of a clipboard message.
+	clipboardText = 0
+	clipboardPNG  = 1
 
 	// frameBudget is how much memory the frames being read from the compositors may take all together. It must hold
 	// a frame of maxGuestFrame, so that a complete large frame is still accepted when nothing else is in flight.
@@ -792,7 +801,7 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 			// before it), and is not revisited before the write. Revalidating would not order anything better: holding mu
 			// across link.write would stall the host reader behind a slow write, and a message already on the wire to the
 			// host cannot be recalled when the focus moves. Admission time is the contract.
-			if err = checkClipboard(frame[5:]); err == nil {
+			if err = checkClipboard(frame[5:], peer.link.version); err == nil {
 				budget.release(reserved)
 
 				continue
@@ -810,25 +819,44 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 	}
 }
 
-// checkClipboard validates the payload of a clipboard message: a known format, a length that is exactly what follows,
-// and, for text (format 0), valid UTF-8: the host's decoder refuses anything else and closes the whole session.
-func checkClipboard(payload []byte) error {
+// pngSignature starts every PNG file.
+var pngSignature = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+
+// checkClipboard validates the payload of a clipboard message on a link of the given protocol version: a known format
+// (an image only from clipboardImageVersion on), a length that is exactly what follows and within the limit of the
+// format, valid UTF-8 for text and the PNG signature for an image: the host's decoder refuses anything else and closes
+// the whole session.
+func checkClipboard(payload []byte, version uint16) error {
 	if len(payload) < 5 {
 		return errShortMessage
 	}
 
-	if payload[0] != 0 {
+	limit := maxClipboard
+
+	switch payload[0] {
+	case clipboardText:
+	case clipboardPNG:
+		if version < clipboardImageVersion {
+			return fmt.Errorf("clipboard image on protocol version %d", version)
+		}
+
+		limit = maxClipboardImage
+	default:
 		return fmt.Errorf("clipboard format %d", payload[0])
 	}
 
 	n := binary.LittleEndian.Uint32(payload[1:])
 
-	if n > maxClipboard || int(n) != len(payload)-5 {
+	if n > uint32(limit) || int(n) != len(payload)-5 {
 		return fmt.Errorf("clipboard of %d bytes in a message of %d", n, len(payload)-5)
 	}
 
-	if payload[0] == 0 && !utf8.Valid(payload[5:]) {
+	if payload[0] == clipboardText && !utf8.Valid(payload[5:]) {
 		return errors.New("clipboard text is not UTF-8")
+	}
+
+	if payload[0] == clipboardPNG && (n < uint32(len(pngSignature)) || !bytes.Equal(payload[5:5+len(pngSignature)], pngSignature)) {
+		return errors.New("clipboard image is not a PNG")
 	}
 
 	return nil
@@ -1207,8 +1235,8 @@ func (p *hubPeer) rewrite(frame []byte, prefix string) ([]byte, error) {
 			return nil, fmt.Errorf("clipboard message on protocol version %d", p.link.version)
 		}
 
-		// u8 format (0: UTF-8 text) + u32 length + bytes. There is no window id: whose it is, is the hub's business.
-		if err := checkClipboard(payload); err != nil {
+		// u8 format (0: UTF-8 text, 1: PNG) + u32 length + bytes. There is no window id: whose it is, is the hub's business.
+		if err := checkClipboard(payload, p.link.version); err != nil {
 			return nil, err
 		}
 
@@ -1362,7 +1390,7 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 		}
 
 	case hClipboard:
-		if err := checkClipboard(payload); err != nil {
+		if err := checkClipboard(payload, link.version); err != nil {
 			return err
 		}
 

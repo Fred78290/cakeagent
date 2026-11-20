@@ -35,9 +35,9 @@ Keyboard layout: the host sends physical keys (evdev codes), the guest's layout 
 
 `SEAMLESS_FORCE_FOCUS=1` gives keyboard focus to every new toplevel, for hosts that can't report window focus.
 
-## Clipboard (protocol 3)
+## Clipboard (protocol 3, images from protocol 4)
 
-Text only, both ways, up to 1 MiB (`SEAMLESS_MAX_CLIPBOARD`). When an application sets the selection (copy), the compositor
+Text and images, both ways. Text is up to 1 MiB (`SEAMLESS_MAX_CLIPBOARD`). When an application sets the selection (copy), the compositor
 reads its `text/plain` at once (a pipe, bounded in size and time, 3 s) and sends it as `G_CLIPBOARD` (`0x09`: `u8 format`
 (0, UTF-8 text) + `u32 length` + bytes). The host's clipboard comes as `H_CLIPBOARD` (`0x8C`, same payload) and becomes the
 selection of the seat, offered as `text/plain;charset=utf-8`, `text/plain`, `UTF8_STRING`, `STRING` and `TEXT`; the source it
@@ -46,6 +46,15 @@ between the guest's applications only. `wlr-data-control` is offered so `wl-copy
 without a focused surface (which the host decides on). The agent's hub gives the host's clipboard to the focused user's
 compositor only, and takes a clipboard from the focused user's compositor only (or from any when no window has the focus).
 A host on protocol 2 (or a compositor on protocol 2) has none of this: the host simply doesn't send the message.
+
+**Images (protocol 4)**: the format byte `1` carries a PNG file (it must start with the PNG signature), up to 32 MiB
+(`SEAMLESS_MAX_CLIPBOARD_IMAGE`). A selection that offers `image/png` and no text is read like text is (a longer delay,
+15 s, since an X11 application sends a big image in pieces) and sent with format 1; the host's image becomes a selection
+that offers `image/png` (Xwayland turns that into the X11 `image/png` target, which is what GIMP reads). A selection that
+offers both goes as text, and so does the host's. A protocol 3 peer has no images: the hub refuses a format 1 message on a
+link of that version, and the host does not send one to a guest that said 3. The protocol is 4 for every compositor and
+the host (one version per link), so a host older than the agent refuses it, as it did for each earlier bump: Caker pins the
+agent it installs.
 
 ## XWayland (X11 applications)
 
@@ -87,7 +96,7 @@ ignored like the xdg ones.
 Ubuntu 26.04 arm64 guest in Caker, host `caked seamless-demo --no-guest` over the real vsock bridge:
 `weston-simple-shm` (animated) and `foot` (a shell: typed keys reach the guest, output is drawn back). Clipboard: a test host
 speaking the protocol, `wl-copy`/`wl-paste`, both directions, 900 KB from the host, a 1.1 MB copy dropped; and from the
-guest to a real host through the hub. XWayland: `xclock` and GIMP 2.10.36 (GTK2, X11 only) started through the agent show as
+guest to a real host through the hub. Images: the hub and the codec by unit tests, GIMP 2.10 (see below). XWayland: `xclock` and GIMP 2.10.36 (GTK2, X11 only) started through the agent show as
 windows on the host (`[linux] xclock`, `[linux] GNU Image Manipulation Program`, 1024x800).
 
 ## Not done

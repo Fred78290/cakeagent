@@ -1,4 +1,4 @@
-// Seamless window protocol, guest side. Mirror of Sources/cakedlib/Seamless/SeamlessProtocol.swift (version 3):
+// Seamless window protocol, guest side. Mirror of Sources/cakedlib/Seamless/SeamlessProtocol.swift (version 4):
 // every message is `u32 length` (type byte + payload) + `u8 type` + payload, little endian, strings are
 // `u16 length` + UTF-8. Types 0x01..0x7F go guest -> host, 0x81..0xFF host -> guest.
 
@@ -9,9 +9,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SEAMLESS_VERSION 3
+#define SEAMLESS_VERSION 4
 /* First version with the clipboard (G_CLIPBOARD / H_CLIPBOARD). */
 #define SEAMLESS_CLIPBOARD_VERSION 3
+/* First version whose clipboard carries images (format 1, PNG). */
+#define SEAMLESS_CLIPBOARD_IMAGE_VERSION 4
 #define SEAMLESS_DEFAULT_VSOCK_PORT 5100
 #define SEAMLESS_MAX_STRING 4096
 #define SEAMLESS_MAX_RECTS 1024
@@ -19,8 +21,10 @@
 #define SEAMLESS_MAX_PIXELS 40000000
 /* The clipboard text, in bytes, in either direction. A bigger selection is not transferred. */
 #define SEAMLESS_MAX_CLIPBOARD (1024 * 1024)
+/* The clipboard image (a PNG file), in bytes, in either direction. */
+#define SEAMLESS_MAX_CLIPBOARD_IMAGE (32 * 1024 * 1024)
 /* Host messages are tiny, but for the clipboard; anything bigger is a broken or hostile peer. */
-#define SEAMLESS_MAX_HOST_FRAME (SEAMLESS_MAX_CLIPBOARD + 64 * 1024)
+#define SEAMLESS_MAX_HOST_FRAME (SEAMLESS_MAX_CLIPBOARD_IMAGE + 64 * 1024)
 
 enum seamless_guest_type {
 	G_HELLO = 0x01,
@@ -31,7 +35,7 @@ enum seamless_guest_type {
 	G_WINDOW_FRAME = 0x06,
 	G_WINDOW_DESTROY = 0x07,
 	G_CURSOR = 0x08,
-	G_CLIPBOARD = 0x09, /* u8 format (0: UTF-8 text) + u32 length + bytes */
+	G_CLIPBOARD = 0x09, /* u8 format (0: UTF-8 text, 1: PNG image, protocol 4) + u32 length + bytes */
 };
 
 enum seamless_host_type {
@@ -50,6 +54,9 @@ enum seamless_host_type {
 };
 
 enum seamless_window_kind { KIND_TOPLEVEL = 0, KIND_POPUP = 1 };
+
+/* The format byte of a clipboard message. */
+enum seamless_clipboard_format { CLIP_TEXT = 0, CLIP_PNG = 1 };
 
 /* Growable output buffer. */
 struct wbuf {
@@ -87,7 +94,8 @@ struct host_msg {
 	bool flag;           /* focused / pressed */
 	uint16_t version;
 	uint32_t code; /* key */
-	const uint8_t *data; /* clipboard text, in the receive buffer: valid until the next rx_* call */
+	uint8_t format;      /* clipboard: enum seamless_clipboard_format */
+	const uint8_t *data; /* clipboard text or PNG, in the receive buffer: valid until the next rx_* call */
 	size_t data_len;
 };
 

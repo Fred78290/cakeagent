@@ -464,25 +464,41 @@ static void notify_axis(struct server *s, const struct host_msg *m) {
 /* ======================================================================== clipboard */
 
 /*
- * Text only, both ways. A selection an application sets is read at once (a pipe, bounded in size and time) and sent
- * to the host, which puts it on its clipboard; the host's clipboard comes as H_CLIPBOARD and becomes the selection
- * of the seat, offered as plain text. The source the host's text came in is recognised when the seat reports the
- * selection back, so it does not go round again.
+ * Text and PNG images, both ways. A selection an application sets is read at once (a pipe, bounded in size and time)
+ * and sent to the host, which puts it on its clipboard; the host's clipboard comes as H_CLIPBOARD and becomes the
+ * selection of the seat, offered as plain text or as image/png. A selection that offers both goes as text. The source
+ * the host's data came in is recognised when the seat reports the selection back, so it does not go round again.
  */
 
 #define CLIP_READ_TIMEOUT_MS 3000
+/* An image can be a long transfer (an X11 application sends it in pieces). */
+#define CLIP_READ_IMAGE_TIMEOUT_MS 15000
 /* A reader that makes no progress for this long loses its write; any progress starts the delay again. */
 #define CLIP_WRITE_TIMEOUT_MS 5000
 /* Bounds on the writes pending at once, so applications that open pipes and never read cannot exhaust memory or fds. */
 #define CLIP_WRITE_MAX_COUNT 8
-#define CLIP_WRITE_MAX_BYTES (4 * (size_t)SEAMLESS_MAX_CLIPBOARD)
+#define CLIP_WRITE_MAX_BYTES (2 * (size_t)SEAMLESS_MAX_CLIPBOARD_IMAGE)
 
 static const char *const clip_text_mimes[] = {"text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", "TEXT"};
+static const char *const clip_image_mimes[] = {"image/png"};
+
+/* The types offered for a clipboard format, and how many. */
+static const char *const *clip_mimes(uint8_t format, size_t *count) {
+	if (format == CLIP_PNG) {
+		*count = sizeof(clip_image_mimes) / sizeof(clip_image_mimes[0]);
+		return clip_image_mimes;
+	}
+
+	*count = sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]);
+
+	return clip_text_mimes;
+}
 
 struct clip_source {
 	struct wlr_data_source base;
 	struct server *srv;
-	char *text;
+	uint8_t format; /* enum seamless_clipboard_format */
+	char *text;     /* the text, or the PNG file */
 	size_t len;
 };
 
@@ -498,6 +514,8 @@ struct clip_read {
 	struct server *srv;
 	struct wl_event_source *src, *timer;
 	int fd;
+	uint8_t format;
+	size_t max; /* the most the format may carry */
 	uint8_t *buf;
 	size_t len, cap;
 };
@@ -557,9 +575,11 @@ static int on_clip_write(int fd, uint32_t mask, void *data) {
 static void clip_source_send(struct wlr_data_source *source, const char *mime_type, int32_t fd) {
 	struct clip_source *cs = wl_container_of(source, cs, base);
 	bool known = false;
+	size_t nmimes;
+	const char *const *mimes = clip_mimes(cs->format, &nmimes);
 
-	for (size_t i = 0; i < sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]); i++) {
-		if (strcmp(clip_text_mimes[i], mime_type) == 0)
+	for (size_t i = 0; i < nmimes; i++) {
+		if (strcmp(mimes[i], mime_type) == 0)
 			known = true;
 	}
 
@@ -608,9 +628,9 @@ static const struct wlr_data_source_impl clip_source_impl = {
 	.destroy = clip_source_destroy,
 };
 
-/* The host's text becomes the selection of the guest. */
-static void host_set_clipboard(struct server *s, const uint8_t *data, size_t len) {
-	if (len == 0 || len > SEAMLESS_MAX_CLIPBOARD)
+/* The host's text or image becomes the selection of the guest. */
+static void host_set_clipboard(struct server *s, const uint8_t *data, size_t len, uint8_t format) {
+	if (len == 0 || len > (format == CLIP_PNG ? SEAMLESS_MAX_CLIPBOARD_IMAGE : SEAMLESS_MAX_CLIPBOARD))
 		return;
 
 	struct clip_source *cs = calloc(1, sizeof(*cs));
@@ -628,13 +648,17 @@ static void host_set_clipboard(struct server *s, const uint8_t *data, size_t len
 	memcpy(cs->text, data, len);
 	cs->len = len;
 	cs->srv = s;
+	cs->format = format;
 	wlr_data_source_init(&cs->base, &clip_source_impl);
 
-	for (size_t i = 0; i < sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]); i++) {
+	size_t nmimes;
+	const char *const *mimes = clip_mimes(format, &nmimes);
+
+	for (size_t i = 0; i < nmimes; i++) {
 		char **slot = wl_array_add(&cs->base.mime_types, sizeof(*slot));
 
 		if (slot)
-			*slot = strdup(clip_text_mimes[i]);
+			*slot = strdup(mimes[i]);
 	}
 
 	s->clip_own = cs;
@@ -657,13 +681,13 @@ static void clip_read_free(struct clip_read *r) {
 	free(r);
 }
 
-static void send_clipboard(struct server *s, const uint8_t *text, size_t len) {
+static void send_clipboard(struct server *s, const uint8_t *data, size_t len, uint8_t format) {
 	struct wbuf b = {0};
 	size_t st = wire_begin(&b, G_CLIPBOARD);
 
-	wbuf_u8(&b, 0);
+	wbuf_u8(&b, format);
 	wbuf_u32(&b, (uint32_t)len);
-	wbuf_bytes(&b, text, len);
+	wbuf_bytes(&b, data, len);
 	wire_end(&b, st);
 	send_message(s, &b);
 	wbuf_free(&b);
@@ -677,8 +701,8 @@ static int on_clip_read(int fd, uint32_t mask, void *data) {
 		if (r->len == r->cap) {
 			size_t cap = r->cap ? r->cap * 2 : 4096;
 
-			if (cap > SEAMLESS_MAX_CLIPBOARD + 1)
-				cap = SEAMLESS_MAX_CLIPBOARD + 1;
+			if (cap > r->max + 1)
+				cap = r->max + 1;
 
 			/* Past the limit: too big to share, dropped. */
 			if (cap == r->cap) {
@@ -714,8 +738,8 @@ static int on_clip_read(int fd, uint32_t mask, void *data) {
 	}
 
 	/* End of the data (or an error): what was read is the selection. */
-	if (r->len > 0 && r->len <= SEAMLESS_MAX_CLIPBOARD && s->ready)
-		send_clipboard(s, r->buf, r->len);
+	if (r->len > 0 && r->len <= r->max && s->ready && (r->format != CLIP_PNG || (r->len >= 8 && memcmp(r->buf, "\x89PNG\r\n\x1a\n", 8) == 0)))
+		send_clipboard(s, r->buf, r->len, r->format);
 
 	clip_read_free(r);
 
@@ -740,14 +764,22 @@ static void on_set_selection(struct wl_listener *l, void *data) {
 		return;
 
 	const char *mime = NULL;
+	uint8_t format = CLIP_TEXT;
 
-	for (size_t i = 0; i < sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]) && !mime; i++) {
-		char **offered;
+	/* Text first, then an image: a selection that offers both goes as text. */
+	for (uint8_t f = CLIP_TEXT; f <= CLIP_PNG && !mime; f++) {
+		size_t nmimes;
+		const char *const *mimes = clip_mimes(f, &nmimes);
 
-		wl_array_for_each(offered, &source->mime_types) {
-			if (strcmp(*offered, clip_text_mimes[i]) == 0) {
-				mime = clip_text_mimes[i];
-				break;
+		for (size_t i = 0; i < nmimes && !mime; i++) {
+			char **offered;
+
+			wl_array_for_each(offered, &source->mime_types) {
+				if (strcmp(*offered, mimes[i]) == 0) {
+					mime = mimes[i];
+					format = f;
+					break;
+				}
 			}
 		}
 	}
@@ -770,6 +802,8 @@ static void on_set_selection(struct wl_listener *l, void *data) {
 
 	r->srv = s;
 	r->fd = fds[0];
+	r->format = format;
+	r->max = format == CLIP_PNG ? SEAMLESS_MAX_CLIPBOARD_IMAGE : SEAMLESS_MAX_CLIPBOARD;
 	/* Closes the write end once it has been handed to the application, which then holds the only one. */
 	wlr_data_source_send(source, mime, fds[1]);
 	r->src = wl_event_loop_add_fd(s->loop, r->fd, WL_EVENT_READABLE, on_clip_read, r);
@@ -780,7 +814,7 @@ static void on_set_selection(struct wl_listener *l, void *data) {
 		return;
 	}
 
-	wl_event_source_timer_update(r->timer, CLIP_READ_TIMEOUT_MS);
+	wl_event_source_timer_update(r->timer, format == CLIP_PNG ? CLIP_READ_IMAGE_TIMEOUT_MS : CLIP_READ_TIMEOUT_MS);
 	s->clip_rd = r;
 }
 
@@ -866,7 +900,7 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 			notify_axis(s, m);
 		break;
 	case H_CLIPBOARD:
-		host_set_clipboard(s, m->data, m->data_len);
+		host_set_clipboard(s, m->data, m->data_len, m->format);
 		break;
 	case H_KEY: {
 		struct wlr_keyboard_key_event ev = {

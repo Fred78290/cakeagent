@@ -1057,14 +1057,75 @@ func TestHubRejectsAMalformedClipboard(t *testing.T) {
 }
 
 func TestCheckClipboardAcceptsAnEmptyAndAFullText(t *testing.T) {
-	if err := checkClipboard(append([]byte{0}, u32(0)...)); err != nil {
+	if err := checkClipboard(append([]byte{0}, u32(0)...), clipboardVersion); err != nil {
 		t.Fatal(err)
 	}
 
 	full := append([]byte{0}, u32(maxClipboard)...)
 
-	if err := checkClipboard(append(full, make([]byte, maxClipboard)...)); err != nil {
+	if err := checkClipboard(append(full, make([]byte, maxClipboard)...), clipboardVersion); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// pngPayload is a clipboard payload of format 1 whose file starts with the PNG signature and has size bytes in all.
+func pngPayload(size int) []byte {
+	file := append(append([]byte{}, pngSignature...), make([]byte, size-len(pngSignature))...)
+
+	return append(append([]byte{clipboardPNG}, u32(uint32(len(file)))...), file...)
+}
+
+func TestCheckClipboardImages(t *testing.T) {
+	if err := checkClipboard(pngPayload(64), clipboardImageVersion); err != nil {
+		t.Fatalf("a PNG on protocol 4: %v", err)
+	}
+
+	if err := checkClipboard(pngPayload(maxClipboardImage), clipboardImageVersion); err != nil {
+		t.Fatalf("a PNG of the largest size: %v", err)
+	}
+
+	for name, c := range map[string]struct {
+		payload []byte
+		version uint16
+	}{
+		"protocol 3 has no images": {pngPayload(64), clipboardVersion},
+		"not a PNG":                {append(append([]byte{clipboardPNG}, u32(16)...), make([]byte, 16)...), clipboardImageVersion},
+		"shorter than a signature": {append(append([]byte{clipboardPNG}, u32(4)...), pngSignature[:4]...), clipboardImageVersion},
+		"over the image limit":     {append([]byte{clipboardPNG}, u32(maxClipboardImage+1)...), clipboardImageVersion},
+	} {
+		if err := checkClipboard(c.payload, c.version); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestHubRoutesClipboardImagesOnProtocol4(t *testing.T) {
+	rig := newHubRigVersion(t, clipboardImageVersion)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Editor")); err != nil {
+		t.Fatal(err)
+	}
+
+	window := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	host.send(buildFrame(hWindowFocus, append(u32(window), 1)))
+	readOne(t, aliceConn, aliceReader)
+
+	image := pngPayload(200)
+
+	host.send(buildFrame(hClipboard, image))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hClipboard || got[5] != clipboardPNG || len(got) != 5+len(image) {
+		t.Fatalf("the focused user must get the image: %x", got[:12])
+	}
+
+	_, _ = aliceConn.Write(buildFrame(gClipboard, image))
+
+	if got := expect(t, host.received); got[4] != gClipboard || got[5] != clipboardPNG || len(got) != 5+len(image) {
+		t.Fatalf("the host must get the image: %x", got[:12])
 	}
 }
 

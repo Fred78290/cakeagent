@@ -201,10 +201,23 @@ int wire_parse_host(uint8_t type, const uint8_t *payload, size_t n, struct host_
 		uint8_t format = rd_u8(&r);
 		uint32_t length = rd_u32(&r);
 
-		if (format != 0 || length > SEAMLESS_MAX_CLIPBOARD)
+		/* Text up to SEAMLESS_MAX_CLIPBOARD, a PNG (it starts with the PNG signature) up to SEAMLESS_MAX_CLIPBOARD_IMAGE. */
+		if (format == CLIP_TEXT) {
+			if (length > SEAMLESS_MAX_CLIPBOARD)
+				r.bad = true;
+		} else if (format == CLIP_PNG) {
+			if (length < 8 || length > SEAMLESS_MAX_CLIPBOARD_IMAGE)
+				r.bad = true;
+		} else {
+			r.bad = true;
+		}
+
+		out->format = format;
+		out->data = rd_take(&r, length);
+
+		if (!r.bad && format == CLIP_PNG && memcmp(out->data, "\x89PNG\r\n\x1a\n", 8) != 0)
 			r.bad = true;
 
-		out->data = rd_take(&r, length);
 		out->data_len = length;
 		break;
 	}
