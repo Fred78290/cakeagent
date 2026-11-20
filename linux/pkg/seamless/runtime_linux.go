@@ -181,6 +181,12 @@ func baseEnv(a Account, runtimeDir string) []string {
 	}
 }
 
+// x11DisplayFile is the file the compositor writes its X display name to, next to its Wayland socket. The compositor
+// writes it once its X side is settled, empty when it has no Xwayland, so its existence also means "initialised".
+func x11DisplayFile(cfg Config, runtimeDir string) string {
+	return filepath.Join(runtimeDir, cfg.SocketName+".display")
+}
+
 // x11DisplayPattern is what the compositor writes for an X display: ":" and its number.
 var x11DisplayPattern = regexp.MustCompile(`^:[0-9]{1,5}$`)
 
@@ -190,7 +196,7 @@ var x11DisplayPattern = regexp.MustCompile(`^:[0-9]{1,5}$`)
 func X11Display(cfg Config, runtimeDir string) string {
 	cfg = cfg.WithDefaults()
 
-	data, err := os.ReadFile(filepath.Join(runtimeDir, cfg.SocketName+".display"))
+	data, err := os.ReadFile(x11DisplayFile(cfg, runtimeDir))
 
 	if err != nil {
 		return ""
@@ -351,6 +357,10 @@ func runOnce(ctx context.Context, cfg Config, a Account, runtimeDir string) erro
 	args := []string{"--connect", cfg.HubConnect(), "--socket", cfg.SocketName}
 	cmd := exec.CommandContext(ctx, cfg.Binary, args...)
 
+	// A file left by a compositor that did not exit cleanly must not pass for the new one's: it is rewritten once the
+	// compositor has settled its X side.
+	_ = os.Remove(x11DisplayFile(cfg.WithDefaults(), runtimeDir))
+
 	cmd.Env = append(baseEnv(a, runtimeDir), "WLR_RENDERER=pixman")
 
 	if cfg.Layout != "" {
@@ -448,9 +458,10 @@ func exportActivationEnv(ctx context.Context, cfg Config, a Account, runtimeDir 
 	socket := filepath.Join(runtimeDir, cfg.SocketName)
 
 	for attempt := 0; attempt < 30 && ctx.Err() == nil; attempt++ {
-		// The services only matter once the compositor listens and the user's bus exists.
-		if _, err := os.Stat(socket); err == nil {
-			// Read after the socket exists: the compositor writes its X display name right after creating it.
+		// The services only matter once the compositor listens and the user's bus exists. The socket appears before the
+		// compositor has started its X side, so the display file, which it writes last (empty without Xwayland), is what
+		// says the display name is final.
+		if _, err := os.Stat(socket); err == nil && fileExists(x11DisplayFile(cfg, runtimeDir)) {
 			vars := activationVars(cfg, runtimeDir)
 
 			if _, err = os.Stat(bus); err == nil && runActivationCommands(ctx, a, runtimeDir, bus, vars) {

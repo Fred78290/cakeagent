@@ -1136,9 +1136,19 @@ static bool diff_bounds(const uint8_t *cur, size_t stride, const uint8_t *prev, 
 	return true;
 }
 
-/* The window an X11 menu or tooltip hangs off: one of the same process, else the focused X11 window, else the newest. */
+/*
+ * The window an X11 menu or tooltip hangs off: its transient parent when it names one, else the focused window of the same
+ * process, else the newest window of that process, else the focused X11 window, else the newest.
+ */
 static struct window *x11_popup_parent(struct server *s, struct window *popup) {
 	struct window *o, *same_pid = NULL, *newest = NULL;
+
+	if (popup->xw->parent) {
+		struct window *p = popup->xw->parent->data;
+
+		if (p && p->xw && p->kind == WIN_TOPLEVEL && p->id != 0)
+			return p;
+	}
 
 	wl_list_for_each(o, &s->windows, link) {
 		if (!o->xw || o->kind != WIN_TOPLEVEL || o->id == 0)
@@ -1146,8 +1156,13 @@ static struct window *x11_popup_parent(struct server *s, struct window *popup) {
 
 		newest = o;
 
-		if (popup->xw->pid > 0 && o->xw->pid == popup->xw->pid)
+		if (popup->xw->pid > 0 && o->xw->pid == popup->xw->pid) {
+			/* The focused window of the process wins over a newer one. */
+			if (o == s->focus_win)
+				return o;
+
 			same_pid = o;
+		}
 	}
 
 	if (same_pid)
@@ -1221,8 +1236,15 @@ static void announce_window(struct server *s, struct window *w) {
 static void announce_all(struct server *s) {
 	struct window *w;
 
+	/* Toplevels first: an X11 menu or tooltip picks its parent among the announced toplevels, whatever the list order. */
 	wl_list_for_each(w, &s->windows, link) {
-		announce_window(s, w);
+		if (w->kind != WIN_POPUP)
+			announce_window(s, w);
+	}
+
+	wl_list_for_each(w, &s->windows, link) {
+		if (w->kind == WIN_POPUP)
+			announce_window(s, w);
 	}
 }
 
@@ -1873,6 +1895,15 @@ static bool in_path(const char *name) {
  * SEAMLESS_XWAYLAND=0 turns it off; a guest without the Xwayland program just has no X11 support.
  */
 static void xwayland_init(struct server *s, const char *sock) {
+	const char *rt = getenv("XDG_RUNTIME_DIR");
+
+	/* A file left by a compositor that did not exit cleanly names a display that is not ours. */
+	if (rt && snprintf(s->x11_display_file, sizeof(s->x11_display_file), "%s/%s.display", rt, sock) < (int)sizeof(s->x11_display_file))
+		unlink(s->x11_display_file);
+	else
+		s->x11_display_file[0] = '\0';
+
+	const char *display_name = "";
 	const char *off = getenv("SEAMLESS_XWAYLAND");
 
 	const char *program = getenv("WLR_XWAYLAND");
@@ -1882,35 +1913,43 @@ static void xwayland_init(struct server *s, const char *sock) {
 
 	if ((off && strcmp(off, "0") == 0) || !installed) {
 		wlr_log(WLR_INFO, "no XWayland (%s)", off && strcmp(off, "0") == 0 ? "disabled" : "the Xwayland program is not installed");
-		return;
+	} else {
+		s->xwayland = wlr_xwayland_create(s->display, s->compositor, true);
+
+		if (!s->xwayland) {
+			wlr_log(WLR_ERROR, "cannot create XWayland");
+		} else {
+			s->xwayland_new_surface.notify = on_xwayland_new_surface;
+			wl_signal_add(&s->xwayland->events.new_surface, &s->xwayland_new_surface);
+			wlr_xwayland_set_seat(s->xwayland, s->seat);
+			setenv("DISPLAY", s->xwayland->display_name, 1);
+			display_name = s->xwayland->display_name;
+			wlr_log(WLR_INFO, "XWayland on DISPLAY=%s", display_name);
+		}
 	}
 
-	s->xwayland = wlr_xwayland_create(s->display, s->compositor, true);
+	/*
+	 * The file is written whatever the outcome, empty when there is no X display: it tells whoever waits for the compositor
+	 * (the agent exporting the display to the session services) that the X side is settled, since the Wayland socket exists
+	 * before this runs. It is written whole, then renamed, so a reader never sees it half done.
+	 */
+	if (s->x11_display_file[0]) {
+		char tmp[PATH_MAX + 8];
 
-	if (!s->xwayland) {
-		wlr_log(WLR_ERROR, "cannot create XWayland");
-		return;
-	}
+		snprintf(tmp, sizeof(tmp), "%s.tmp", s->x11_display_file);
 
-	s->xwayland_new_surface.notify = on_xwayland_new_surface;
-	wl_signal_add(&s->xwayland->events.new_surface, &s->xwayland_new_surface);
-	wlr_xwayland_set_seat(s->xwayland, s->seat);
-	setenv("DISPLAY", s->xwayland->display_name, 1);
-
-	const char *rt = getenv("XDG_RUNTIME_DIR");
-
-	if (rt && snprintf(s->x11_display_file, sizeof(s->x11_display_file), "%s/%s.display", rt, sock) < (int)sizeof(s->x11_display_file)) {
-		FILE *f = fopen(s->x11_display_file, "w");
+		FILE *f = fopen(tmp, "w");
 
 		if (f) {
-			fprintf(f, "%s\n", s->xwayland->display_name);
-			fclose(f);
+			if (*display_name)
+				fprintf(f, "%s\n", display_name);
+
+			if (fclose(f) != 0 || rename(tmp, s->x11_display_file) != 0)
+				unlink(tmp);
 		} else {
 			s->x11_display_file[0] = '\0';
 		}
 	}
-
-	wlr_log(WLR_INFO, "XWayland on DISPLAY=%s", s->xwayland->display_name);
 }
 
 /* ======================================================================== input */
