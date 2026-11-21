@@ -35,17 +35,34 @@ Keyboard layout: the host sends physical keys (evdev codes), the guest's layout 
 
 `SEAMLESS_FORCE_FOCUS=1` gives keyboard focus to every new toplevel, for hosts that can't report window focus.
 
-## Clipboard (protocol 3)
+## Clipboard (protocol 3 text, protocol 4 any MIME type)
 
-Text only, both ways, up to 1 MiB (`SEAMLESS_MAX_CLIPBOARD`). When an application sets the selection (copy), the compositor
-reads its `text/plain` at once (a pipe, bounded in size and time, 3 s) and sends it as `G_CLIPBOARD` (`0x09`: `u8 format`
-(0, UTF-8 text) + `u32 length` + bytes). The host's clipboard comes as `H_CLIPBOARD` (`0x8C`, same payload) and becomes the
-selection of the seat, offered as `text/plain;charset=utf-8`, `text/plain`, `UTF8_STRING`, `STRING` and `TEXT`; the source it
-came in is recognised when the seat reports the selection back, so it does not go round again. Primary selection is shared
-between the guest's applications only. `wlr-data-control` is offered so `wl-copy`/`wl-paste` and clipboard managers work
-without a focused surface (which the host decides on). The agent's hub gives the host's clipboard to the focused user's
-compositor only, and takes a clipboard from the focused user's compositor only (or from any when no window has the focus).
-A host on protocol 2 (or a compositor on protocol 2) has none of this: the host simply doesn't send the message.
+Both ways. **Protocol 4** carries a list of MIME typed items: `G_CLIPBOARD_ITEMS` (`0x0A`) and `H_CLIPBOARD_ITEMS` (`0x8D`),
+`u16 count` (1 to 16), then per item `u16 mime length` + MIME type + `u32 length` + bytes. A MIME type is `type/subtype` in
+printable ASCII without spaces (3 to 127 bytes; the X11 pseudo targets `TARGETS`, `UTF8_STRING`... have no slash and are
+not MIME types), the types are distinct (ignoring case), an item is not empty, and the data of all the items together is
+at most 32 MiB (`SEAMLESS_MAX_CLIPBOARD_TOTAL`). The parser and the hub refuse anything else, and the connection ends.
+
+When an application sets the selection (copy), the compositor reads what it offers at once, one type after another (a pipe
+each, bounded in size and time: 3 s for text, 15 s for the rest, since an X11 application sends a big image in pieces, and
+15 s for the whole selection: past that, what was read so far is sent), and sends one `G_CLIPBOARD_ITEMS`: one plain text
+first (always named `text/plain;charset=utf-8`, whatever name it was read under: `text/plain`, `UTF8_STRING`...), then every
+other type with a valid MIME type, under its own name (a `text/plain` in another charset is sent as that), up to 16 items
+and the total above (an item that does not fit, or that nobody answers, is left out). The host's clipboard comes as
+`H_CLIPBOARD_ITEMS` and becomes the selection of the seat, offering its types, and the usual names of plain text
+(`text/plain;charset=utf-8`, `text/plain`, `UTF8_STRING`, `STRING`, `TEXT`) when it carries UTF-8 text (a text in another
+charset is offered under its own type only). Xwayland turns the types into the X11 targets (GIMP reads `image/png`).
+The source the host's data came in is recognised when the seat reports the selection back, so it does not go round again.
+Primary selection is shared between the guest's applications only. `wlr-data-control` is offered so `wl-copy`/`wl-paste` and
+clipboard managers work without a focused surface (which the host decides on). The agent's hub gives the host's clipboard to
+the focused user's compositor only, and takes a clipboard from the focused user's compositor only (or from any when no
+window has the focus). Xwayland itself only bridges a selection while one of its surfaces has the keyboard focus.
+
+**Protocol 3** (`G_CLIPBOARD` `0x09` / `H_CLIPBOARD` `0x8C`: `u8 format` (0, UTF-8 text) + `u32 length` + bytes, 1 MiB) is
+not spoken by this compositor: a link has one version, exactly, so a host older than the agent refuses it, as it did for
+each earlier bump (Caker pins the agent it installs). The host still talks protocol 3 to an older agent. What the host does
+with the types (which MIME types map to pasteboard types, what is left out) is the host's business: Caker shares text,
+images and PDF.
 
 ## XWayland (X11 applications)
 
@@ -87,10 +104,10 @@ ignored like the xdg ones.
 Ubuntu 26.04 arm64 guest in Caker, host `caked seamless-demo --no-guest` over the real vsock bridge:
 `weston-simple-shm` (animated) and `foot` (a shell: typed keys reach the guest, output is drawn back). Clipboard: a test host
 speaking the protocol, `wl-copy`/`wl-paste`, both directions, 900 KB from the host, a 1.1 MB copy dropped; and from the
-guest to a real host through the hub. XWayland: `xclock` and GIMP 2.10.36 (GTK2, X11 only) started through the agent show as
+guest to a real host through the hub. Any MIME type: the hub and the codec by unit tests, and a test host speaking protocol 4 with GTK X11 clients through Xwayland (text, `text/html` and `image/png` read by the client; the same three set by the client and sent to the host). XWayland: `xclock` and GIMP 2.10.36 (GTK2, X11 only) started through the agent show as
 windows on the host (`[linux] xclock`, `[linux] GNU Image Manipulation Program`, 1024x800).
 
 ## Not done
 
-Images and other formats on the clipboard, client-drawn cursor images, IME (`text-input`), popup grabs against real toolkits
+Clipboard files and lazy fetching of big types (everything offered is read at once), client-drawn cursor images, IME (`text-input`), popup grabs against real toolkits
 (code exists, untested), `wl_output` changes when the host moves a window between displays, GPU acceleration.

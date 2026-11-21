@@ -1,4 +1,4 @@
-// Seamless window protocol, guest side. Mirror of Sources/cakedlib/Seamless/SeamlessProtocol.swift (version 3):
+// Seamless window protocol, guest side. Mirror of Sources/cakedlib/Seamless/SeamlessProtocol.swift (version 4):
 // every message is `u32 length` (type byte + payload) + `u8 type` + payload, little endian, strings are
 // `u16 length` + UTF-8. Types 0x01..0x7F go guest -> host, 0x81..0xFF host -> guest.
 
@@ -9,18 +9,23 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SEAMLESS_VERSION 3
-/* First version with the clipboard (G_CLIPBOARD / H_CLIPBOARD). */
-#define SEAMLESS_CLIPBOARD_VERSION 3
+#define SEAMLESS_VERSION 4
+/* First version whose clipboard is a list of MIME typed items (G_CLIPBOARD_ITEMS / H_CLIPBOARD_ITEMS). Version 3 had
+ * a text only message (0x09 / 0x8C), which this side no longer speaks: a link has one version, exactly. */
+#define SEAMLESS_CLIPBOARD_ITEMS_VERSION 4
 #define SEAMLESS_DEFAULT_VSOCK_PORT 5100
 #define SEAMLESS_MAX_STRING 4096
 #define SEAMLESS_MAX_RECTS 1024
 #define SEAMLESS_MAX_DIMENSION 16384
 #define SEAMLESS_MAX_PIXELS 40000000
-/* The clipboard text, in bytes, in either direction. A bigger selection is not transferred. */
-#define SEAMLESS_MAX_CLIPBOARD (1024 * 1024)
+/* The data of all the items of a clipboard message, in bytes, in either direction. A bigger selection is not
+ * transferred (an item that does not fit is left out). */
+#define SEAMLESS_MAX_CLIPBOARD_TOTAL (32 * 1024 * 1024)
+/* The items of a clipboard message, and the length of a MIME type. */
+#define SEAMLESS_MAX_CLIPBOARD_ITEMS 16
+#define SEAMLESS_MAX_MIME 127
 /* Host messages are tiny, but for the clipboard; anything bigger is a broken or hostile peer. */
-#define SEAMLESS_MAX_HOST_FRAME (SEAMLESS_MAX_CLIPBOARD + 64 * 1024)
+#define SEAMLESS_MAX_HOST_FRAME (SEAMLESS_MAX_CLIPBOARD_TOTAL + 64 * 1024)
 
 enum seamless_guest_type {
 	G_HELLO = 0x01,
@@ -31,7 +36,8 @@ enum seamless_guest_type {
 	G_WINDOW_FRAME = 0x06,
 	G_WINDOW_DESTROY = 0x07,
 	G_CURSOR = 0x08,
-	G_CLIPBOARD = 0x09, /* u8 format (0: UTF-8 text) + u32 length + bytes */
+	/* 0x09 is the protocol 3 text clipboard, not spoken any more. */
+	G_CLIPBOARD_ITEMS = 0x0A, /* u16 count, then per item: u16 mime length + MIME type + u32 length + bytes */
 };
 
 enum seamless_host_type {
@@ -46,10 +52,26 @@ enum seamless_host_type {
 	H_POINTER_BUTTON = 0x89,
 	H_POINTER_AXIS = 0x8A,
 	H_KEY = 0x8B,
-	H_CLIPBOARD = 0x8C, /* same payload as G_CLIPBOARD */
+	/* 0x8C is the protocol 3 text clipboard, not spoken any more. */
+	H_CLIPBOARD_ITEMS = 0x8D, /* same payload as G_CLIPBOARD_ITEMS */
 };
 
 enum seamless_window_kind { KIND_TOPLEVEL = 0, KIND_POPUP = 1 };
+
+/* True for a MIME type the clipboard carries: type/subtype, printable ASCII without spaces, 3 to SEAMLESS_MAX_MIME
+ * bytes. The X11 pseudo targets (TARGETS, UTF8_STRING...) have no slash and are not MIME types. */
+bool seamless_valid_mime(const char *s, size_t n);
+
+/* Walks the items of a validated clipboard payload (H_CLIPBOARD_ITEMS data). */
+struct clip_iter {
+	const uint8_t *p;
+	size_t left;
+	uint16_t remaining;
+};
+
+void clip_iter_init(struct clip_iter *it, const uint8_t *payload, size_t n);
+/* The next item: its MIME type (NUL terminated, in mime[SEAMLESS_MAX_MIME + 1]) and data, which stays in the payload. */
+bool clip_iter_next(struct clip_iter *it, char *mime, const uint8_t **data, size_t *len);
 
 /* Growable output buffer. */
 struct wbuf {
@@ -87,7 +109,7 @@ struct host_msg {
 	bool flag;           /* focused / pressed */
 	uint16_t version;
 	uint32_t code; /* key */
-	const uint8_t *data; /* clipboard text, in the receive buffer: valid until the next rx_* call */
+	const uint8_t *data; /* clipboard: the validated payload, in the receive buffer: valid until the next rx_* call */
 	size_t data_len;
 };
 
