@@ -2,13 +2,13 @@ package seamless
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -44,22 +44,22 @@ const (
 	maxGuestFrame = 192 * 1024 * 1024
 	// maxClipboard mirrors SEAMLESS_MAX_CLIPBOARD: the text of a clipboard message, in bytes.
 	maxClipboard = 1024 * 1024
-	// maxClipboardImage mirrors SEAMLESS_MAX_CLIPBOARD_IMAGE: the PNG file of a clipboard message, in bytes.
-	maxClipboardImage = 32 * 1024 * 1024
+	// maxClipboardTotal mirrors SEAMLESS_MAX_CLIPBOARD_TOTAL: the data of all the items of a clipboard items message.
+	maxClipboardTotal = 32 * 1024 * 1024
+	// maxClipboardItems and maxMIME mirror SEAMLESS_MAX_CLIPBOARD_ITEMS and SEAMLESS_MAX_MIME.
+	maxClipboardItems = 16
+	maxMIME           = 127
 	// maxHostFrame mirrors SEAMLESS_MAX_HOST_FRAME: host messages are tiny, but for the clipboard.
-	maxHostFrame = maxClipboardImage + 64*1024
+	maxHostFrame = maxClipboardTotal + 64*1024
 	// maxString mirrors SeamlessProtocol.maxStringLength.
 	maxString = 4096
 
 	// clipboardVersion is the first protocol version with the clipboard messages. A host or a compositor on an older one
 	// does not know them: the host would close the whole session on one it cannot decode.
 	clipboardVersion = 3
-	// clipboardImageVersion is the first protocol version whose clipboard carries images (format 1, PNG).
-	clipboardImageVersion = 4
-
-	// clipboardText and clipboardPNG are the format byte of a clipboard message.
-	clipboardText = 0
-	clipboardPNG  = 1
+	// clipboardItemsVersion is the first protocol version whose clipboard is a list of MIME typed items (0x0A / 0x8D);
+	// the text message of version 3 is not spoken on it, a link has one version.
+	clipboardItemsVersion = 4
 
 	// frameBudget is how much memory the frames being read from the compositors may take all together. It must hold
 	// a frame of maxGuestFrame, so that a complete large frame is still accepted when nothing else is in flight.
@@ -84,31 +84,33 @@ const (
 
 // Guest -> host message types.
 const (
-	gHello         = 0x01
-	gWindowCreate  = 0x02
-	gWindowTitle   = 0x03
-	gWindowAppID   = 0x04
-	gWindowHints   = 0x05
-	gWindowFrame   = 0x06
-	gWindowDestroy = 0x07
-	gCursor        = 0x08
-	gClipboard     = 0x09
+	gHello          = 0x01
+	gWindowCreate   = 0x02
+	gWindowTitle    = 0x03
+	gWindowAppID    = 0x04
+	gWindowHints    = 0x05
+	gWindowFrame    = 0x06
+	gWindowDestroy  = 0x07
+	gCursor         = 0x08
+	gClipboard      = 0x09
+	gClipboardItems = 0x0A
 )
 
 // Host -> guest message types.
 const (
-	hHelloAck      = 0x81
-	hOutput        = 0x82
-	hWindowResize  = 0x83
-	hWindowClose   = 0x84
-	hWindowFocus   = 0x85
-	hPointerEnter  = 0x86
-	hPointerLeave  = 0x87
-	hPointerMotion = 0x88
-	hPointerButton = 0x89
-	hPointerAxis   = 0x8A
-	hKey           = 0x8B
-	hClipboard     = 0x8C
+	hHelloAck       = 0x81
+	hOutput         = 0x82
+	hWindowResize   = 0x83
+	hWindowClose    = 0x84
+	hWindowFocus    = 0x85
+	hPointerEnter   = 0x86
+	hPointerLeave   = 0x87
+	hPointerMotion  = 0x88
+	hPointerButton  = 0x89
+	hPointerAxis    = 0x8A
+	hKey            = 0x8B
+	hClipboard      = 0x8C
+	hClipboardItems = 0x8D
 )
 
 var errShortMessage = errors.New("short message")
@@ -400,6 +402,9 @@ type Hub struct {
 	// focus is the compositor that owns the focused window, where keys go. It is the peer itself, not its slot: slots
 	// are reused, and a replacement must not inherit the keyboard of the compositor that left.
 	focus *hubPeer
+	// focusWindow is the (host) id of the window that gave focus its owner: only the loss of that very window ends the
+	// focus, so a loss reported after the gain of another window of the same compositor does not.
+	focusWindow uint32
 	// budget bounds the memory of the compositors' frames being read; made on first use.
 	budget *memBudget
 
@@ -793,7 +798,7 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 			prefix = h.titlePrefix(account)
 		}
 
-		if frame[4] == gClipboard && !h.mayShareClipboard(peer) {
+		if (frame[4] == gClipboard || frame[4] == gClipboardItems) && !h.mayShareClipboard(peer) {
 			// Not the user the host is looking at: a background session does not get to overwrite the host's clipboard.
 			// Still checked, so that a malformed message ends this compositor as it would anywhere else.
 			//
@@ -801,7 +806,7 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 			// before it), and is not revisited before the write. Revalidating would not order anything better: holding mu
 			// across link.write would stall the host reader behind a slow write, and a message already on the wire to the
 			// host cannot be recalled when the focus moves. Admission time is the contract.
-			if err = checkClipboard(frame[5:], peer.link.version); err == nil {
+			if err = checkClipboardFrame(frame[4], frame[5:], peer.link.version); err == nil {
 				budget.release(reserved)
 
 				continue
@@ -819,51 +824,146 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 	}
 }
 
-// pngSignature starts every PNG file.
-var pngSignature = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
-
-// checkClipboard validates the payload of a clipboard message on a link of the given protocol version: a known format
-// (an image only from clipboardImageVersion on), a length that is exactly what follows and within the limit of the
-// format, valid UTF-8 for text and the PNG signature for an image: the host's decoder refuses anything else and closes
-// the whole session.
-func checkClipboard(payload []byte, version uint16) error {
+// checkClipboard validates the payload of a clipboard message: a known format, a length that is exactly what follows,
+// and, for text (format 0), valid UTF-8: the host's decoder refuses anything else and closes the whole session.
+func checkClipboard(payload []byte) error {
 	if len(payload) < 5 {
 		return errShortMessage
 	}
 
-	limit := maxClipboard
-
-	switch payload[0] {
-	case clipboardText:
-	case clipboardPNG:
-		if version < clipboardImageVersion {
-			return fmt.Errorf("clipboard image on protocol version %d", version)
-		}
-
-		limit = maxClipboardImage
-	default:
+	if payload[0] != 0 {
 		return fmt.Errorf("clipboard format %d", payload[0])
 	}
 
 	n := binary.LittleEndian.Uint32(payload[1:])
 
-	if n > uint32(limit) || int(n) != len(payload)-5 {
+	if n > maxClipboard || int(n) != len(payload)-5 {
 		return fmt.Errorf("clipboard of %d bytes in a message of %d", n, len(payload)-5)
 	}
 
-	if payload[0] == clipboardText && !utf8.Valid(payload[5:]) {
+	if payload[0] == 0 && !utf8.Valid(payload[5:]) {
 		return errors.New("clipboard text is not UTF-8")
 	}
 
-	if payload[0] == clipboardPNG && (n < uint32(len(pngSignature)) || !bytes.Equal(payload[5:5+len(pngSignature)], pngSignature)) {
-		return errors.New("clipboard image is not a PNG")
+	return nil
+}
+
+// checkClipboardFrame validates a clipboard message of either generation for a link of the given version.
+func checkClipboardFrame(typ byte, payload []byte, version uint16) error {
+	if typ == gClipboardItems || typ == hClipboardItems {
+		if version < clipboardItemsVersion {
+			return fmt.Errorf("clipboard items message on protocol version %d", version)
+		}
+
+		return checkClipboardItems(payload)
+	}
+
+	// The text message belongs to protocol 3 alone: from protocol 4 on a link has the items message, and a text one
+	// would be a format the other end does not speak.
+	if version < clipboardVersion || version >= clipboardItemsVersion {
+		return fmt.Errorf("clipboard text message on protocol version %d", version)
+	}
+
+	return checkClipboard(payload)
+}
+
+// validMIME mirrors seamless_valid_mime: type/subtype in printable ASCII without spaces, 3 to maxMIME bytes.
+func validMIME(s string) bool {
+	if len(s) < 3 || len(s) > maxMIME {
+		return false
+	}
+
+	slashes := 0
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+
+		if c < 0x21 || c > 0x7E {
+			return false
+		}
+
+		if c == '/' {
+			slashes++
+
+			if i == 0 || i == len(s)-1 {
+				return false
+			}
+		}
+	}
+
+	return slashes == 1
+}
+
+// checkClipboardItems validates the payload of a clipboard items message: u16 count (1 to maxClipboardItems), then per
+// item a u16 MIME length + a valid MIME type (distinct, ignoring case) + a u32 length (not empty) + the data, the data
+// of all the items within maxClipboardTotal, and nothing left over. The host's decoder refuses anything else and
+// closes the whole session.
+func checkClipboardItems(payload []byte) error {
+	if len(payload) < 2 {
+		return errShortMessage
+	}
+
+	count := int(binary.LittleEndian.Uint16(payload))
+
+	if count == 0 || count > maxClipboardItems {
+		return fmt.Errorf("clipboard of %d items", count)
+	}
+
+	off := 2
+	total := uint64(0)
+	seen := make([]string, 0, count)
+
+	for i := 0; i < count; i++ {
+		if len(payload)-off < 2 {
+			return errShortMessage
+		}
+
+		n := int(binary.LittleEndian.Uint16(payload[off:]))
+		off += 2
+
+		if len(payload)-off < n {
+			return errShortMessage
+		}
+
+		mime := string(payload[off : off+n])
+		off += n
+
+		if !validMIME(mime) {
+			return fmt.Errorf("clipboard MIME type %q", mime)
+		}
+
+		for _, other := range seen {
+			if strings.EqualFold(other, mime) {
+				return fmt.Errorf("clipboard MIME type %q twice", mime)
+			}
+		}
+
+		seen = append(seen, mime)
+
+		if len(payload)-off < 4 {
+			return errShortMessage
+		}
+
+		size := uint64(binary.LittleEndian.Uint32(payload[off:]))
+		off += 4
+		total += size
+
+		if size == 0 || total > maxClipboardTotal || uint64(len(payload)-off) < size {
+			return fmt.Errorf("clipboard item of %d bytes (%d in all)", size, total)
+		}
+
+		off += int(size)
+	}
+
+	if off != len(payload) {
+		return fmt.Errorf("clipboard items leave %d bytes over", len(payload)-off)
 	}
 
 	return nil
 }
 
 // mayShareClipboard says whether the compositor's clipboard goes to the host: the host's keyboard focus is in its
-// windows, or nowhere yet.
+// windows, or in none of the guest's (nowhere yet, or lost).
 func (h *Hub) mayShareClipboard(p *hubPeer) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -1112,6 +1212,7 @@ func (h *Hub) drop(peer *hubPeer) {
 
 	if h.focus == peer {
 		h.focus = nil
+		h.focusWindow = 0
 	}
 
 	link := h.link
@@ -1231,12 +1332,14 @@ func (p *hubPeer) rewrite(frame []byte, prefix string) ([]byte, error) {
 		binary.LittleEndian.PutUint32(payload, globalID(p.slot, id))
 
 	case gClipboard:
-		if p.link.version < clipboardVersion {
-			return nil, fmt.Errorf("clipboard message on protocol version %d", p.link.version)
+		// u8 format (0: UTF-8 text) + u32 length + bytes, protocol 3 only. There is no window id: whose it is, is the
+		// hub's business.
+		if err := checkClipboardFrame(gClipboard, payload, p.link.version); err != nil {
+			return nil, err
 		}
 
-		// u8 format (0: UTF-8 text, 1: PNG) + u32 length + bytes. There is no window id: whose it is, is the hub's business.
-		if err := checkClipboard(payload, p.link.version); err != nil {
+	case gClipboardItems:
+		if err := checkClipboardFrame(gClipboardItems, payload, p.link.version); err != nil {
 			return nil, err
 		}
 
@@ -1366,12 +1469,20 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 			return nil
 		}
 
-		if frame[4] == hWindowFocus && len(payload) >= 5 && payload[4] != 0 {
+		if frame[4] == hWindowFocus && len(payload) >= 5 {
 			// The peer may have been dropped since it was looked up: only a peer still registered takes the focus.
 			h.mu.Lock()
 
 			if h.peers[peer.slot] == peer {
-				h.focus = peer
+				if payload[4] != 0 {
+					h.focus = peer
+					h.focusWindow = id
+				} else if h.focus == peer && h.focusWindow == id {
+					// Nothing of the guest has the focus any more: the host's keys and clipboard are not for the user
+					// that had it last, a clipboard that arrives before the next focus gain included.
+					h.focus = nil
+					h.focusWindow = 0
+				}
 			}
 
 			h.mu.Unlock()
@@ -1390,7 +1501,7 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 		}
 
 	case hClipboard:
-		if err := checkClipboard(payload, link.version); err != nil {
+		if err := checkClipboard(payload); err != nil {
 			return err
 		}
 
@@ -1400,7 +1511,26 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 			return nil
 		}
 
+		// From protocol 4 the host speaks the items message: a text one is not part of the protocol.
+		if link.version >= clipboardItemsVersion {
+			return fmt.Errorf("clipboard text message on protocol version %d", link.version)
+		}
+
 		// The user whose window has the focus: the clipboard of the host is not given to every account of the guest.
+		h.mu.Lock()
+		peer := h.focus
+		h.mu.Unlock()
+
+		if peer != nil && peer.link == link {
+			peer.write(frame)
+		}
+
+	case hClipboardItems:
+		if err := checkClipboardFrame(hClipboardItems, payload, link.version); err != nil {
+			return err
+		}
+
+		// The user whose window has the focus, like the text clipboard of version 3.
 		h.mu.Lock()
 		peer := h.focus
 		h.mu.Unlock()

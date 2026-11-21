@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net"
@@ -1057,75 +1058,14 @@ func TestHubRejectsAMalformedClipboard(t *testing.T) {
 }
 
 func TestCheckClipboardAcceptsAnEmptyAndAFullText(t *testing.T) {
-	if err := checkClipboard(append([]byte{0}, u32(0)...), clipboardVersion); err != nil {
+	if err := checkClipboard(append([]byte{0}, u32(0)...)); err != nil {
 		t.Fatal(err)
 	}
 
 	full := append([]byte{0}, u32(maxClipboard)...)
 
-	if err := checkClipboard(append(full, make([]byte, maxClipboard)...), clipboardVersion); err != nil {
+	if err := checkClipboard(append(full, make([]byte, maxClipboard)...)); err != nil {
 		t.Fatal(err)
-	}
-}
-
-// pngPayload is a clipboard payload of format 1 whose file starts with the PNG signature and has size bytes in all.
-func pngPayload(size int) []byte {
-	file := append(append([]byte{}, pngSignature...), make([]byte, size-len(pngSignature))...)
-
-	return append(append([]byte{clipboardPNG}, u32(uint32(len(file)))...), file...)
-}
-
-func TestCheckClipboardImages(t *testing.T) {
-	if err := checkClipboard(pngPayload(64), clipboardImageVersion); err != nil {
-		t.Fatalf("a PNG on protocol 4: %v", err)
-	}
-
-	if err := checkClipboard(pngPayload(maxClipboardImage), clipboardImageVersion); err != nil {
-		t.Fatalf("a PNG of the largest size: %v", err)
-	}
-
-	for name, c := range map[string]struct {
-		payload []byte
-		version uint16
-	}{
-		"protocol 3 has no images": {pngPayload(64), clipboardVersion},
-		"not a PNG":                {append(append([]byte{clipboardPNG}, u32(16)...), make([]byte, 16)...), clipboardImageVersion},
-		"shorter than a signature": {append(append([]byte{clipboardPNG}, u32(4)...), pngSignature[:4]...), clipboardImageVersion},
-		"over the image limit":     {append([]byte{clipboardPNG}, u32(maxClipboardImage+1)...), clipboardImageVersion},
-	} {
-		if err := checkClipboard(c.payload, c.version); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
-	}
-}
-
-func TestHubRoutesClipboardImagesOnProtocol4(t *testing.T) {
-	rig := newHubRigVersion(t, clipboardImageVersion)
-
-	aliceConn, aliceReader := rig.compositor(alice)
-	host := <-rig.hosts
-
-	if _, err := aliceConn.Write(createWindow(1, 0, "Editor")); err != nil {
-		t.Fatal(err)
-	}
-
-	window := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
-
-	host.send(buildFrame(hWindowFocus, append(u32(window), 1)))
-	readOne(t, aliceConn, aliceReader)
-
-	image := pngPayload(200)
-
-	host.send(buildFrame(hClipboard, image))
-
-	if got := readOne(t, aliceConn, aliceReader); got[4] != hClipboard || got[5] != clipboardPNG || len(got) != 5+len(image) {
-		t.Fatalf("the focused user must get the image: %x", got[:12])
-	}
-
-	_, _ = aliceConn.Write(buildFrame(gClipboard, image))
-
-	if got := expect(t, host.received); got[4] != gClipboard || got[5] != clipboardPNG || len(got) != 5+len(image) {
-		t.Fatalf("the host must get the image: %x", got[:12])
 	}
 }
 
@@ -1173,5 +1113,211 @@ func TestHubKeepsClipboardOffProtocolVersion2(t *testing.T) {
 
 	if got := expect(t, host.received); got[4] != gWindowCreate {
 		t.Fatalf("the shared host connection must live on: %x", got)
+	}
+}
+
+// itemsPayload is a clipboard items payload: u16 count, then u16 mime length + mime + u32 length + data per item.
+func itemsPayload(items ...[2]string) []byte {
+	payload := binary.LittleEndian.AppendUint16(nil, uint16(len(items)))
+
+	for _, it := range items {
+		payload = binary.LittleEndian.AppendUint16(payload, uint16(len(it[0])))
+		payload = append(payload, it[0]...)
+		payload = append(payload, u32(uint32(len(it[1])))...)
+		payload = append(payload, it[1]...)
+	}
+
+	return payload
+}
+
+func TestCheckClipboardItems(t *testing.T) {
+	good := [][]byte{
+		itemsPayload([2]string{"text/plain;charset=utf-8", "hello"}),
+		itemsPayload([2]string{"text/plain", "a"}, [2]string{"image/png", "\x89PNG"}, [2]string{"text/html", "<b>a</b>"}),
+	}
+
+	for i, p := range good {
+		if err := checkClipboardItems(p); err != nil {
+			t.Fatalf("good payload %d: %v", i, err)
+		}
+	}
+
+	many := make([][2]string, 0, maxClipboardItems+1)
+
+	for i := 0; i <= maxClipboardItems; i++ {
+		many = append(many, [2]string{fmt.Sprintf("x/%d", i), "a"})
+	}
+
+	bad := map[string][]byte{
+		"empty":                {},
+		"no item":              {0, 0},
+		"too many items":       itemsPayload(many...),
+		"no slash":             itemsPayload([2]string{"UTF8_STRING", "a"}),
+		"two slashes":          itemsPayload([2]string{"a/b/c", "a"}),
+		"slash at the end":     itemsPayload([2]string{"text/", "a"}),
+		"a space":              itemsPayload([2]string{"text/pl ain", "a"}),
+		"not ASCII":            itemsPayload([2]string{"text/é", "a"}),
+		"too short a type":     itemsPayload([2]string{"a/", "a"}),
+		"empty data":           itemsPayload([2]string{"text/plain", ""}),
+		"the same type twice":  itemsPayload([2]string{"text/plain", "a"}, [2]string{"TEXT/Plain", "b"}),
+		"bytes left over":      append(itemsPayload([2]string{"text/plain", "a"}), 0),
+		"truncated data":       itemsPayload([2]string{"text/plain", "abcd"})[:len(itemsPayload([2]string{"text/plain", "abcd"}))-1],
+		"over the total limit": append(append(itemsPayload([2]string{"a/b", ""})[:2+2+3], u32(maxClipboardTotal+1)...), make([]byte, 0)...),
+	}
+
+	for name, p := range bad {
+		if err := checkClipboardItems(p); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+
+	// The data of all the items, not of each one, is limited.
+	half := strings.Repeat("a", maxClipboardTotal/2+1)
+
+	if err := checkClipboardItems(itemsPayload([2]string{"a/b", half}, [2]string{"c/d", half})); err == nil {
+		t.Error("two items past the limit together: accepted")
+	}
+
+	if err := checkClipboardItems(itemsPayload([2]string{"a/b", strings.Repeat("a", maxClipboardTotal)})); err != nil {
+		t.Errorf("one item of the limit: %v", err)
+	}
+}
+
+func TestCheckClipboardFrameNeedsProtocol4ForItems(t *testing.T) {
+	p := itemsPayload([2]string{"text/plain", "a"})
+
+	if err := checkClipboardFrame(gClipboardItems, p, clipboardVersion); err == nil {
+		t.Error("items on protocol 3: accepted")
+	}
+
+	if err := checkClipboardFrame(hClipboardItems, p, clipboardItemsVersion); err != nil {
+		t.Errorf("items on protocol 4: %v", err)
+	}
+}
+
+func TestHubRoutesClipboardItemsOnProtocol4(t *testing.T) {
+	rig := newHubRigVersion(t, clipboardItemsVersion)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, _ := rig.compositor(bob)
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	aliceWindow := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+
+	host.send(buildFrame(hWindowFocus, append(u32(aliceWindow), 1)))
+	readOne(t, aliceConn, aliceReader)
+
+	items := itemsPayload([2]string{"text/plain;charset=utf-8", "hi"}, [2]string{"image/png", "\x89PNG\r\n\x1a\n"})
+
+	host.send(buildFrame(hClipboardItems, items))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hClipboardItems || !bytes.Equal(got[5:], items) {
+		t.Fatalf("alice must get the items: %x", got)
+	}
+
+	if _, err := aliceConn.Write(buildFrame(gClipboardItems, items)); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := expect(t, host.received); got[4] != gClipboardItems || !bytes.Equal(got[5:], items) {
+		t.Fatalf("the host must get the items: %x", got)
+	}
+
+	// A malformed message ends that compositor, not the shared connection.
+	if _, err := aliceConn.Write(buildFrame(gClipboardItems, itemsPayload([2]string{"nomime", "a"}))); err != nil {
+		t.Fatal(err)
+	}
+
+	expectClosed(t, aliceConn, aliceReader, "a malformed clipboard items message")
+
+	// The host sees alice's window go, not her clipboard, and the shared connection lives on for bob.
+	if got := expect(t, host.received); got[4] != gWindowDestroy {
+		t.Fatalf("the host must see no clipboard items: %x", got)
+	}
+
+	if _, err := bobConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := expect(t, host.received); got[4] != gWindowCreate {
+		t.Fatalf("the shared host connection must live on: %x", got)
+	}
+}
+
+// Protocol 4 has the items message only: the text message of protocol 3 is a format the other end does not speak.
+func TestCheckClipboardFrameRefusesTextOffProtocol3(t *testing.T) {
+	payload := append([]byte{0}, append(u32(2), 'h', 'i')...)
+
+	for version, ok := range map[uint16]bool{2: false, clipboardVersion: true, clipboardItemsVersion: false} {
+		if err := checkClipboardFrame(gClipboard, payload, version); (err == nil) != ok {
+			t.Errorf("guest text clipboard on protocol %d: %v", version, err)
+		}
+	}
+}
+
+func TestHubRefusesTheTextClipboardOnProtocol4(t *testing.T) {
+	rig := newHubRigVersion(t, clipboardItemsVersion)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, bobReader := rig.compositor(bob)
+
+	// From the compositor: it is disconnected, bob is not.
+	_, _ = aliceConn.Write(clipboardFrame(gClipboard, "legacy"))
+
+	expectClosed(t, aliceConn, aliceReader, "a text clipboard message on protocol 4")
+
+	// From the host: not part of the protocol, the host connection ends and takes the compositors with it.
+	host.send(clipboardFrame(hClipboard, "legacy"))
+
+	expectClosed(t, bobConn, bobReader, "a text clipboard message from the host on protocol 4")
+}
+
+// A clipboard that reaches the hub after the focused window lost the focus, and before another one gains it, is for
+// nobody.
+func TestHubDropsTheHostClipboardOnceTheFocusIsLost(t *testing.T) {
+	rig := newHubRigVersion(t, clipboardItemsVersion)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := aliceConn.Write(createWindow(2, 0, "Editor")); err != nil {
+		t.Fatal(err)
+	}
+
+	first := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+	second := binary.LittleEndian.Uint32(expect(t, host.received)[5:])
+	items := itemsPayload([2]string{"text/plain;charset=utf-8", "hi"})
+
+	host.send(buildFrame(hWindowFocus, append(u32(first), 1)))
+	readOne(t, aliceConn, aliceReader)
+
+	// The focus moves to another window of the same compositor, the loss of the first arriving late: still focused.
+	host.send(buildFrame(hWindowFocus, append(u32(second), 1)))
+	readOne(t, aliceConn, aliceReader)
+	host.send(buildFrame(hWindowFocus, append(u32(first), 0)))
+	readOne(t, aliceConn, aliceReader)
+	host.send(buildFrame(hClipboardItems, items))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hClipboardItems {
+		t.Fatalf("the focus is still in alice's windows: %x", got)
+	}
+
+	// The focused window loses it: the clipboard is not delivered, the next message alice sees is the output scale.
+	host.send(buildFrame(hWindowFocus, append(u32(second), 0)))
+	readOne(t, aliceConn, aliceReader)
+	host.send(buildFrame(hClipboardItems, items))
+	host.send(buildFrame(hOutput, u32(360)))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hOutput {
+		t.Fatalf("no window has the focus, the clipboard goes nowhere: %x", got)
 	}
 }

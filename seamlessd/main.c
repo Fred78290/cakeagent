@@ -464,60 +464,153 @@ static void notify_axis(struct server *s, const struct host_msg *m) {
 /* ======================================================================== clipboard */
 
 /*
- * Text and PNG images, both ways. A selection an application sets is read at once (a pipe, bounded in size and time)
- * and sent to the host, which puts it on its clipboard; the host's clipboard comes as H_CLIPBOARD and becomes the
- * selection of the seat, offered as plain text or as image/png. A selection that offers both goes as text. The source
- * the host's data came in is recognised when the seat reports the selection back, so it does not go round again.
+ * Any MIME typed data, both ways, as a list of items. A selection an application sets is read at once, one offered
+ * type after another (a pipe each, bounded in size and time), and sent to the host, which puts what it understands on
+ * its clipboard; the host's clipboard comes as H_CLIPBOARD_ITEMS and becomes the selection of the seat, with the
+ * types it carries (and the usual names of plain text when it carries some). The source the host's data came in is
+ * recognised when the seat reports the selection back, so it does not go round again.
  */
 
-#define CLIP_READ_TIMEOUT_MS 3000
-/* An image can be a long transfer (an X11 application sends it in pieces). */
-#define CLIP_READ_IMAGE_TIMEOUT_MS 15000
+/* Text is quick; anything else (an X11 application sends an image in pieces) can be a long transfer. One type may take
+ * at most its own timeout, and the whole selection (all its types together) at most CLIP_READ_TIMEOUT_MS. */
+#define CLIP_READ_TEXT_TIMEOUT_MS 3000
+#define CLIP_READ_TIMEOUT_MS 15000
 /* A reader that makes no progress for this long loses its write; any progress starts the delay again. */
 #define CLIP_WRITE_TIMEOUT_MS 5000
 /* Bounds on the writes pending at once, so applications that open pipes and never read cannot exhaust memory or fds. */
 #define CLIP_WRITE_MAX_COUNT 8
-#define CLIP_WRITE_MAX_BYTES (2 * (size_t)SEAMLESS_MAX_CLIPBOARD_IMAGE)
+#define CLIP_WRITE_MAX_BYTES (2 * (size_t)SEAMLESS_MAX_CLIPBOARD_TOTAL)
 
-static const char *const clip_text_mimes[] = {"text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", "TEXT"};
-static const char *const clip_image_mimes[] = {"image/png"};
+/* The names plain text goes by; the first is the one the host is told. */
+static const char *const clip_text_names[] = {"text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", "TEXT"};
 
-/* The types offered for a clipboard format, and how many. */
-static const char *const *clip_mimes(uint8_t format, size_t *count) {
-	if (format == CLIP_PNG) {
-		*count = sizeof(clip_image_mimes) / sizeof(clip_image_mimes[0]);
-		return clip_image_mimes;
+static bool clip_is_text(const char *mime) {
+	return strncasecmp(mime, "text/plain", 10) == 0;
+}
+
+static int64_t clip_now_ms(void) {
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+
+	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+/* Well formed UTF-8 (no overlongs, surrogates or code points past U+10FFFF). */
+static bool clip_utf8_valid(const uint8_t *p, size_t n) {
+	size_t i = 0;
+
+	while (i < n) {
+		uint8_t c = p[i];
+		size_t need = 0;
+		uint32_t cp = 0, min = 0;
+
+		if (c < 0x80) {
+			i++;
+			continue;
+		} else if ((c & 0xE0) == 0xC0) {
+			need = 1;
+			cp = c & 0x1F;
+			min = 0x80;
+		} else if ((c & 0xF0) == 0xE0) {
+			need = 2;
+			cp = c & 0x0F;
+			min = 0x800;
+		} else if ((c & 0xF8) == 0xF0) {
+			need = 3;
+			cp = c & 0x07;
+			min = 0x10000;
+		} else {
+			return false;
+		}
+
+		if (n - i - 1 < need)
+			return false;
+
+		for (size_t k = 1; k <= need; k++) {
+			if ((p[i + k] & 0xC0) != 0x80)
+				return false;
+
+			cp = cp << 6 | (p[i + k] & 0x3F);
+		}
+
+		if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+			return false;
+
+		i += need + 1;
 	}
 
-	*count = sizeof(clip_text_mimes) / sizeof(clip_text_mimes[0]);
+	return true;
+}
 
-	return clip_text_mimes;
+/* text/plain, or text/plain with a UTF-8 charset: the types whose bytes can be handed out as UTF-8 text unchanged. */
+static bool clip_is_utf8_text_type(const char *mime) {
+	if (!clip_is_text(mime))
+		return false;
+
+	const char *param = mime + 10;
+
+	return *param == '\0' || strcasecmp(param, ";charset=utf-8") == 0;
+}
+
+static bool clip_is_text_name(const char *mime) {
+	for (size_t i = 0; i < sizeof(clip_text_names) / sizeof(clip_text_names[0]); i++) {
+		if (strcasecmp(clip_text_names[i], mime) == 0)
+			return true;
+	}
+
+	return false;
+}
+
+struct clip_item {
+	char *mime;
+	uint8_t *data;
+	size_t len;
+};
+
+static void clip_items_free(struct clip_item *items, size_t n) {
+	for (size_t i = 0; i < n; i++) {
+		free(items[i].mime);
+		free(items[i].data);
+	}
 }
 
 struct clip_source {
 	struct wlr_data_source base;
 	struct server *srv;
-	uint8_t format; /* enum seamless_clipboard_format */
-	char *text;     /* the text, or the PNG file */
-	size_t len;
+	struct clip_item items[SEAMLESS_MAX_CLIPBOARD_ITEMS];
+	size_t nitems;
+	/* The item the usual names of plain text are answered with: UTF-8 text, as is. Only when there is one are those
+	 * names offered. */
+	bool has_text;
+	size_t text;
 };
 
 struct clip_write {
 	struct server *srv;
 	struct wl_event_source *src, *timer;
 	int fd;
-	char *text;
+	uint8_t *data;
 	size_t len, off;
+};
+
+/* A type to read from the application, and the type the host is told it is. */
+struct clip_want {
+	char *read;
+	const char *send; /* clip_text_names[0] or the same string as read */
 };
 
 struct clip_read {
 	struct server *srv;
 	struct wl_event_source *src, *timer;
-	int fd;
-	uint8_t format;
-	size_t max; /* the most the format may carry */
-	uint8_t *buf;
-	size_t len, cap;
+	int fd; /* -1 between two items */
+	struct clip_want wants[SEAMLESS_MAX_CLIPBOARD_ITEMS];
+	size_t nwants, next;
+	int64_t deadline; /* the whole selection must be read by then (CLOCK_MONOTONIC, ms) */
+	struct clip_item items[SEAMLESS_MAX_CLIPBOARD_ITEMS];
+	size_t nitems, total;
+	uint8_t *buf; /* the item being read */
+	size_t len, cap, max;
 };
 
 static void clip_write_finish(struct clip_write *w) {
@@ -530,7 +623,7 @@ static void clip_write_finish(struct clip_write *w) {
 	w->srv->clip_wr_count--;
 	w->srv->clip_wr_bytes -= w->len;
 	close(w->fd);
-	free(w->text);
+	free(w->data);
 	free(w);
 }
 
@@ -549,7 +642,7 @@ static int on_clip_write(int fd, uint32_t mask, void *data) {
 	}
 
 	while (w->off < w->len) {
-		ssize_t n = write(fd, w->text + w->off, w->len - w->off);
+		ssize_t n = write(fd, w->data + w->off, w->len - w->off);
 
 		if (n < 0) {
 			if (errno == EINTR)
@@ -572,35 +665,40 @@ static int on_clip_write(int fd, uint32_t mask, void *data) {
 	return 0;
 }
 
-static void clip_source_send(struct wlr_data_source *source, const char *mime_type, int32_t fd) {
-	struct clip_source *cs = wl_container_of(source, cs, base);
-	bool known = false;
-	size_t nmimes;
-	const char *const *mimes = clip_mimes(cs->format, &nmimes);
-
-	for (size_t i = 0; i < nmimes; i++) {
-		if (strcmp(mimes[i], mime_type) == 0)
-			known = true;
+/* The item an application asks for: its type, or the UTF-8 text for one of the names plain text goes by. */
+static const struct clip_item *clip_source_find(const struct clip_source *cs, const char *mime) {
+	for (size_t i = 0; i < cs->nitems; i++) {
+		if (strcasecmp(cs->items[i].mime, mime) == 0)
+			return &cs->items[i];
 	}
 
+	if (cs->has_text && clip_is_text_name(mime))
+		return &cs->items[cs->text];
+
+	return NULL;
+}
+
+static void clip_source_send(struct wlr_data_source *source, const char *mime_type, int32_t fd) {
+	struct clip_source *cs = wl_container_of(source, cs, base);
+	const struct clip_item *item = clip_source_find(cs, mime_type);
 	struct server *s = cs->srv;
 
-	if (!known || s->clip_wr_count >= CLIP_WRITE_MAX_COUNT || s->clip_wr_bytes + cs->len > CLIP_WRITE_MAX_BYTES) {
+	if (!item || s->clip_wr_count >= CLIP_WRITE_MAX_COUNT || s->clip_wr_bytes + item->len > CLIP_WRITE_MAX_BYTES) {
 		close(fd);
 		return;
 	}
 
 	struct clip_write *w = calloc(1, sizeof(*w));
 
-	if (!w || !(w->text = malloc(cs->len ? cs->len : 1))) {
+	if (!w || !(w->data = malloc(item->len))) {
 		free(w);
 		close(fd);
 		return;
 	}
 
-	memcpy(w->text, cs->text, cs->len);
+	memcpy(w->data, item->data, item->len);
 	w->srv = s;
-	w->len = cs->len;
+	w->len = item->len;
 	w->fd = fd;
 	s->clip_wr_count++;
 	s->clip_wr_bytes += w->len;
@@ -619,7 +717,7 @@ static void clip_source_destroy(struct wlr_data_source *source) {
 	if (cs->srv->clip_own == cs)
 		cs->srv->clip_own = NULL;
 
-	free(cs->text);
+	clip_items_free(cs->items, cs->nitems);
 	free(cs);
 }
 
@@ -628,43 +726,96 @@ static const struct wlr_data_source_impl clip_source_impl = {
 	.destroy = clip_source_destroy,
 };
 
-/* The host's text or image becomes the selection of the guest. */
-static void host_set_clipboard(struct server *s, const uint8_t *data, size_t len, uint8_t format) {
-	if (len == 0 || len > (format == CLIP_PNG ? SEAMLESS_MAX_CLIPBOARD_IMAGE : SEAMLESS_MAX_CLIPBOARD))
-		return;
+/* Offers a type once. False when memory ran out: the caller drops the source, so that the selection is never one that
+ * misses types, and no empty entry reaches a comparison. */
+static bool clip_source_offer(struct clip_source *cs, const char *mime) {
+	char **offered;
 
+	wl_array_for_each(offered, &cs->base.mime_types) {
+		if (strcasecmp(*offered, mime) == 0)
+			return true;
+	}
+
+	char *copy = strdup(mime);
+
+	if (!copy)
+		return false;
+
+	char **slot = wl_array_add(&cs->base.mime_types, sizeof(*slot));
+
+	if (!slot) {
+		free(copy);
+		return false;
+	}
+
+	*slot = copy;
+
+	return true;
+}
+
+/* The host's clipboard (a validated H_CLIPBOARD_ITEMS payload) becomes the selection of the guest. */
+static void host_set_clipboard(struct server *s, const uint8_t *payload, size_t n) {
 	struct clip_source *cs = calloc(1, sizeof(*cs));
 
 	if (!cs)
 		return;
 
-	cs->text = malloc(len);
-
-	if (!cs->text) {
-		free(cs);
-		return;
-	}
-
-	memcpy(cs->text, data, len);
-	cs->len = len;
 	cs->srv = s;
-	cs->format = format;
 	wlr_data_source_init(&cs->base, &clip_source_impl);
 
-	size_t nmimes;
-	const char *const *mimes = clip_mimes(format, &nmimes);
+	struct clip_iter it;
+	char mime[SEAMLESS_MAX_MIME + 1];
+	const uint8_t *data;
+	size_t len;
 
-	for (size_t i = 0; i < nmimes; i++) {
-		char **slot = wl_array_add(&cs->base.mime_types, sizeof(*slot));
+	clip_iter_init(&it, payload, n);
 
-		if (slot)
-			*slot = strdup(mimes[i]);
+	while (clip_iter_next(&it, mime, &data, &len)) {
+		struct clip_item *item = &cs->items[cs->nitems];
+
+		item->mime = strdup(mime);
+		item->data = malloc(len);
+
+		if (!item->mime || !item->data) {
+			free(item->mime);
+			free(item->data);
+			wlr_data_source_destroy(&cs->base);
+			return;
+		}
+
+		memcpy(item->data, data, len);
+		item->len = len;
+		cs->nitems++;
+
+		/* Every type the host sent stays offered under its own name. */
+		if (!clip_source_offer(cs, mime)) {
+			wlr_data_source_destroy(&cs->base);
+			return;
+		}
+
+		/* The first text that is UTF-8 (a text in another charset is not passed off as UTF-8). */
+		if (!cs->has_text && clip_is_utf8_text_type(mime) && clip_utf8_valid(item->data, item->len)) {
+			cs->has_text = true;
+			cs->text = cs->nitems - 1;
+		}
+	}
+
+	/* Applications ask for plain text by several names. */
+	if (cs->has_text) {
+		for (size_t i = 0; i < sizeof(clip_text_names) / sizeof(clip_text_names[0]); i++) {
+			if (!clip_source_offer(cs, clip_text_names[i])) {
+				wlr_data_source_destroy(&cs->base);
+				return;
+			}
+		}
 	}
 
 	s->clip_own = cs;
 	/* The seat destroys the source it replaces, and this one when it is replaced in turn. */
 	wlr_seat_set_selection(s->seat, &cs->base, wl_display_next_serial(s->display));
 }
+
+static void clip_read_item_end(struct clip_read *r, bool keep);
 
 static void clip_read_free(struct clip_read *r) {
 	if (r->srv->clip_rd == r)
@@ -676,26 +827,136 @@ static void clip_read_free(struct clip_read *r) {
 	if (r->timer)
 		wl_event_source_remove(r->timer);
 
-	close(r->fd);
+	if (r->fd >= 0)
+		close(r->fd);
+
+	for (size_t i = 0; i < r->nwants; i++)
+		free(r->wants[i].read);
+
+	clip_items_free(r->items, r->nitems);
 	free(r->buf);
 	free(r);
 }
 
-static void send_clipboard(struct server *s, const uint8_t *data, size_t len, uint8_t format) {
+static void send_clipboard(struct server *s, const struct clip_item *items, size_t n) {
 	struct wbuf b = {0};
-	size_t st = wire_begin(&b, G_CLIPBOARD);
+	size_t st = wire_begin(&b, G_CLIPBOARD_ITEMS);
 
-	wbuf_u8(&b, format);
-	wbuf_u32(&b, (uint32_t)len);
-	wbuf_bytes(&b, data, len);
+	wbuf_u16(&b, (uint16_t)n);
+
+	for (size_t i = 0; i < n; i++) {
+		size_t mlen = strlen(items[i].mime);
+
+		wbuf_u16(&b, (uint16_t)mlen);
+		wbuf_bytes(&b, items[i].mime, mlen);
+		wbuf_u32(&b, (uint32_t)items[i].len);
+		wbuf_bytes(&b, items[i].data, items[i].len);
+	}
+
 	wire_end(&b, st);
 	send_message(s, &b);
 	wbuf_free(&b);
 }
 
+static int on_clip_read(int fd, uint32_t mask, void *data);
+static int on_clip_read_timeout(void *data);
+
+/* Starts reading the next type, or, when there is none left, sends what was read and ends. */
+static void clip_read_next(struct clip_read *r) {
+	struct server *s = r->srv;
+
+	/* Past the deadline of the selection, what was read so far is what is sent. */
+	while (r->next < r->nwants && r->total < SEAMLESS_MAX_CLIPBOARD_TOTAL) {
+		struct clip_want *want = &r->wants[r->next];
+		struct wlr_data_source *source = s->seat->selection_source;
+		int64_t left = r->deadline - clip_now_ms();
+		int fds[2];
+
+		if (left <= 0)
+			break;
+
+		/* The selection moved on: what was read is out of date. */
+		if (!source || source->impl == &clip_source_impl) {
+			clip_read_free(r);
+			return;
+		}
+
+		if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) < 0) {
+			r->next++;
+			continue;
+		}
+
+		r->fd = fds[0];
+		r->len = 0;
+		r->max = SEAMLESS_MAX_CLIPBOARD_TOTAL - r->total;
+		/* Closes the write end once it has been handed to the application, which then holds the only one. */
+		wlr_data_source_send(source, want->read, fds[1]);
+		r->src = wl_event_loop_add_fd(s->loop, r->fd, WL_EVENT_READABLE, on_clip_read, r);
+		r->timer = wl_event_loop_add_timer(s->loop, on_clip_read_timeout, r);
+
+		int64_t per_type = clip_is_text(want->send) ? CLIP_READ_TEXT_TIMEOUT_MS : CLIP_READ_TIMEOUT_MS;
+
+		if (r->src && r->timer && wl_event_source_timer_update(r->timer, (int)(left < per_type ? left : per_type)) == 0)
+			return;
+
+		/* Out of resources for this one: leave it out. */
+		if (r->src)
+			wl_event_source_remove(r->src);
+
+		if (r->timer)
+			wl_event_source_remove(r->timer);
+
+		r->src = NULL;
+		r->timer = NULL;
+		close(r->fd);
+		r->fd = -1;
+		r->next++;
+	}
+
+	if (r->nitems > 0 && s->ready)
+		send_clipboard(s, r->items, r->nitems);
+
+	clip_read_free(r);
+}
+
+/* The type being read is done: kept when it holds data, then the next one. */
+static void clip_read_item_end(struct clip_read *r, bool keep) {
+	struct clip_want *want = &r->wants[r->next];
+
+	if (r->src)
+		wl_event_source_remove(r->src);
+
+	if (r->timer)
+		wl_event_source_remove(r->timer);
+
+	r->src = NULL;
+	r->timer = NULL;
+	close(r->fd);
+	r->fd = -1;
+
+	if (keep && r->len > 0 && r->len <= r->max) {
+		struct clip_item *item = &r->items[r->nitems];
+
+		item->mime = strdup(want->send);
+
+		if (item->mime) {
+			item->data = r->buf;
+			item->len = r->len;
+			r->buf = NULL;
+			r->nitems++;
+			r->total += item->len;
+		}
+	}
+
+	free(r->buf);
+	r->buf = NULL;
+	r->len = r->cap = 0;
+	r->next++;
+	clip_read_next(r);
+}
+
 static int on_clip_read(int fd, uint32_t mask, void *data) {
 	struct clip_read *r = data;
-	struct server *s = r->srv;
 
 	for (;;) {
 		if (r->len == r->cap) {
@@ -704,16 +965,16 @@ static int on_clip_read(int fd, uint32_t mask, void *data) {
 			if (cap > r->max + 1)
 				cap = r->max + 1;
 
-			/* Past the limit: too big to share, dropped. */
+			/* Past the limit: too big to share, left out. */
 			if (cap == r->cap) {
-				clip_read_free(r);
+				clip_read_item_end(r, false);
 				return 0;
 			}
 
 			uint8_t *p = realloc(r->buf, cap);
 
 			if (!p) {
-				clip_read_free(r);
+				clip_read_item_end(r, false);
 				return 0;
 			}
 
@@ -737,22 +998,78 @@ static int on_clip_read(int fd, uint32_t mask, void *data) {
 		break;
 	}
 
-	/* End of the data (or an error): what was read is the selection. */
-	if (r->len > 0 && r->len <= r->max && s->ready && (r->format != CLIP_PNG || (r->len >= 8 && memcmp(r->buf, "\x89PNG\r\n\x1a\n", 8) == 0)))
-		send_clipboard(s, r->buf, r->len, r->format);
-
-	clip_read_free(r);
+	/* End of the data (or an error): what was read is the item. */
+	clip_read_item_end(r, true);
 
 	return 0;
 }
 
 static int on_clip_read_timeout(void *data) {
-	clip_read_free(data);
+	clip_read_item_end(data, false);
 
 	return 0;
 }
 
-/* An application set the selection: read its text, when it offers some, and send it to the host. */
+static bool clip_want_add(struct clip_read *r, const char *read, const char *send) {
+	if (r->nwants >= SEAMLESS_MAX_CLIPBOARD_ITEMS)
+		return false;
+
+	for (size_t i = 0; i < r->nwants; i++) {
+		if (strcasecmp(r->wants[i].send, send) == 0)
+			return false;
+	}
+
+	char *copy = strdup(read);
+
+	if (!copy)
+		return false;
+
+	r->wants[r->nwants].read = copy;
+	/* send is the text name, or the type read itself: point at the copy in that case. */
+	r->wants[r->nwants].send = strcmp(read, send) == 0 ? copy : send;
+	r->nwants++;
+
+	return true;
+}
+
+/* The type as the source spells it (what it has to be asked for), or NULL when it is not offered. */
+static const char *clip_offered(struct wlr_data_source *source, const char *mime) {
+	char **offered;
+
+	wl_array_for_each(offered, &source->mime_types) {
+		if (strcasecmp(*offered, mime) == 0)
+			return *offered;
+	}
+
+	return NULL;
+}
+
+/* The types worth sending: one plain text first (read under the name the source offers it by, and the host is told
+ * text/plain;charset=utf-8 whatever that name), then every other MIME type offered under its own name, up to the limit
+ * of items. A text in another charset is not an alias: it is sent as what it is. */
+static void clip_pick_wants(struct clip_read *r, struct wlr_data_source *source) {
+	bool have_text = false;
+
+	for (size_t i = 0; i < sizeof(clip_text_names) / sizeof(clip_text_names[0]) && !have_text; i++) {
+		const char *name = clip_offered(source, clip_text_names[i]);
+
+		if (name)
+			have_text = clip_want_add(r, name, clip_text_names[0]);
+	}
+
+	char **offered;
+
+	wl_array_for_each(offered, &source->mime_types) {
+		const char *m = *offered;
+
+		if (!seamless_valid_mime(m, strlen(m)) || clip_is_text_name(m))
+			continue;
+
+		clip_want_add(r, m, m);
+	}
+}
+
+/* An application set the selection: read what it offers and send it to the host. */
 static void on_set_selection(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, set_selection);
 	struct wlr_data_source *source = s->seat->selection_source;
@@ -763,59 +1080,23 @@ static void on_set_selection(struct wl_listener *l, void *data) {
 	if (!source || !s->ready || source->impl == &clip_source_impl)
 		return;
 
-	const char *mime = NULL;
-	uint8_t format = CLIP_TEXT;
-
-	/* Text first, then an image: a selection that offers both goes as text. */
-	for (uint8_t f = CLIP_TEXT; f <= CLIP_PNG && !mime; f++) {
-		size_t nmimes;
-		const char *const *mimes = clip_mimes(f, &nmimes);
-
-		for (size_t i = 0; i < nmimes && !mime; i++) {
-			char **offered;
-
-			wl_array_for_each(offered, &source->mime_types) {
-				if (strcmp(*offered, mimes[i]) == 0) {
-					mime = mimes[i];
-					format = f;
-					break;
-				}
-			}
-		}
-	}
-
-	if (!mime)
-		return;
-
-	int fds[2];
-
-	if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) < 0)
-		return;
-
 	struct clip_read *r = calloc(1, sizeof(*r));
 
-	if (!r) {
-		close(fds[0]);
-		close(fds[1]);
+	if (!r)
 		return;
-	}
 
 	r->srv = s;
-	r->fd = fds[0];
-	r->format = format;
-	r->max = format == CLIP_PNG ? SEAMLESS_MAX_CLIPBOARD_IMAGE : SEAMLESS_MAX_CLIPBOARD;
-	/* Closes the write end once it has been handed to the application, which then holds the only one. */
-	wlr_data_source_send(source, mime, fds[1]);
-	r->src = wl_event_loop_add_fd(s->loop, r->fd, WL_EVENT_READABLE, on_clip_read, r);
-	r->timer = wl_event_loop_add_timer(s->loop, on_clip_read_timeout, r);
+	r->fd = -1;
+	clip_pick_wants(r, source);
 
-	if (!r->src || !r->timer) {
+	if (r->nwants == 0) {
 		clip_read_free(r);
 		return;
 	}
 
-	wl_event_source_timer_update(r->timer, format == CLIP_PNG ? CLIP_READ_IMAGE_TIMEOUT_MS : CLIP_READ_TIMEOUT_MS);
+	r->deadline = clip_now_ms() + CLIP_READ_TIMEOUT_MS;
 	s->clip_rd = r;
+	clip_read_next(r);
 }
 
 /* Applications ask to set the selection: always allowed, the host decides nothing about it. */
@@ -899,8 +1180,8 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 		if (w)
 			notify_axis(s, m);
 		break;
-	case H_CLIPBOARD:
-		host_set_clipboard(s, m->data, m->data_len, m->format);
+	case H_CLIPBOARD_ITEMS:
+		host_set_clipboard(s, m->data, m->data_len);
 		break;
 	case H_KEY: {
 		struct wlr_keyboard_key_event ev = {

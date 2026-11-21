@@ -1,6 +1,7 @@
 #include "wire.h"
 
 #include <stdlib.h>
+#include <strings.h>
 #include <string.h>
 
 static bool wbuf_reserve(struct wbuf *b, size_t extra) {
@@ -98,6 +99,52 @@ void wire_end(struct wbuf *b, size_t start) {
 }
 
 /* ---- parsing ---- */
+
+bool seamless_valid_mime(const char *s, size_t n) {
+	size_t slash = 0;
+
+	if (!s || n < 3 || n > SEAMLESS_MAX_MIME)
+		return false;
+
+	for (size_t i = 0; i < n; i++) {
+		unsigned char ch = (unsigned char)s[i];
+
+		if (ch < 0x21 || ch > 0x7E)
+			return false;
+
+		if (ch == '/') {
+			if (i == 0 || i == n - 1 || ++slash > 1)
+				return false;
+		}
+	}
+
+	return slash == 1;
+}
+
+void clip_iter_init(struct clip_iter *it, const uint8_t *payload, size_t n) {
+	it->p = payload + 2;
+	it->left = n - 2;
+	it->remaining = (uint16_t)(payload[0] | payload[1] << 8);
+}
+
+bool clip_iter_next(struct clip_iter *it, char *mime, const uint8_t **data, size_t *len) {
+	if (it->remaining == 0)
+		return false;
+
+	size_t mlen = (size_t)(it->p[0] | it->p[1] << 8);
+
+	memcpy(mime, it->p + 2, mlen);
+	mime[mlen] = 0;
+
+	const uint8_t *q = it->p + 2 + mlen;
+
+	*len = (size_t)q[0] | (size_t)q[1] << 8 | (size_t)q[2] << 16 | (size_t)q[3] << 24;
+	*data = q + 4;
+	it->p = q + 4 + *len;
+	it->remaining--;
+
+	return true;
+}
 
 struct rd {
 	const uint8_t *p;
@@ -197,28 +244,46 @@ int wire_parse_host(uint8_t type, const uint8_t *payload, size_t n, struct host_
 		out->code = rd_u32(&r);
 		out->flag = rd_u8(&r) != 0;
 		break;
-	case H_CLIPBOARD: {
-		uint8_t format = rd_u8(&r);
-		uint32_t length = rd_u32(&r);
+	case H_CLIPBOARD_ITEMS: {
+		/* At least one item, no more than SEAMLESS_MAX_CLIPBOARD_ITEMS, valid and distinct MIME types, data that adds
+		 * up to SEAMLESS_MAX_CLIPBOARD_TOTAL at most, and nothing left over. */
+		uint16_t count = rd_u16(&r);
+		uint64_t total = 0;
+		char seen[SEAMLESS_MAX_CLIPBOARD_ITEMS][SEAMLESS_MAX_MIME + 1];
 
-		/* Text up to SEAMLESS_MAX_CLIPBOARD, a PNG (it starts with the PNG signature) up to SEAMLESS_MAX_CLIPBOARD_IMAGE. */
-		if (format == CLIP_TEXT) {
-			if (length > SEAMLESS_MAX_CLIPBOARD)
-				r.bad = true;
-		} else if (format == CLIP_PNG) {
-			if (length < 8 || length > SEAMLESS_MAX_CLIPBOARD_IMAGE)
-				r.bad = true;
-		} else {
+		if (count == 0 || count > SEAMLESS_MAX_CLIPBOARD_ITEMS)
 			r.bad = true;
+
+		for (uint16_t k = 0; k < count && !r.bad; k++) {
+			uint16_t mlen = rd_u16(&r);
+			const uint8_t *mime = rd_take(&r, mlen);
+			uint32_t dlen;
+
+			if (r.bad || !seamless_valid_mime((const char *)mime, mlen)) {
+				r.bad = true;
+				break;
+			}
+
+			memcpy(seen[k], mime, mlen);
+			seen[k][mlen] = 0;
+
+			for (uint16_t q = 0; q < k; q++) {
+				if (strcasecmp(seen[q], seen[k]) == 0)
+					r.bad = true;
+			}
+
+			dlen = rd_u32(&r);
+			total += dlen;
+
+			if (dlen == 0 || total > SEAMLESS_MAX_CLIPBOARD_TOTAL)
+				r.bad = true;
+
+			rd_take(&r, dlen);
 		}
 
-		out->format = format;
-		out->data = rd_take(&r, length);
-
-		if (!r.bad && format == CLIP_PNG && memcmp(out->data, "\x89PNG\r\n\x1a\n", 8) != 0)
-			r.bad = true;
-
-		out->data_len = length;
+		out->data = payload;
+		out->data_len = n;
+		out->u32a = count;
 		break;
 	}
 	default:
