@@ -6,6 +6,9 @@ FROM alpine:3.24 AS build
 RUN apk add --no-cache file xkeyboard-config
 ARG SEAMLESSD_KEEP_SYMBOLS=0
 ENV SEAMLESSD_KEEP_SYMBOLS=$SEAMLESSD_KEEP_SYMBOLS
+# The version the compositor reports (--version, and what the agent reads out of it): the release of the agent.
+ARG SEAMLESSD_VERSION=dev
+ENV SEAMLESSD_VERSION=$SEAMLESSD_VERSION
 COPY scripts/build-seamlessd.sh /build-seamlessd.sh
 COPY seamlessd /src
 RUN /build-seamlessd.sh /src /caker-seamlessd

@@ -76,6 +76,7 @@ cakeagent service install --seamless --seamless-layout=fr ...
 cakeagent seamless install                      # write the embedded compositor to /usr/libexec/caker/
 cakeagent seamless run                          # foreground supervisor: starts it as the user, restarts it
 cakeagent seamless status [--json]              # installed? running? exit status 1 when it is not
+cakeagent seamless version [--json]             # compositor version: embedded, installed, running (exit status 1 when they differ)
 cakeagent seamless apps [--json]                # .desktop applications of the guest
 cakeagent seamless launch --desktop org.gnome.gedit
 cakeagent seamless launch -- foot               # any program, as the user, with WAYLAND_DISPLAY & co.

@@ -69,7 +69,8 @@ export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 )
 
 cp -R "$SRC" "$WORK/compositor"
-make -C "$WORK/compositor" STATIC=1
+# SEAMLESSD_VERSION is what `caker-seamlessd --version` and `cakeagent seamless version` report ("dev" when unset).
+make -C "$WORK/compositor" STATIC=1 VERSION="${SEAMLESSD_VERSION:-dev}"
 # SEAMLESSD_KEEP_SYMBOLS=1 keeps the symbols (a binary to debug with gdb); the one the agent embeds is stripped.
 if [ "${SEAMLESSD_KEEP_SYMBOLS:-0}" = 1 ]; then
 	cp "$WORK/compositor/caker-seamlessd" "$OUT"

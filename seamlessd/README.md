@@ -16,6 +16,11 @@ Needs wlroots 0.19 (Ubuntu 26.04 has it). `make STATIC=1` links everything stati
 `scripts/build-seamlessd.sh` in the repository root, which builds them on Alpine); that one binary is what the cakeagent ships. At run time the
 guest needs the XKB data files (`xkb-data` on Debian/Ubuntu, `xkeyboard-config` on Fedora/Alpine).
 
+`caker-seamlessd --version` prints the version and the protocol (`caker-seamlessd v1.0.335 (protocol 4)`). CI and `scripts/build-seamlessd.sh`
+set it to the release of the agent that embeds the compositor (`make VERSION=...`, `SEAMLESSD_VERSION` for the script and the Dockerfile); a build
+made by hand says `dev`. The version is a marker string in the binary, so `cakeagent seamless version` reads it out of the embedded, the
+installed and the running compositor (`/proc/<pid>/exe`) without starting any of them.
+
 ## Use
 
 The VM needs the vsock bridge to the host socket (`caked launch ... --socket connect://vsock:5100/<host socket path>`),

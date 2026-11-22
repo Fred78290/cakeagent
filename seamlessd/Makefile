@@ -9,6 +9,10 @@
 PKGS := wlroots-0.19 wayland-server xkbcommon pixman-1 liblz4 libdrm
 CFLAGS ?= -O2 -g
 
+# What `caker-seamlessd --version` and `cakeagent seamless version` report: the release of the agent that embeds the
+# compositor (v1.0.<commit count>), set by CI and scripts/build-seamlessd.sh. "dev" for a build made by hand.
+VERSION ?= dev
+
 # STATIC=1 links everything into one binary with no runtime dependencies (the agent embeds that one). It needs
 # static libraries: scripts/build-seamlessd.sh of this repository builds them on Alpine (musl). Switching
 # between `make` and `make STATIC=1` recompiles and relinks (see .mode below).
@@ -19,7 +23,7 @@ else
 PKGCONFIG := pkg-config
 endif
 
-override CFLAGS += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -DWLR_USE_UNSTABLE -I. $(shell $(PKGCONFIG) --cflags $(PKGS))
+override CFLAGS += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -DWLR_USE_UNSTABLE -DSEAMLESSD_VERSION='"$(VERSION)"' -I. $(shell $(PKGCONFIG) --cflags $(PKGS))
 override LDLIBS := $(shell $(PKGCONFIG) --libs $(PKGS)) -lm
 
 WL_PROTOCOLS := $(shell pkg-config --variable=pkgdatadir wayland-protocols)
@@ -30,7 +34,7 @@ PROTO_HEADERS := xdg-shell-protocol.h xdg-decoration-unstable-v1-protocol.h frac
 
 # The link mode changes the flags but not any file: record it, so that switching modes rebuilds instead of
 # reporting a binary built the other way as up to date.
-MODE := $(if $(STATIC),static,dynamic)
+MODE := $(if $(STATIC),static,dynamic) $(VERSION)
 
 .DEFAULT_GOAL := all
 
