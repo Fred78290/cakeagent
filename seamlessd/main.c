@@ -122,7 +122,8 @@ struct server {
 	struct wlr_cursor_shape_manager_v1 *cursor_shape;
 	struct wlr_xdg_decoration_manager_v1 *decoration_manager;
 	struct wlr_xwayland *xwayland; /* NULL when the guest has no Xwayland: X11 applications then fail to connect */
-	struct wl_listener xwayland_new_surface;
+	struct wl_listener xwayland_new_surface, xwayland_ready;
+	bool xwayland_reannounce; /* the selection is being announced again to a freshly started Xwayland: not an application's change */
 	char x11_display_file[PATH_MAX];
 
 	struct wlr_keyboard keyboard;
@@ -1073,6 +1074,10 @@ static void clip_pick_wants(struct clip_read *r, struct wlr_data_source *source)
 static void on_set_selection(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, set_selection);
 	struct wlr_data_source *source = s->seat->selection_source;
+
+	/* The selection did not change: it is only announced again to an Xwayland that has just started (see on_xwayland_ready). */
+	if (s->xwayland_reannounce)
+		return;
 
 	if (s->clip_rd)
 		clip_read_free(s->clip_rd);
@@ -2142,6 +2147,24 @@ static void on_xw_request_configure(struct wl_listener *l, void *data) {
 		wlr_xwayland_surface_configure(w->xw, 0, 0, ev->width, ev->height);
 }
 
+/*
+ * Xwayland runs only while an X11 client does (it is started when one connects and stops a few seconds after the last one
+ * leaves), and its window manager only exports a selection when it is told the selection changed: one set before it
+ * started (the host's clipboard, or a Wayland application's) is never seen by the X11 application that caused it to start,
+ * so a paste in it finds nothing until the next copy. Telling the seat's listeners again, now that the window manager
+ * listens, makes it export the current selection.
+ */
+static void on_xwayland_ready(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, xwayland_ready);
+
+	if (!s->seat->selection_source)
+		return;
+
+	s->xwayland_reannounce = true;
+	wl_signal_emit_mutable(&s->seat->events.set_selection, s->seat);
+	s->xwayland_reannounce = false;
+}
+
 static void on_xwayland_new_surface(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, xwayland_new_surface);
 	struct wlr_xwayland_surface *xw = data;
@@ -2236,6 +2259,8 @@ static void xwayland_init(struct server *s, const char *sock) {
 		} else {
 			s->xwayland_new_surface.notify = on_xwayland_new_surface;
 			wl_signal_add(&s->xwayland->events.new_surface, &s->xwayland_new_surface);
+			s->xwayland_ready.notify = on_xwayland_ready;
+			wl_signal_add(&s->xwayland->events.ready, &s->xwayland_ready);
 			wlr_xwayland_set_seat(s->xwayland, s->seat);
 			setenv("DISPLAY", s->xwayland->display_name, 1);
 			display_name = s->xwayland->display_name;
@@ -2616,6 +2641,7 @@ int main(int argc, char **argv) {
 
 	if (s->xwayland) {
 		wl_list_remove(&s->xwayland_new_surface.link);
+		wl_list_remove(&s->xwayland_ready.link);
 		wlr_xwayland_destroy(s->xwayland);
 		s->xwayland = NULL;
 	}
