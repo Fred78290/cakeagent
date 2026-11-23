@@ -58,11 +58,16 @@ const (
 	// does not know them: the host would close the whole session on one it cannot decode.
 	clipboardVersion = 3
 	// clipboardItemsVersion is the first protocol version whose clipboard is a list of MIME typed items (0x0A / 0x8D);
-	// the text message of version 3 is not spoken on it, a link has one version.
+	// the text message of version 3 is not spoken on it.
 	clipboardItemsVersion = 4
-	// keyboardLayoutVersion is the first protocol version with hKeyboardLayout. maxLayout mirrors SEAMLESS_MAX_LAYOUT.
+	// keyboardLayoutVersion is the first protocol version with hKeyboardLayout.
 	keyboardLayoutVersion = 5
-	maxLayout             = 32
+	// maxLayout mirrors SEAMLESS_MAX_LAYOUT: the longest XKB layout name of hKeyboardLayout.
+	maxLayout = 32
+	// fallbackVersion is the oldest protocol version a compositor of this agent still talks: 4 and 5 differ only by the host's
+	// keyboardLayout message, which a link on 4 simply does not carry. A host that refuses the compositor's version (Caker
+	// closes the connection on a hello it does not know) is tried with the previous one down to it.
+	fallbackVersion = clipboardItemsVersion
 
 	// frameBudget is how much memory the frames being read from the compositors may take all together. It must hold
 	// a frame of maxGuestFrame, so that a complete large frame is still accepted when nothing else is in flight.
@@ -516,6 +521,8 @@ type hubPeer struct {
 	account Account
 	conn    net.Conn
 	link    *hubLink
+	// version is what the compositor and the host both speak: the lower of the two. Messages a version does not know are not sent.
+	version uint16
 	// out holds the messages for the compositor, in order; writeLoop sends them.
 	out chan []byte
 	// windows are the compositor's own window ids still alive, guarded by winMu: the reader goroutine maintains it and
@@ -852,7 +859,7 @@ func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, versio
 			// before it), and is not revisited before the write. Revalidating would not order anything better: holding mu
 			// across link.write would stall the host reader behind a slow write, and a message already on the wire to the
 			// host cannot be recalled when the focus moves. Admission time is the contract.
-			if err = checkClipboardFrame(frame[4], frame[5:], peer.link.version); err == nil {
+			if err = checkClipboardFrame(frame[4], frame[5:], peer.version); err == nil {
 				budget.release(reserved)
 
 				continue
@@ -1047,11 +1054,15 @@ func (h *Hub) attach(conn net.Conn, account Account, version uint16, name string
 			return nil, err
 		}
 
-		if link.version != version {
+		// The link speaks what the first compositor asked for, or less when the host refused it, and a compositor of another
+		// generation may join it: both talk the lower of the two, provided it is one this agent still speaks.
+		peerVersion := min(version, link.version)
+
+		if link.version != version && peerVersion < fallbackVersion {
 			return nil, fmt.Errorf("protocol version %d, the host connection speaks %d", version, link.version)
 		}
 
-		peer, err := h.claimSlot(conn, account, link)
+		peer, err := h.claimSlot(conn, account, link, peerVersion)
 
 		if errors.Is(err, errStaleLink) {
 			continue
@@ -1066,7 +1077,7 @@ func (h *Hub) attach(conn net.Conn, account Account, version uint16, name string
 var errStaleLink = errors.New("the host connection ended while the compositor was attaching")
 
 // claimSlot puts the compositor in a slot of link, provided link is still the host connection.
-func (h *Hub) claimSlot(conn net.Conn, account Account, link *hubLink) (*hubPeer, error) {
+func (h *Hub) claimSlot(conn net.Conn, account Account, link *hubLink, version uint16) (*hubPeer, error) {
 	h.mu.Lock()
 
 	if h.closing {
@@ -1094,15 +1105,16 @@ func (h *Hub) claimSlot(conn net.Conn, account Account, link *hubLink) (*hubPeer
 		slot := (h.lastSlot+i)%maxSlot + 1
 
 		if h.peers[slot] == nil {
-			peer = &hubPeer{slot: slot, account: account, conn: conn, link: link, windows: map[uint32]struct{}{}, done: make(chan struct{}), out: make(chan []byte, peerQueueLen)}
+			peer = &hubPeer{slot: slot, account: account, conn: conn, link: link, version: version, windows: map[uint32]struct{}{}, done: make(chan struct{}), out: make(chan []byte, peerQueueLen)}
 
 			// First in the queue, before the host can route anything to the compositor. The scale is read under mu, as
 			// routeHost stores it and lists the receivers under mu: a concurrent output change either comes after this
 			// registration (and is queued behind the acknowledgement) or is already part of the scale read here.
-			peer.out <- buildHelloAck(link.version, link.currentScale())
+			peer.out <- buildHelloAck(version, link.currentScale())
 
-			// The host's keyboard layout, stored and listed under mu like the scale, comes right after it.
-			if layout := link.currentLayout(); layout != nil {
+			// The host's keyboard layout, stored and listed under mu like the scale, comes right after it (for a compositor
+			// that knows the message).
+			if layout := link.currentLayout(); layout != nil && version >= keyboardLayoutVersion {
 				peer.out <- layout
 			}
 
@@ -1144,85 +1156,29 @@ func (h *Hub) ensureLink(version uint16, name string) (*hubLink, error) {
 		return link, nil
 	}
 
-	// Dial cannot be interrupted, so it runs on the side: at shutdown its late connection is closed unused.
-	type dialed struct {
-		conn net.Conn
-		err  error
-	}
-
-	result := make(chan dialed, 1)
-
-	go func() {
-		c, e := h.Dial()
-
-		result <- dialed{c, e}
-	}()
-
-	var conn net.Conn
-
-	select {
-	case d := <-result:
-		if d.err != nil {
-			return nil, fmt.Errorf("cannot reach the host: %w", d.err)
-		}
-
-		conn = d.conn
-	case <-stop:
-		go func() {
-			if d := <-result; d.conn != nil {
-				d.conn.Close()
-			}
-		}()
-
-		return nil, net.ErrClosed
-	}
-
-	// Shutdown during the handshake closes the connection, which fails the exchange below.
-	handshaking := make(chan struct{})
-
-	defer close(handshaking)
-
-	go func() {
-		select {
-		case <-stop:
-			conn.Close()
-		case <-handshaking:
-		}
-	}()
-
-	_ = conn.SetDeadline(time.Now().Add(hubHandshakeTimeout))
-
-	link = &hubLink{conn: conn, reader: bufio.NewReaderSize(conn, 64*1024)}
-
 	var err error
 
-	if _, err = conn.Write(buildHello(version, name)); err != nil {
-		conn.Close()
+	// A host that does not know the version closes the connection on the hello: the previous version is tried, down to
+	// fallbackVersion. A host that is not there, or that answers with another version, is no reason to try again.
+	for {
+		var refused bool
 
-		return nil, err
+		link, refused, err = h.handshake(version, name, stop)
+
+		if err == nil {
+			break
+		}
+
+		if !refused || version <= fallbackVersion {
+			return nil, err
+		}
+
+		glog.Infof("seamless hub: the host refused protocol %d, trying %d", version, version-1)
+
+		version--
 	}
 
-	ack, err := readFrame(link.reader, maxHostFrame)
-
-	if err != nil {
-		conn.Close()
-
-		return nil, fmt.Errorf("host hello: %w", err)
-	}
-
-	if link.version, link.scale, err = parseHelloAck(ack); err != nil {
-		conn.Close()
-
-		return nil, err
-	}
-
-	// A host that answers with another version is of no use to the compositor that asked: the connection is dropped
-	// here, before it is published, rather than kept as a host session with nobody attached to it.
-	if link.version != version {
-		conn.Close()
-
-		return nil, fmt.Errorf("protocol version %d, the host speaks %d", version, link.version)
-	}
+	conn := link.conn
 
 	_ = conn.SetDeadline(time.Time{})
 
@@ -1249,6 +1205,100 @@ func (h *Hub) ensureLink(version uint16, name string) (*hubLink, error) {
 	glog.Infof("seamless hub: connected to the host (protocol %d)", link.version)
 
 	return link, nil
+}
+
+// handshake connects to the host and makes the hello exchange for one protocol version. refused is true when the host was
+// reached and closed the connection (or sent nothing) after the hello, which is how a host that does not know the version
+// answers. It is called with linkMu held.
+func (h *Hub) handshake(version uint16, name string, stop <-chan struct{}) (link *hubLink, refused bool, err error) {
+	// Dial cannot be interrupted, so it runs on the side: at shutdown its late connection is closed unused.
+	type dialed struct {
+		conn net.Conn
+		err  error
+	}
+
+	result := make(chan dialed, 1)
+
+	go func() {
+		c, e := h.Dial()
+
+		result <- dialed{c, e}
+	}()
+
+	var conn net.Conn
+
+	select {
+	case d := <-result:
+		if d.err != nil {
+			return nil, false, fmt.Errorf("cannot reach the host: %w", d.err)
+		}
+
+		conn = d.conn
+	case <-stop:
+		go func() {
+			if d := <-result; d.conn != nil {
+				d.conn.Close()
+			}
+		}()
+
+		return nil, false, net.ErrClosed
+	}
+
+	// Shutdown during the handshake closes the connection, which fails the exchange below.
+	handshaking := make(chan struct{})
+
+	defer close(handshaking)
+
+	go func() {
+		select {
+		case <-stop:
+			conn.Close()
+		case <-handshaking:
+		}
+	}()
+
+	_ = conn.SetDeadline(time.Now().Add(hubHandshakeTimeout))
+
+	link = &hubLink{conn: conn, reader: bufio.NewReaderSize(conn, 64*1024)}
+
+	if _, err = conn.Write(buildHello(version, name)); err != nil {
+		conn.Close()
+
+		return nil, false, err
+	}
+
+	ack, err := readFrame(link.reader, maxHostFrame)
+
+	if err != nil {
+		conn.Close()
+
+		select {
+		case <-stop:
+			return nil, false, net.ErrClosed
+		default:
+		}
+
+		// A timeout is a host that is slow or stuck, not one that does not know the version.
+		var timeout net.Error
+
+		return nil, !(errors.As(err, &timeout) && timeout.Timeout()), fmt.Errorf("host hello: %w", err)
+	}
+
+	if link.version, link.scale, err = parseHelloAck(ack); err != nil {
+		conn.Close()
+
+		return nil, false, err
+	}
+
+	// A host that answers with another version is of no use to the compositor that asked: the connection is dropped
+	// here, before it is published, rather than kept as a host session with nobody attached to it.
+	if link.version != version {
+		conn.Close()
+
+		return nil, false, fmt.Errorf("protocol version %d, the host speaks %d", version, link.version)
+	}
+
+	return link, false, nil
 }
 
 // drop forgets a compositor: its windows go from the host, and the connection to the host with the last one.
@@ -1386,12 +1436,12 @@ func (p *hubPeer) rewrite(frame []byte, prefix string) ([]byte, error) {
 	case gClipboard:
 		// u8 format (0: UTF-8 text) + u32 length + bytes, protocol 3 only. There is no window id: whose it is, is the
 		// hub's business.
-		if err := checkClipboardFrame(gClipboard, payload, p.link.version); err != nil {
+		if err := checkClipboardFrame(gClipboard, payload, p.version); err != nil {
 			return nil, err
 		}
 
 	case gClipboardItems:
-		if err := checkClipboardFrame(gClipboardItems, payload, p.link.version); err != nil {
+		if err := checkClipboardFrame(gClipboardItems, payload, p.version); err != nil {
 			return nil, err
 		}
 
@@ -1520,7 +1570,7 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 		var peers []*hubPeer
 
 		for _, p := range h.peers {
-			if p != nil && p.link == link {
+			if p != nil && p.link == link && p.version >= keyboardLayoutVersion {
 				peers = append(peers, p)
 			}
 		}

@@ -26,19 +26,26 @@ type fakeHost struct {
 	version  uint16
 	scale    uint32
 	received chan []byte
+	// maxVersion is the newest protocol the host knows: it closes the connection on a hello with a bigger version, like Caker
+	// does. 0 means any.
+	maxVersion uint16
 }
 
 type hubRig struct {
-	t         *testing.T
-	version   uint16
-	hub       *Hub
-	dir       string
-	hosts     chan *fakeHost
-	accounts  map[net.Conn]Account
-	nextUID   uint32
-	mu        sync.Mutex
-	cancel    context.CancelFunc
-	compSocks []string
+	t       *testing.T
+	version uint16
+	// hostMaxVersion makes the fake hosts refuse a newer hello (see fakeHost.maxVersion); ackVersion is what a compositor
+	// expects in its acknowledgement when that differs from version.
+	hostMaxVersion uint16
+	ackVersion     uint16
+	hub            *Hub
+	dir            string
+	hosts          chan *fakeHost
+	accounts       map[net.Conn]Account
+	nextUID        uint32
+	mu             sync.Mutex
+	cancel         context.CancelFunc
+	compSocks      []string
 }
 
 func newHubRig(t *testing.T) *hubRig {
@@ -61,7 +68,7 @@ func newHubRigVersion(t *testing.T, version uint16) *hubRig {
 
 			closeOnCleanup(t, hubSide, hostSide)
 
-			host := &fakeHost{t: t, conn: hostSide, reader: bufio.NewReader(hostSide), version: version, scale: 240, received: make(chan []byte, 64)}
+			host := &fakeHost{t: t, conn: hostSide, reader: bufio.NewReader(hostSide), version: version, scale: 240, received: make(chan []byte, 64), maxVersion: rig.hostMaxVersion}
 
 			go host.serve()
 
@@ -105,13 +112,29 @@ func (h *fakeHost) serve() {
 		return
 	}
 
-	if _, _, err = parseHello(frame); err != nil {
+	hello, _, err := parseHello(frame)
+
+	if err != nil {
 		h.t.Errorf("host got a bad hello: %v", err)
 
 		return
 	}
 
-	_, _ = h.conn.Write(buildHelloAck(h.version, h.scale))
+	// An older host does not know the version: it closes the connection without an acknowledgement.
+	if h.maxVersion != 0 && hello > h.maxVersion {
+		h.conn.Close()
+		close(h.received)
+
+		return
+	}
+
+	version := h.version
+
+	if h.maxVersion != 0 {
+		version = hello
+	}
+
+	_, _ = h.conn.Write(buildHelloAck(version, h.scale))
 
 	for {
 		frame, err = readFrame(h.reader, maxGuestFrame)
@@ -134,6 +157,19 @@ func (h *fakeHost) send(frame []byte) {
 func (r *hubRig) compositor(account Account) (net.Conn, *bufio.Reader) {
 	r.t.Helper()
 
+	want := r.version
+
+	if r.ackVersion != 0 {
+		want = r.ackVersion
+	}
+
+	return r.compositorAt(account, r.version, want)
+}
+
+// compositorAt is compositor for one that says hello with the given version and expects the acknowledgement to carry want.
+func (r *hubRig) compositorAt(account Account, hello, want uint16) (net.Conn, *bufio.Reader) {
+	r.t.Helper()
+
 	hubSide, compSide := net.Pipe()
 
 	closeOnCleanup(r.t, hubSide, compSide)
@@ -144,7 +180,7 @@ func (r *hubRig) compositor(account Account) (net.Conn, *bufio.Reader) {
 
 	go r.hub.handle(hubSide)
 
-	if _, err := compSide.Write(buildHello(r.version, "caker-seamlessd 0.1")); err != nil {
+	if _, err := compSide.Write(buildHello(hello, "caker-seamlessd 0.1")); err != nil {
 		r.t.Fatal(err)
 	}
 
@@ -160,7 +196,7 @@ func (r *hubRig) compositor(account Account) (net.Conn, *bufio.Reader) {
 
 	version, scale, err := parseHelloAck(ack)
 
-	if err != nil || version != r.version || scale != 240 {
+	if err != nil || version != want || scale != 240 {
 		r.t.Fatalf("bad acknowledgement: %d %d %v", version, scale, err)
 	}
 
@@ -1395,4 +1431,97 @@ func TestHubRefusesAKeyboardLayoutOnAnOlderProtocol(t *testing.T) {
 	host.send(layoutFrame("fr"))
 
 	expectClosed(t, aliceConn, aliceReader, "protocol 4 has no keyboard layout message")
+}
+
+func TestHubFallsBackToProtocol4ForAHostThatDoesNotKnow5(t *testing.T) {
+	rig := newHubRigVersion(t, keyboardLayoutVersion)
+
+	rig.hostMaxVersion = keyboardLayoutVersion - 1
+	rig.ackVersion = keyboardLayoutVersion - 1
+
+	// The compositor speaks 5, the host refuses it (the first connection is closed on the hello), the hub tries 4 and
+	// answers the compositor with what the link speaks.
+	aliceConn, aliceReader := rig.compositor(alice)
+
+	if refused := <-rig.hosts; refused.maxVersion == 0 {
+		t.Fatal("the first host connection must be the refusing one")
+	}
+
+	host := <-rig.hosts
+
+	if _, err := aliceConn.Write(createWindow(1, 0, "Terminal")); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := expect(t, host.received); got[4] != gWindowCreate {
+		t.Fatalf("the window must reach the host on protocol 4: %x", got)
+	}
+
+	// Everything of protocol 4 still flows.
+	host.send(buildFrame(hOutput, u32(360)))
+
+	if out := readOne(t, aliceConn, aliceReader); out[4] != hOutput {
+		t.Fatalf("output: %x", out)
+	}
+}
+
+func TestHubDoesNotFallBackWhenTheHostIsNotThere(t *testing.T) {
+	rig := newHubRigVersion(t, keyboardLayoutVersion)
+
+	dials := 0
+
+	rig.hub.Dial = func() (net.Conn, error) {
+		dials++
+
+		return nil, errors.New("no host")
+	}
+
+	hubSide, compSide := net.Pipe()
+
+	closeOnCleanup(t, hubSide, compSide)
+
+	rig.mu.Lock()
+	rig.accounts[hubSide] = alice
+	rig.mu.Unlock()
+
+	go rig.hub.handle(hubSide)
+
+	if _, err := compSide.Write(buildHello(keyboardLayoutVersion, "caker-seamlessd")); err != nil {
+		t.Fatal(err)
+	}
+
+	expectClosed(t, compSide, bufio.NewReader(compSide), "no host, no acknowledgement")
+
+	if dials != 1 {
+		t.Fatalf("a host that is not there must not make the hub retry with another version: %d dials", dials)
+	}
+}
+
+func TestHubTalksTheLowerVersionToACompositorOfAnotherGeneration(t *testing.T) {
+	rig := newHubRigVersion(t, keyboardLayoutVersion)
+
+	// alice speaks 5, the link is on 5.
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	host.send(layoutFrame("fr"))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hKeyboardLayout {
+		t.Fatalf("alice: %x", got)
+	}
+
+	// bob is a compositor of the previous generation on the same link: acknowledged with 4, never given the layout, not
+	// even the stored one.
+	bobConn, bobReader := rig.compositorAt(bob, keyboardLayoutVersion-1, keyboardLayoutVersion-1)
+
+	host.send(layoutFrame("de"))
+	host.send(buildFrame(hOutput, u32(360)))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hKeyboardLayout || !bytes.Equal(got[5:], str("de")) {
+		t.Fatalf("alice: %x", got)
+	}
+
+	if got := readOne(t, bobConn, bobReader); got[4] != hOutput {
+		t.Fatalf("a protocol 4 compositor must not be sent the layout: %x", got)
+	}
 }

@@ -10,8 +10,12 @@
 #include <stdint.h>
 
 #define SEAMLESS_VERSION 5
+/* The oldest version this compositor still talks. It says hello with SEAMLESS_VERSION and the agent's hub answers with what the
+ * host speaks, which is lower for a host that does not know 5 (the only difference is H_KEYBOARD_LAYOUT, which that host never
+ * sends). */
+#define SEAMLESS_MIN_VERSION 4
 /* First version whose clipboard is a list of MIME typed items (G_CLIPBOARD_ITEMS / H_CLIPBOARD_ITEMS). Version 3 had
- * a text only message (0x09 / 0x8C), which this side no longer speaks: a link has one version, exactly. */
+ * a text only message (0x09 / 0x8C), which this side no longer speaks: a link has one version, 4 or 5 (the hub negotiates it with the host). */
 #define SEAMLESS_CLIPBOARD_ITEMS_VERSION 4
 /* First version with H_KEYBOARD_LAYOUT: the host tells the guest the XKB layout of the keyboard that types into the windows. */
 #define SEAMLESS_KEYBOARD_LAYOUT_VERSION 5

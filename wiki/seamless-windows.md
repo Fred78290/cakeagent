@@ -15,7 +15,7 @@ cakeagent service install --seamless --seamless-layout=fr ...
 
 Avec Caker, c'est `caked build --seamless` pour une nouvelle VM, ou `caked configure <vm> --seamless true` puis une mise à jour de l'agent pour une VM existante.
 
-`--seamless-layout` est la disposition de départ du compositeur : les touches voyagent par position. Depuis le protocole 5, l'hôte envoie la disposition du clavier du Mac qui affiche les fenêtres (celui d'un `cakectl seamless` distant compris) dès la connexion et à chaque changement, et le compositeur l'applique aussitôt ; `--seamless-layout` ne sert plus que tant que l'hôte n'a rien dit (ou si sa disposition n'a pas d'équivalent XKB simple).
+`--seamless-layout` est la disposition de départ du compositeur : les touches voyagent par position. Depuis le protocole 5, l'hôte envoie la disposition du clavier du Mac qui affiche les fenêtres (celui d'un `cakectl seamless` distant compris) dès la connexion et à chaque changement, et le compositeur l'applique aussitôt ; `--seamless-layout` ne sert plus que tant que l'hôte n'a rien dit (ou si sa disposition n'a pas d'équivalent XKB simple). Un hôte plus ancien (protocole 4) reste pris en charge : le hub de l'agent retente avec le protocole 4 quand l'hôte refuse le 5, et `--seamless-layout` reste alors la disposition.
 
 ## Applications X11 (XWayland)
 
@@ -75,7 +75,7 @@ cakeagent service install --seamless --seamless-layout=fr ...
 
 With Caker that is `caked build --seamless` for a new VM, or `caked configure <vm> --seamless true` followed by an agent update for an existing one.
 
-`--seamless-layout` is the layout the compositor starts with: keys travel by position. Since protocol 5 the host sends the layout of the keyboard of the Mac that shows the windows (a remote `cakectl seamless` included) when it connects and whenever it changes, and the compositor applies it at once; `--seamless-layout` only matters until the host has said something (or when its layout has no plain XKB equivalent).
+`--seamless-layout` is the layout the compositor starts with: keys travel by position. Since protocol 5 the host sends the layout of the keyboard of the Mac that shows the windows (a remote `cakectl seamless` included) when it connects and whenever it changes, and the compositor applies it at once; `--seamless-layout` only matters until the host has said something (or when its layout has no plain XKB equivalent). An older host (protocol 4) is still supported: the agent's hub retries with protocol 4 when the host refuses 5, and `--seamless-layout` then stays the layout.
 
 ## X11 applications (XWayland)
 
