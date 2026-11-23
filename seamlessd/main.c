@@ -128,6 +128,7 @@ struct server {
 
 	struct wlr_keyboard keyboard;
 	struct xkb_context *xkb;
+	char kb_layout[SEAMLESS_MAX_LAYOUT + 1]; /* the XKB layout the keymap was last made with: empty is the one the compositor started with */
 
 	struct wl_list windows; /* announce order: parents before popups */
 	uint32_t next_id;
@@ -1132,6 +1133,58 @@ static void on_request_set_primary_selection(struct wl_listener *l, void *data) 
 	wlr_seat_set_primary_selection(s->seat, ev->source, ev->serial);
 }
 
+/* Makes the keymap of the virtual keyboard for the viewer's layout (empty: XKB_DEFAULT_LAYOUT & co. of the environment, which is
+ * what the agent set from --seamless-layout). Keys come by physical position, so the viewer's layout is what turns them into
+ * the characters the user typed. A layout the guest has no data for keeps the keymap in use. */
+static void apply_keyboard_layout(struct server *s, const char *layout) {
+	if (strcmp(s->kb_layout, layout) == 0)
+		return;
+
+	struct xkb_rule_names rules = {0};
+
+	if (layout[0])
+		rules.layout = layout;
+
+	struct xkb_keymap *keymap = xkb_keymap_new_from_names(s->xkb, &rules, XKB_KEYMAP_COMPILE_NO_FLAGS);
+
+	if (!keymap) {
+		wlr_log(WLR_ERROR, "no XKB keymap for the host's layout \"%s\", keeping the current one", layout);
+		return;
+	}
+
+	/* A new keymap comes with a fresh XKB state, which drops the locked modifiers (Caps Lock, Num Lock): they are looked up by name in
+	 * the keymap being replaced (kept alive until then) and locked again in the new one, as modifier indices can differ between layouts. */
+	struct xkb_keymap *old_keymap = s->keyboard.keymap ? xkb_keymap_ref(s->keyboard.keymap) : NULL;
+	struct xkb_state *old_state = s->keyboard.xkb_state;
+	xkb_mod_mask_t locked = 0;
+
+	if (old_keymap && old_state) {
+		xkb_mod_index_t n = xkb_keymap_num_mods(old_keymap);
+
+		for (xkb_mod_index_t i = 0; i < n; i++) {
+			if (xkb_state_mod_index_is_active(old_state, i, XKB_STATE_MODS_LOCKED) > 0) {
+				xkb_mod_index_t j = xkb_keymap_mod_get_index(keymap, xkb_keymap_mod_get_name(old_keymap, i));
+
+				if (j != XKB_MOD_INVALID)
+					locked |= (xkb_mod_mask_t)1 << j;
+			}
+		}
+	}
+
+	wlr_keyboard_set_keymap(&s->keyboard, keymap);
+	xkb_keymap_unref(keymap);
+
+	if (old_keymap)
+		xkb_keymap_unref(old_keymap);
+
+	/* Goes through the keyboard's modifiers signal, so on_kb_modifiers tells the focused client. */
+	if (locked)
+		wlr_keyboard_notify_modifiers(&s->keyboard, 0, 0, locked, 0);
+
+	snprintf(s->kb_layout, sizeof(s->kb_layout), "%s", layout);
+	wlr_log(WLR_INFO, "keyboard layout: %s", layout[0] ? layout : "(default)");
+}
+
 static void handle_host_message(struct server *s, const struct host_msg *m) {
 	struct window *w = window_by_id(s, m->id);
 
@@ -1140,12 +1193,13 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 
 	switch (m->type) {
 	case H_HELLO_ACK:
-		if (m->version != SEAMLESS_VERSION) {
-			wlr_log(WLR_ERROR, "host speaks protocol %u, expected %u", m->version, SEAMLESS_VERSION);
+		if (m->version < SEAMLESS_MIN_VERSION || m->version > SEAMLESS_VERSION) {
+			wlr_log(WLR_ERROR, "host speaks protocol %u, expected %u to %u", m->version, SEAMLESS_MIN_VERSION, SEAMLESS_VERSION);
 			transport_close(s);
 			return;
 		}
 
+		wlr_log(WLR_INFO, "protocol %u with the host", m->version);
 		s->ready = true;
 		apply_scale(s, m->u32a);
 		announce_all(s);
@@ -1200,6 +1254,9 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 		break;
 	case H_CLIPBOARD_ITEMS:
 		host_set_clipboard(s, m->data, m->data_len);
+		break;
+	case H_KEYBOARD_LAYOUT:
+		apply_keyboard_layout(s, m->layout);
 		break;
 	case H_KEY: {
 		struct wlr_keyboard_key_event ev = {

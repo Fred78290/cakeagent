@@ -35,8 +35,19 @@ WAYLAND_DISPLAY=wayland-1 foot
 Options: `--connect vsock:PORT|unix:/path|tcp:host:port` (default `vsock:5100`; unix/tcp are for testing), `--socket NAME`,
 `-v`. It reconnects every second until the host is there, and re-announces its windows when the host comes back.
 
-Keyboard layout: the host sends physical keys (evdev codes), the guest's layout applies. Set `XKB_DEFAULT_LAYOUT` (and
-`_VARIANT`) to the host's.
+Keyboard layout: the host sends physical keys (evdev codes), the guest's layout turns them into characters. **Protocol 5**
+carries the layout of the keyboard that types into the windows: `H_KEYBOARD_LAYOUT` (`0x8E`, one string, an XKB layout name
+such as `fr`, lowercase letters, digits and underscores, 32 bytes at most), sent right after the acknowledgement and again
+whenever it changes, so the layout is that of the Mac that shows the windows (a `cakectl seamless` on another Mac included),
+not of the one that installed the agent. The compositor compiles a new keymap with it at once. An empty layout means "back
+to the one the compositor started with", which is what `XKB_DEFAULT_LAYOUT` (and `_VARIANT`, set from the agent's
+`--seamless-layout`) gives: that stays the default until the host says otherwise. The compositor says hello with protocol 5
+and accepts an acknowledgement of 4 or 5: the agent's hub tries the host with 5 and, when the host closes the connection on
+the hello (Caker before protocol 5 does), with 4, and answers the compositor with what the host speaks. On 4 the host sends no
+layout, so the compositor keeps the one from `--seamless-layout`: everything else is the same. (Only the hub does this: a
+compositor connected straight to a host, `--connect` on a unix or tcp socket, needs a host on 5.) A
+layout the guest has no XKB data for is refused and the keymap in use stays. The agent's hub gives the layout to every
+compositor, and to one that attaches later.
 
 `SEAMLESS_FORCE_FOCUS=1` gives keyboard focus to every new toplevel, for hosts that can't report window focus.
 
@@ -64,7 +75,7 @@ the focused user's compositor only, and takes a clipboard from the focused user'
 window has the focus). Xwayland itself only bridges a selection while one of its surfaces has the keyboard focus.
 
 **Protocol 3** (`G_CLIPBOARD` `0x09` / `H_CLIPBOARD` `0x8C`: `u8 format` (0, UTF-8 text) + `u32 length` + bytes, 1 MiB) is
-not spoken by this compositor: a link has one version, exactly, so a host older than the agent refuses it, as it did for
+not spoken by this compositor: the hub falls back no further than 4, so a host on 3 or older is refused, as it was for
 each earlier bump (Caker pins the agent it installs). The host still talks protocol 3 to an older agent. What the host does
 with the types (which MIME types map to pasteboard types, what is left out) is the host's business: Caker shares text,
 images and PDF.
