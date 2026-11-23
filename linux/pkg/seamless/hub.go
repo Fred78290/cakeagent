@@ -64,6 +64,9 @@ const (
 	keyboardLayoutVersion = 5
 	// maxLayout mirrors SEAMLESS_MAX_LAYOUT: the longest XKB layout name of hKeyboardLayout.
 	maxLayout = 32
+	// maxVersion is the newest protocol version this agent speaks: a compositor that says hello with a bigger one is refused
+	// before anything is attempted, which also bounds the fallback loop of ensureLink to maxVersion-fallbackVersion+1 handshakes.
+	maxVersion = keyboardLayoutVersion
 	// fallbackVersion is the oldest protocol version a compositor of this agent still talks: 4 and 5 differ only by the host's
 	// keyboardLayout message, which a link on 4 simply does not carry. A host that refuses the compositor's version (Caker
 	// closes the connection on a hello it does not know) is tried with the previous one down to it.
@@ -825,6 +828,11 @@ func (h *Hub) handle(conn net.Conn) {
 }
 
 func (h *Hub) serve(conn net.Conn, reader *bufio.Reader, account Account, version uint16, name string) error {
+	// The version comes from the compositor: checked before it decides how many times the hub dials the host, with linkMu held.
+	if version > maxVersion {
+		return fmt.Errorf("protocol version %d, the newest this agent speaks is %d", version, maxVersion)
+	}
+
 	peer, err := h.attach(conn, account, version, name)
 
 	if err != nil {

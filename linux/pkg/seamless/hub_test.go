@@ -1525,3 +1525,37 @@ func TestHubTalksTheLowerVersionToACompositorOfAnotherGeneration(t *testing.T) {
 		t.Fatalf("a protocol 4 compositor must not be sent the layout: %x", got)
 	}
 }
+
+func TestHubRefusesACompositorOfANewerProtocolWithoutDialingTheHost(t *testing.T) {
+	rig := newHubRigVersion(t, maxVersion)
+
+	dials := 0
+
+	rig.hub.Dial = func() (net.Conn, error) {
+		dials++
+
+		return nil, errors.New("must not be dialed")
+	}
+
+	for _, version := range []uint16{maxVersion + 1, 65535} {
+		hubSide, compSide := net.Pipe()
+
+		closeOnCleanup(t, hubSide, compSide)
+
+		rig.mu.Lock()
+		rig.accounts[hubSide] = alice
+		rig.mu.Unlock()
+
+		go rig.hub.handle(hubSide)
+
+		if _, err := compSide.Write(buildHello(version, "caker-seamlessd")); err != nil {
+			t.Fatal(err)
+		}
+
+		expectClosed(t, compSide, bufio.NewReader(compSide), "a protocol that does not exist yet")
+	}
+
+	if dials != 0 {
+		t.Fatalf("the host must not be dialed for a protocol this agent does not speak: %d dials", dials)
+	}
+}
