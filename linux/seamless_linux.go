@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Fred78290/cakeagent/pkg/seamless"
+	"github.com/Fred78290/cakeagent/version"
 	glog "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -138,10 +139,81 @@ var seamlessStatusCmd = &cobra.Command{
 			out, _ := json.MarshalIndent(st, "", "  ")
 			fmt.Println(string(out))
 		} else {
-			fmt.Printf("binary:   %s (installed: %t)\nuser:     %s\nruntime:  %s\ndisplay:  %s\nrunning:  %t\n", st.Binary, st.Installed, st.User, st.RuntimeDir, st.WaylandDisplay, st.Running)
+			fmt.Printf("binary:   %s (installed: %t)\nversion:  %s\nuser:     %s\nruntime:  %s\ndisplay:  %s\nrunning:  %t\n", st.Binary, st.Installed, st.Version, st.User, st.RuntimeDir, st.WaylandDisplay, st.Running)
 		}
 
 		if !st.Running {
+			os.Exit(1)
+		}
+	},
+}
+
+// seamlessVersionInfo is what "seamless version" reports: the compositor carried by this agent, the one installed and the
+// ones running, which differ after an agent was updated in place until the compositors are restarted.
+type seamlessVersionInfo struct {
+	Agent     string                       `json:"agent"`
+	Embedded  string                       `json:"embedded,omitempty"`
+	Installed string                       `json:"installed,omitempty"`
+	Binary    string                       `json:"binary"`
+	Running   []seamless.RunningCompositor `json:"running"`
+	UpToDate  bool                         `json:"upToDate"`
+}
+
+var seamlessVersionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show the version of the guest compositor (embedded, installed and running)",
+	Long: `Shows the version of caker-seamlessd: the one this agent carries, the one installed at the compositor path and
+the ones running (one per user). They are the release of the agent that built them (v1.0.<commit count>); "dev" is a build
+made by hand. A running compositor older than the installed one is restarted by "systemctl restart cakeagent".
+Exits with status 1 when what is installed or running is not the compositor the agent carries.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		info := seamlessVersionInfo{Agent: version.VERSION, Binary: binaryPath(), Running: seamless.RunningVersions()}
+
+		if v, ok := seamless.EmbeddedVersion(); ok {
+			info.Embedded = v
+		}
+
+		if v, err := seamless.InstalledVersion(info.Binary); err == nil {
+			info.Installed = v
+		}
+
+		// Without an embedded compositor (a development build of the agent) there is nothing to be up to date with.
+		info.UpToDate = info.Embedded == "" || (info.Installed == info.Embedded && func() bool {
+			for _, r := range info.Running {
+				if r.Version != info.Embedded {
+					return false
+				}
+			}
+
+			return true
+		}())
+
+		if jsonOutput {
+			out, _ := json.MarshalIndent(info, "", "  ")
+			fmt.Println(string(out))
+		} else {
+			show := func(label, v string) {
+				if v == "" {
+					v = "-"
+				}
+
+				fmt.Printf("%-11s%s\n", label, v)
+			}
+
+			show("agent:", info.Agent)
+			show("embedded:", info.Embedded)
+			show("installed:", info.Installed)
+
+			if len(info.Running) == 0 {
+				show("running:", "")
+			}
+
+			for _, r := range info.Running {
+				fmt.Printf("%-11s%s (pid %d, user %s)\n", "running:", r.Version, r.PID, r.User)
+			}
+		}
+
+		if !info.UpToDate {
 			os.Exit(1)
 		}
 	},
@@ -228,8 +300,9 @@ func init() {
 
 	seamlessLaunchCmd.Flags().StringVar(&seamlessLaunchDesktop, "desktop", "", "Launch the application with this desktop file ID")
 	seamlessStatusCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	seamlessVersionCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	seamlessAppsCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 
-	seamlessCmd.AddCommand(seamlessInstallCmd, seamlessRunCmd, seamlessStatusCmd, seamlessAppsCmd, seamlessEnvCmd, seamlessLaunchCmd)
+	seamlessCmd.AddCommand(seamlessInstallCmd, seamlessRunCmd, seamlessStatusCmd, seamlessAppsCmd, seamlessEnvCmd, seamlessLaunchCmd, seamlessVersionCmd)
 	rootCmd.AddCommand(seamlessCmd)
 }

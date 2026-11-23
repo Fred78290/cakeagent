@@ -268,12 +268,25 @@ static struct window *window_by_id(struct server *s, uint32_t id) {
 	return NULL;
 }
 
+/*
+ * The version of this build: the release of the agent that embeds it (v1.0.<commit count>), set by the build (make VERSION=...),
+ * "dev" for a build made by hand. The marker is read straight out of the binary by the agent (cakeagent seamless version), so
+ * the version of an embedded, an installed and a running compositor can be told without starting any of them: keep its form.
+ */
+#ifndef SEAMLESSD_VERSION
+#define SEAMLESSD_VERSION "dev"
+#endif
+
+#define SEAMLESSD_VERSION_MARKER "caker-seamlessd-version:"
+
+__attribute__((used)) static const char seamlessd_version_marker[] = SEAMLESSD_VERSION_MARKER SEAMLESSD_VERSION;
+
 static void send_hello(struct server *s) {
 	struct wbuf b = {0};
 	size_t st = wire_begin(&b, G_HELLO);
 
 	wbuf_u16(&b, SEAMLESS_VERSION);
-	wbuf_str(&b, "caker-seamlessd 0.1");
+	wbuf_str(&b, "caker-seamlessd " SEAMLESSD_VERSION);
 	wire_end(&b, st);
 	send_message(s, &b);
 	wbuf_free(&b);
@@ -2410,10 +2423,11 @@ static void on_new_decoration(struct wl_listener *l, void *data) {
 
 static void usage(const char *argv0) {
 	fprintf(stderr,
-		"usage: %s [--connect SPEC] [--socket NAME] [-v] [-- command args...]\n"
+		"usage: %s [--connect SPEC] [--socket NAME] [-v] [-V] [-- command args...]\n"
 		"  --connect SPEC  vsock:PORT (default vsock:%d), unix:/path or tcp:host:port\n"
 		"  --socket NAME   Wayland socket name (default: automatic)\n"
-		"  -v              verbose logging\n",
+		"  -v              verbose logging\n"
+		"  -V, --version   print the version and exit\n",
 		argv0, SEAMLESS_DEFAULT_VSOCK_PORT);
 }
 
@@ -2454,6 +2468,9 @@ int main(int argc, char **argv) {
 			connect_spec = argv[++i];
 		} else if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc) {
 			socket_name = argv[++i];
+		} else if (strcmp(argv[i], "-V") == 0 || strcmp(argv[i], "--version") == 0) {
+			printf("caker-seamlessd %s (protocol %d)\n", SEAMLESSD_VERSION, SEAMLESS_VERSION);
+			return 0;
 		} else if (strcmp(argv[i], "-v") == 0) {
 			level = WLR_DEBUG;
 		} else {

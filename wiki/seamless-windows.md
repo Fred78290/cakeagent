@@ -29,6 +29,7 @@ Le nom de l'affichage est écrit dans `$XDG_RUNTIME_DIR/<socket>.display` (par e
 cakeagent seamless install                      # écrit le compositeur embarqué dans /usr/libexec/caker/
 cakeagent seamless run                          # superviseur au premier plan : le lance en tant qu'utilisateur et le relance
 cakeagent seamless status [--json]              # installé ? en marche ? code de sortie 1 sinon
+cakeagent seamless version [--json]             # version du compositeur : embarqué, installé, en marche (code de sortie 1 s'ils diffèrent)
 cakeagent seamless apps [--json]                # applications .desktop de l'invité
 cakeagent seamless launch --desktop org.gnome.gedit
 cakeagent seamless launch -- foot               # n'importe quel programme, en tant qu'utilisateur, avec WAYLAND_DISPLAY & co.
@@ -88,6 +89,7 @@ The display name is written to `$XDG_RUNTIME_DIR/<socket>.display` (for example 
 cakeagent seamless install                      # write the embedded compositor to /usr/libexec/caker/
 cakeagent seamless run                          # foreground supervisor: starts it as the user, restarts it
 cakeagent seamless status [--json]              # installed? running? exit status 1 when it is not
+cakeagent seamless version [--json]             # compositor version: embedded, installed, running (exit status 1 when they differ)
 cakeagent seamless apps [--json]                # .desktop applications of the guest
 cakeagent seamless launch --desktop org.gnome.gedit
 cakeagent seamless launch -- foot               # any program, as the user, with WAYLAND_DISPLAY & co.

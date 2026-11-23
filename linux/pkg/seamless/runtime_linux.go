@@ -971,6 +971,7 @@ func LaunchDesktop(cfg Config, id string) (int, error) {
 type Status struct {
 	Binary         string `json:"binary"`
 	Installed      bool   `json:"installed"`
+	Version        string `json:"version,omitempty"`
 	User           string `json:"user,omitempty"`
 	RuntimeDir     string `json:"runtimeDir,omitempty"`
 	WaylandDisplay string `json:"waylandDisplay"`
@@ -984,6 +985,7 @@ func CurrentStatus(cfg Config) Status {
 
 	if _, err := os.Stat(cfg.Binary); err == nil {
 		st.Installed = true
+		st.Version, _ = InstalledVersion(cfg.Binary)
 	}
 
 	a, err := LookupAccount(cfg.User)

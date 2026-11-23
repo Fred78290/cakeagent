@@ -38,6 +38,7 @@ restorecon -v /usr/local/bin/cakeagent
 ## Les fenêtres seamless n'apparaissent pas
 
 - `cakeagent seamless status` : le compositeur est-il installé et en marche ? (code de sortie 1 sinon).
+- `cakeagent seamless version` : version du compositeur embarqué dans l'agent, de celui qui est installé et de ceux qui tournent (un par utilisateur). Un compositeur en marche plus ancien que celui qui est installé (agent mis à jour sur place) est relancé par `systemctl restart cakeagent`.
 - La disposition `--seamless-layout` doit correspondre au clavier de l'hôte, sinon les touches tapent autre chose.
 - Les applications doivent être lancées avec l'environnement du compositeur : `cakeagent seamless launch -- <programme>`, ou un shell ouvert par l'hôte sous l'utilisateur seamless.
 - Un hôte plus ancien ne connaît pas le défilement à la molette : la version du protocole est négociée à la baisse.
@@ -86,6 +87,7 @@ restorecon -v /usr/local/bin/cakeagent
 ## Seamless windows do not appear
 
 - `cakeagent seamless status`: is the compositor installed and running? (exit status 1 when it is not).
+- `cakeagent seamless version`: the version of the compositor the agent carries, of the installed one and of the ones running (one per user). A running compositor older than the installed one (agent updated in place) is restarted by `systemctl restart cakeagent`.
 - `--seamless-layout` must match the host's keyboard, otherwise keys type something else.
 - Applications must be started with the compositor's environment: `cakeagent seamless launch -- <program>`, or a shell the host opens as the seamless user.
 - An older host does not know mouse wheel scrolling: the protocol version is negotiated down.
