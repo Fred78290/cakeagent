@@ -1321,3 +1321,78 @@ func TestHubDropsTheHostClipboardOnceTheFocusIsLost(t *testing.T) {
 		t.Fatalf("no window has the focus, the clipboard goes nowhere: %x", got)
 	}
 }
+
+func layoutFrame(name string) []byte { return buildFrame(hKeyboardLayout, str(name)) }
+
+func TestHubGivesTheHostsKeyboardLayoutToEveryCompositorAndToLateOnes(t *testing.T) {
+	rig := newHubRigVersion(t, keyboardLayoutVersion)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+	bobConn, bobReader := rig.compositor(bob)
+
+	// Whatever the focus, the layout is that of the keyboard that types into the windows: both get it.
+	host.send(layoutFrame("fr"))
+
+	for name, c := range map[string]struct {
+		conn   net.Conn
+		reader *bufio.Reader
+	}{"alice": {aliceConn, aliceReader}, "bob": {bobConn, bobReader}} {
+		if got := readOne(t, c.conn, c.reader); got[4] != hKeyboardLayout || !bytes.Equal(got[5:], str("fr")) {
+			t.Fatalf("%s: %x", name, got)
+		}
+	}
+
+	// A compositor that comes later is told it right after its acknowledgement, before the host says anything else.
+	carolConn, carolReader := rig.compositor(Account{UID: 1002, Name: "carol"})
+
+	if got := readOne(t, carolConn, carolReader); got[4] != hKeyboardLayout || !bytes.Equal(got[5:], str("fr")) {
+		t.Fatalf("a late compositor must get the layout: %x", got)
+	}
+
+	// The empty layout (the compositor's own default) is a layout like another and replaces the last one.
+	host.send(layoutFrame(""))
+
+	if got := readOne(t, aliceConn, aliceReader); got[4] != hKeyboardLayout || !bytes.Equal(got[5:], str("")) {
+		t.Fatalf("alice: %x", got)
+	}
+}
+
+func TestHubRefusesAnInvalidKeyboardLayout(t *testing.T) {
+	for _, name := range []string{"FR", "1us", "us,fr", "fr(oss)", "../x", "us fr", "a-b", strings.Repeat("a", maxLayout+1)} {
+		if validLayout(str(name)) {
+			t.Errorf("%q must be refused", name)
+		}
+	}
+
+	for _, name := range []string{"", "us", "fr", "latam", "layout_2", strings.Repeat("a", maxLayout)} {
+		if !validLayout(str(name)) {
+			t.Errorf("%q must be accepted", name)
+		}
+	}
+
+	// Trailing bytes, and a length that does not match.
+	if validLayout(append(str("fr"), 0)) || validLayout([]byte{5, 0, 'f', 'r'}) || validLayout([]byte{1}) {
+		t.Error("a malformed payload must be refused")
+	}
+
+	rig := newHubRigVersion(t, keyboardLayoutVersion)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	host.send(layoutFrame("../etc"))
+
+	expectClosed(t, aliceConn, aliceReader, "an invalid layout must end the host connection")
+}
+
+func TestHubRefusesAKeyboardLayoutOnAnOlderProtocol(t *testing.T) {
+	rig := newHubRigVersion(t, keyboardLayoutVersion-1)
+
+	aliceConn, aliceReader := rig.compositor(alice)
+	host := <-rig.hosts
+
+	host.send(layoutFrame("fr"))
+
+	expectClosed(t, aliceConn, aliceReader, "protocol 4 has no keyboard layout message")
+}

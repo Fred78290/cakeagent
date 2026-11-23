@@ -43,7 +43,8 @@ type Config struct {
 	SocketName string
 	// Binary is the compositor path.
 	Binary string
-	// Layout is the XKB layout of the keyboard, which must match the host's (keys are sent by position).
+	// Layout is the XKB layout the compositor starts with. From protocol 5 the host sends the layout of its keyboard, which
+	// replaces it (keys are sent by position); before, it must match the host's.
 	Layout string
 	// ProfilePath is where the shell profile snippet is installed. Empty is DefaultProfilePath.
 	ProfilePath string

@@ -85,7 +85,7 @@ cakeagent seamless env                          # the environment applications n
 
 The agent runs as root but the compositor and the applications run as the user (Wayland clients, D-Bus and audio
 live in the user's runtime directory; `loginctl enable-linger` makes `/run/user/<uid>` exist without a login).
-`--seamless-layout` must match the host's keyboard layout: keys travel by position. A development build without the
+`--seamless-layout` is the layout the compositor starts with; from protocol 5 the host sends the layout of the keyboard that shows the windows, which replaces it. Keys travel by position. A development build without the
 embedded compositor installs the one named by `$CAKER_SEAMLESSD`, or found on `PATH`.
 
 ## Transports & addressing

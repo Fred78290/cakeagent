@@ -128,6 +128,7 @@ struct server {
 
 	struct wlr_keyboard keyboard;
 	struct xkb_context *xkb;
+	char kb_layout[SEAMLESS_MAX_LAYOUT + 1]; /* the XKB layout the keymap was last made with: empty is the one the compositor started with */
 
 	struct wl_list windows; /* announce order: parents before popups */
 	uint32_t next_id;
@@ -1132,6 +1133,31 @@ static void on_request_set_primary_selection(struct wl_listener *l, void *data) 
 	wlr_seat_set_primary_selection(s->seat, ev->source, ev->serial);
 }
 
+/* Makes the keymap of the virtual keyboard for the viewer's layout (empty: XKB_DEFAULT_LAYOUT & co. of the environment, which is
+ * what the agent set from --seamless-layout). Keys come by physical position, so the viewer's layout is what turns them into
+ * the characters the user typed. A layout the guest has no data for keeps the keymap in use. */
+static void apply_keyboard_layout(struct server *s, const char *layout) {
+	if (strcmp(s->kb_layout, layout) == 0)
+		return;
+
+	struct xkb_rule_names rules = {0};
+
+	if (layout[0])
+		rules.layout = layout;
+
+	struct xkb_keymap *keymap = xkb_keymap_new_from_names(s->xkb, &rules, XKB_KEYMAP_COMPILE_NO_FLAGS);
+
+	if (!keymap) {
+		wlr_log(WLR_ERROR, "no XKB keymap for the host's layout \"%s\", keeping the current one", layout);
+		return;
+	}
+
+	wlr_keyboard_set_keymap(&s->keyboard, keymap);
+	xkb_keymap_unref(keymap);
+	snprintf(s->kb_layout, sizeof(s->kb_layout), "%s", layout);
+	wlr_log(WLR_INFO, "keyboard layout: %s", layout[0] ? layout : "(default)");
+}
+
 static void handle_host_message(struct server *s, const struct host_msg *m) {
 	struct window *w = window_by_id(s, m->id);
 
@@ -1200,6 +1226,9 @@ static void handle_host_message(struct server *s, const struct host_msg *m) {
 		break;
 	case H_CLIPBOARD_ITEMS:
 		host_set_clipboard(s, m->data, m->data_len);
+		break;
+	case H_KEYBOARD_LAYOUT:
+		apply_keyboard_layout(s, m->layout);
 		break;
 	case H_KEY: {
 		struct wlr_keyboard_key_event ev = {

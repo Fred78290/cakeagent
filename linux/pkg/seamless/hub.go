@@ -60,6 +60,9 @@ const (
 	// clipboardItemsVersion is the first protocol version whose clipboard is a list of MIME typed items (0x0A / 0x8D);
 	// the text message of version 3 is not spoken on it, a link has one version.
 	clipboardItemsVersion = 4
+	// keyboardLayoutVersion is the first protocol version with hKeyboardLayout. maxLayout mirrors SEAMLESS_MAX_LAYOUT.
+	keyboardLayoutVersion = 5
+	maxLayout             = 32
 
 	// frameBudget is how much memory the frames being read from the compositors may take all together. It must hold
 	// a frame of maxGuestFrame, so that a complete large frame is still accepted when nothing else is in flight.
@@ -111,6 +114,7 @@ const (
 	hKey            = 0x8B
 	hClipboard      = 0x8C
 	hClipboardItems = 0x8D
+	hKeyboardLayout = 0x8E
 )
 
 var errShortMessage = errors.New("short message")
@@ -425,6 +429,9 @@ type hubLink struct {
 	version uint16
 	mu      sync.Mutex
 	scale   uint32
+	// layout is the last hKeyboardLayout frame of the host (nil when it sent none): a compositor that attaches later is
+	// given it too, right after its acknowledgement.
+	layout []byte
 }
 
 // write sends one frame to the host within a deadline. A write that fails or is cut short leaves the stream in the
@@ -456,6 +463,45 @@ func (l *hubLink) currentScale() uint32 {
 	defer l.mu.Unlock()
 
 	return l.scale
+}
+
+func (l *hubLink) currentLayout() []byte {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.layout
+}
+
+func (l *hubLink) setLayout(frame []byte) {
+	l.mu.Lock()
+	l.layout = frame
+	l.mu.Unlock()
+}
+
+// validLayout checks the payload of hKeyboardLayout: `u16 length` + an XKB layout name, nothing else after it.
+func validLayout(payload []byte) bool {
+	if len(payload) < 2 {
+		return false
+	}
+
+	n := int(binary.LittleEndian.Uint16(payload))
+
+	if n > maxLayout || len(payload) != 2+n {
+		return false
+	}
+
+	name := payload[2:]
+
+	for i, c := range name {
+		switch {
+		case c >= 'a' && c <= 'z':
+		case i > 0 && ((c >= '0' && c <= '9') || c == '_'):
+		default:
+			return false
+		}
+	}
+
+	return true
 }
 
 func (l *hubLink) setScale(scale uint32) {
@@ -1054,6 +1100,12 @@ func (h *Hub) claimSlot(conn net.Conn, account Account, link *hubLink) (*hubPeer
 			// routeHost stores it and lists the receivers under mu: a concurrent output change either comes after this
 			// registration (and is queued behind the acknowledgement) or is already part of the scale read here.
 			peer.out <- buildHelloAck(link.version, link.currentScale())
+
+			// The host's keyboard layout, stored and listed under mu like the scale, comes right after it.
+			if layout := link.currentLayout(); layout != nil {
+				peer.out <- layout
+			}
+
 			h.peers[slot] = peer
 			h.lastSlot = slot
 
@@ -1435,6 +1487,35 @@ func (h *Hub) routeHost(link *hubLink, frame []byte) error {
 		h.mu.Lock()
 
 		link.setScale(binary.LittleEndian.Uint32(payload))
+
+		var peers []*hubPeer
+
+		for _, p := range h.peers {
+			if p != nil && p.link == link {
+				peers = append(peers, p)
+			}
+		}
+
+		h.mu.Unlock()
+
+		for _, p := range peers {
+			p.write(frame)
+		}
+
+	case hKeyboardLayout:
+		if link.version < keyboardLayoutVersion {
+			return fmt.Errorf("keyboard layout message on protocol version %d", link.version)
+		}
+
+		if !validLayout(payload) {
+			return errors.New("invalid keyboard layout message")
+		}
+
+		// The layout belongs to the keyboard that types into the windows, whoever owns them: every compositor gets it. Stored
+		// and the receivers listed under one mu hold, for the same reason as the output scale above.
+		h.mu.Lock()
+
+		link.setLayout(append([]byte(nil), frame...))
 
 		var peers []*hubPeer
 

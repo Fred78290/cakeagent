@@ -294,7 +294,7 @@ func init() {
 	for _, c := range []*cobra.Command{serveCmd, serviceInstallCmd, seamlessCmd} {
 		c.PersistentFlags().StringVar(&cfg.SeamlessUser, "seamless-user", cfg.SeamlessUser, "User the windows and applications belong to (default: the first regular user)")
 		c.PersistentFlags().IntVar(&cfg.SeamlessPort, "seamless-port", cfg.SeamlessPort, "Host vsock port of the seamless windows channel (default 5100)")
-		c.PersistentFlags().StringVar(&cfg.SeamlessLayout, "seamless-layout", cfg.SeamlessLayout, "XKB keyboard layout, must match the host's")
+		c.PersistentFlags().StringVar(&cfg.SeamlessLayout, "seamless-layout", cfg.SeamlessLayout, "XKB keyboard layout the compositor starts with (from protocol 5 the host sends its own)")
 		c.PersistentFlags().StringVar(&cfg.SeamlessBinary, "seamless-binary", cfg.SeamlessBinary, "Compositor path (default "+seamless.DefaultBinary+")")
 	}
 

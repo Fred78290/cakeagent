@@ -121,6 +121,26 @@ bool seamless_valid_mime(const char *s, size_t n) {
 	return slash == 1;
 }
 
+bool seamless_valid_layout(const char *s, size_t n) {
+	if (n > SEAMLESS_MAX_LAYOUT)
+		return false;
+
+	if (n == 0)
+		return true;
+
+	if (!s || s[0] < 'a' || s[0] > 'z')
+		return false;
+
+	for (size_t i = 1; i < n; i++) {
+		char ch = s[i];
+
+		if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_'))
+			return false;
+	}
+
+	return true;
+}
+
 void clip_iter_init(struct clip_iter *it, const uint8_t *payload, size_t n) {
 	it->p = payload + 2;
 	it->left = n - 2;
@@ -244,6 +264,19 @@ int wire_parse_host(uint8_t type, const uint8_t *payload, size_t n, struct host_
 		out->code = rd_u32(&r);
 		out->flag = rd_u8(&r) != 0;
 		break;
+	case H_KEYBOARD_LAYOUT: {
+		uint16_t len = rd_u16(&r);
+		const uint8_t *name = rd_take(&r, len);
+
+		if (r.bad || !seamless_valid_layout((const char *)name, len)) {
+			r.bad = true;
+			break;
+		}
+
+		memcpy(out->layout, name, len);
+		out->layout[len] = 0;
+		break;
+	}
 	case H_CLIPBOARD_ITEMS: {
 		/* At least one item, no more than SEAMLESS_MAX_CLIPBOARD_ITEMS, valid and distinct MIME types, data that adds
 		 * up to SEAMLESS_MAX_CLIPBOARD_TOTAL at most, and nothing left over. */

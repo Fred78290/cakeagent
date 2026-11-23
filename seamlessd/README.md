@@ -35,8 +35,15 @@ WAYLAND_DISPLAY=wayland-1 foot
 Options: `--connect vsock:PORT|unix:/path|tcp:host:port` (default `vsock:5100`; unix/tcp are for testing), `--socket NAME`,
 `-v`. It reconnects every second until the host is there, and re-announces its windows when the host comes back.
 
-Keyboard layout: the host sends physical keys (evdev codes), the guest's layout applies. Set `XKB_DEFAULT_LAYOUT` (and
-`_VARIANT`) to the host's.
+Keyboard layout: the host sends physical keys (evdev codes), the guest's layout turns them into characters. **Protocol 5**
+carries the layout of the keyboard that types into the windows: `H_KEYBOARD_LAYOUT` (`0x8E`, one string, an XKB layout name
+such as `fr`, lowercase letters, digits and underscores, 32 bytes at most), sent right after the acknowledgement and again
+whenever it changes, so the layout is that of the Mac that shows the windows (a `cakectl seamless` on another Mac included),
+not of the one that installed the agent. The compositor compiles a new keymap with it at once. An empty layout means "back
+to the one the compositor started with", which is what `XKB_DEFAULT_LAYOUT` (and `_VARIANT`, set from the agent's
+`--seamless-layout`) gives: that stays the default until the host says otherwise, and for a host on protocol 4 forever. A
+layout the guest has no XKB data for is refused and the keymap in use stays. The agent's hub gives the layout to every
+compositor, and to one that attaches later.
 
 `SEAMLESS_FORCE_FOCUS=1` gives keyboard focus to every new toplevel, for hosts that can't report window focus.
 

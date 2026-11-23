@@ -88,7 +88,7 @@ restorecon -v /usr/local/bin/cakeagent
 
 - `cakeagent seamless status`: is the compositor installed and running? (exit status 1 when it is not).
 - `cakeagent seamless version`: the version of the compositor the agent carries, of the installed one and of the ones running (one per user). A running compositor older than the installed one (agent updated in place) is restarted by `systemctl restart cakeagent`.
-- `--seamless-layout` must match the host's keyboard, otherwise keys type something else.
+- Keys type something else than what was pressed: the guest's layout is not the keyboard's. A host on protocol 5 (Caker with this agent) sends its layout itself; with an older host `--seamless-layout` must match the keyboard. A layout without a plain XKB equivalent (Dvorak...) is not sent, and the compositor stays on `--seamless-layout`.
 - Applications must be started with the compositor's environment: `cakeagent seamless launch -- <program>`, or a shell the host opens as the seamless user.
 - An older host does not know mouse wheel scrolling: the protocol version is negotiated down.
 
