@@ -339,6 +339,13 @@ func (t *pseudoTTY) StdoutReader() *os.File {
 }
 
 func (t *pseudoTTY) StderrWriter() *os.File {
+	// On a terminal, stderr is the terminal, as in any real session. With a separate pipe a program that
+	// checks its descriptors (bash invoked as `sh` by `sudo -s`, which only goes interactive when both
+	// stdin and stderr are terminals) took the session for a script and never printed a prompt.
+	if t.pty != nil {
+		return t.pty
+	}
+
 	return t.stderr.output
 }
 
