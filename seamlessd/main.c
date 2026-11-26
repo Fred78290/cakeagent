@@ -169,6 +169,7 @@ static uint32_t now_msec(void) {
 
 static void transport_close(struct server *s);
 static void announce_all(struct server *s);
+static void mark_dirty(struct server *s, struct window *w);
 
 static void outq_clear(struct server *s) {
 	while (s->outq_head) {
@@ -1619,7 +1620,9 @@ static void announce_window(struct server *s, struct window *w) {
 	}
 
 	w->force_full = true;
-	w->dirty = true;
+	/* Through the frame timer: a window announced again when a host connects may never commit another buffer (an idle
+	 * terminal), and a dirty flag nobody flushes would leave it without a picture, so never shown on the host. */
+	mark_dirty(s, w);
 	send_hints(s, w);
 }
 
